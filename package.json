@@ -1,0 +1,35 @@
+{
+  "name": "whitebrick-cloud",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whitebrick/whitebrick-cloud.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/whitebrick/whitebrick-cloud/issues"
+  },
+  "homepage": "https://github.com/whitebrick/whitebrick-cloud#readme",
+  "dependencies": {
+    "apollo-server-lambda": "^2.22.2",
+    "graphql": "^15.5.0",
+    "pg": "^8.6.0",
+    "pg-format": "^1.0.4"
+  },
+  "devDependencies": {
+    "@types/pg": "^7.14.11",
+    "serverless-dotenv-plugin": "^3.9.0",
+    "serverless-offline": "^6.9.0",
+    "serverless-webpack": "^5.4.1",
+    "ts-loader": "^8.1.0",
+    "webpack": "^5.33.2",
+    "webpack-node-externals": "^2.5.2"
+  }
+}
