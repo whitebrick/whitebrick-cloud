@@ -8,8 +8,11 @@ import { DAL } from "./dal";
 const apolloServer = new ApolloServer({
   typeDefs,
   resolvers,
-  context: {
-    dal: (new DAL())
+  introspection: true,
+  context: function(){
+    return {
+      dal: (new DAL())
+    }
   }
 });
 

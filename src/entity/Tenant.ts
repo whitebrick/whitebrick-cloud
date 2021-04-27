@@ -1,14 +1,14 @@
 import { QueryResult } from "pg";
 
 export class Tenant {
-  id!: String;
-  name!: String;
-  label!: String;
+  id!: number;
+  name!: string;
+  label!: string;
   createdAt!: Date;
   updatedAt!: Date;
 
   public static parseResult(data: QueryResult | null) {
-    if (!data) throw new Error('parseTenantArray: input is null');
+    if (!data) throw new Error('Tenant.parseResult: input is null');
     const tenants = Array<Tenant>();
     data.rows.forEach((row: any) => {
       tenants.push(Tenant.parse(row));
@@ -17,7 +17,7 @@ export class Tenant {
   }
 
   public static parse(data: any): Tenant {
-    if (!data) throw new Error('tenantParser: input is null');
+    if (!data) throw new Error('Tenant.parse: input is null');
     const tenant = new Tenant();
     tenant.name = data.name;
     tenant.label = data.label;

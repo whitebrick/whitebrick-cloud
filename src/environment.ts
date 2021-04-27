@@ -21,4 +21,3 @@ export const environment: Environment = {
   dbPoolIdleTimeoutMillis: parseInt(process.env.DB_POOL_IDLE_TIMEOUT_MILLIS || '') as number,
   dbPoolConnectionTimeoutMillis: parseInt(process.env.DB_POOL_CONNECTION_TIMEOUT_MILLIS || '') as number,
 };
-
