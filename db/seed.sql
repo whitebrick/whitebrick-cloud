@@ -1,4 +1,4 @@
 INSERT INTO wb.roles(name) VALUES
-  ('TENANT_USER'),
-  ('TENANT_ADMIN')
+  ('Organization User'),
+  ('Organization Admin')
 ON CONFLICT DO NOTHING;

@@ -35,12 +35,11 @@ export const typeDefs = gql`
     """
     Test
     """
-    wbResetTestData: Boolean
+    wbResetTestData: Boolean!
     """
     Tenants
     """
     wbCreateTenant(name: String!, label: String!): Tenant
-    wbUpdateTenant(id: ID!, name: String, label: String): Tenant
     wbUpdateTenant(id: ID!, name: String, label: String): Tenant
     wbAddUserToTenant(tenantName: String!, userEmail: String!, tenantRole: String!): User
     """

@@ -9,7 +9,7 @@ export class User {
   createdAt!: Date;
   updatedAt!: Date;
 
-  public static parseResult(data: QueryResult | null) {
+  public static parseResult(data: QueryResult | null): Array<User> {
     if (!data) throw new Error('User.parseResult: input is null');
     const users = Array<User>();
     data.rows.forEach((row: any) => {

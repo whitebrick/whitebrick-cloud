@@ -66,7 +66,7 @@ export const resolvers: IResolvers = {
 
     // Tenants
     wbCreateTenant: async (_, { name, label }, context) => {
-      const result = await context.dal.createTenant(name, label);
+      const result = await context.wbCloud.createTenant(name, label);
       if(!result.success){ throw new ApolloError(result.message, _, {ref: result.code}); }
       return result.payload;
     },

@@ -1,9 +1,11 @@
-import { environment } from './environment';
+import { environment } from "./environment";
 import { log } from "./wb-cloud";
-import { Pool } from 'pg';
-import { Tenant } from './entity/Tenant';
-import { User } from './entity/User';
-import { ServiceResult } from './service-result';
+import { Pool } from "pg";
+import { Tenant } from "./entity/Tenant";
+import { User } from "./entity/User";
+import { Role } from "./entity/Role";
+import { ServiceResult } from "./service-result";
+
 
 export class DAL {
 
@@ -42,7 +44,7 @@ export class DAL {
     } finally {
       client.release();
     }
-    return result
+    return result;
   }
 
   
@@ -51,7 +53,7 @@ export class DAL {
    */
 
   public async tenants() {
-    const query = "SELECT * FROM tenants";
+    const query = "SELECT * FROM wb.tenants";
     const params: any = [];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = Tenant.parseResult(result.payload);
@@ -59,7 +61,7 @@ export class DAL {
   }
 
   public async tenantById(id: number) {
-    const query = "SELECT * FROM tenants WHERE id=$1 LIMIT 1";
+    const query = "SELECT * FROM wb.tenants WHERE id=$1 LIMIT 1";
     const params: any = [id];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = Tenant.parseResult(result.payload)[0];
@@ -67,7 +69,7 @@ export class DAL {
   }
 
   public async tenantByName(name: string) {
-    const query = "SELECT * FROM tenants WHERE name=$1 LIMIT 1";
+    const query = "SELECT * FROM wb.tenants WHERE name=$1 LIMIT 1";
     const params: any = [name];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = Tenant.parseResult(result.payload)[0];
@@ -75,38 +77,65 @@ export class DAL {
   }
 
   public async createTenant(name: string, label: string) {
-    const query = "INSERT INTO tenants(name, label, created_at, updated_at) VALUES($1, $2, $3, $4) RETURNING *";
+    const query = "INSERT INTO wb.tenants(name, label, created_at, updated_at) VALUES($1, $2, $3, $4) RETURNING *";
     const params: any = [name, label, new Date(), new Date()];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = Tenant.parseResult(result.payload)[0];
     return result;
   }
 
-  public async updateTenant(id: number, name: string, label: string) {
-    let query = "UPDATE tenants SET ";
-    if (name != null)   query += ("name='" + name + "', ");
-    if (label != null)  query += ("label='" + label + "', ");
+  public async updateTenant(id: number, name: string|null, label: string|null) {
+    if(name == null && label == null) return {success: false, message: "updateTenant: all parameters are null"}
+    let paramCount = 3;
+    let params: any = [new Date(), id];
+    let query = "UPDATE wb.tenants SET ";
+    if (name  != null)  query += (`name=$${paramCount}, `);  params.push(name);   paramCount++; 
+    if (label != null)  query += (`label=$${paramCount}, `); params.push(label);  paramCount++; 
     query += ("updated_at=$1 WHERE id=$2 RETURNING *");
-    const params: any = [new Date(), id];
     const result = await this.executeQuery(query, params);
-    if(result.success) result.payload = Tenant.parseResult(result.payload)[0];
+    if(result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
 
+  public async deleteTestTenants() {
+    const tenantUsersQuery = "DELETE FROM wb.tenant_users WHERE tenant_id IN (SELECT id FROM wb.tenants WHERE name like 'test_tenant_%')";
+    const tenantsQuery = "DELETE FROM wb.tenants WHERE name like 'test_tenant_%'";
+    const params: any = [];
+    var result = await this.executeQuery(tenantUsersQuery, params);
+    if(!result.success) return result;
+    result = await this.executeQuery(tenantsQuery, params);
+    if(!result.success) return result;
+    return result;
+  }
+
+
+  /**
+   * Tenant-Users 
+   */
+
   public async addUserToTenant(tenantId: number, userId: number, tenantRoleId: number) {
-    const query = "INSERT INTO tenant_users(tenant_id, user_id, role_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5)";
+    const query = "INSERT INTO wb.tenant_users(tenant_id, user_id, role_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5)";
     const params: any = [tenantId, userId, tenantRoleId, new Date(), new Date()];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = Tenant.parseResult(result.payload)[0];
     return result;
   }
 
+  public async removeUserFromTenant(tenantId: number, userId: number, tenantRoleId: number|null) {
+    var query = "DELETE FROM wb.tenant_users WHERE tenant_id=$1 AND user_id=$2";
+    var params: any = [tenantId, userId];
+    if(tenantRoleId) query += (" AND role_id=$3"); params.push(tenantRoleId);
+    const result = await this.executeQuery(query, params);
+    return result;
+  }
+
+
   /**
    * Users 
    */
 
   public async usersByTenantId(tenantId: number) {
-    const query = "SELECT * FROM users WHERE tenant_id=$1";
+    const query = "SELECT * FROM wb.users WHERE tenant_id=$1";
     const params: any = [tenantId];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload);
@@ -114,46 +143,63 @@ export class DAL {
   }
 
   public async userById(id: number) {
-    const query = "SELECT * FROM users WHERE id=$1 LIMIT 1";
+    const query = "SELECT * FROM wb.users WHERE id=$1 LIMIT 1";
     const params: any = [id];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
 
-  public async userByEmail(name: string) {
-    const query = "SELECT * FROM users WHERE email=$1 LIMIT 1";
-    const params: any = [name];
+  public async userByEmail(email: string) {
+    const query = "SELECT * FROM wb.users WHERE email=$1 LIMIT 1";
+    const params: any = [email];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
 
-  public async createUser(email: string, firstName: string|null, lastName: string|null) {
-    const query = "INSERT INTO users(email, first_name, last_name, created_at, updated_at) VALUES($1, $2, $3, $4, $5) RETURNING *";
+  public async createUser(email: string, firstName: string, lastName: string) {
+    const query = "INSERT INTO wb.users(email, first_name, last_name, created_at, updated_at) VALUES($1, $2, $3, $4, $5) RETURNING *";
     const params: any = [email, firstName, lastName, new Date(), new Date()];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
 
-  public async updateUser(id: number, email: string, firstName: string, lastName: string) {
-    let query = "UPDATE users SET ";
-    if (email != null)      query += ("email='" + email + "', ");
-    if (firstName != null)  query += ("first_name='" + firstName + "', ");
-    if (lastName != null)   query += ("last_name='" + lastName + "', ");
+  public async updateUser(id: number, email: string|null, firstName: string|null, lastName: string|null) {
+    if(email == null && firstName == null && lastName == null) return {success: false, message: "updateUser: all parameters are null"}
+    let paramCount = 3;
+    let params: any = [new Date(), id];
+    let query = "UPDATE wb.users SET ";
+    if (email     != null)  query += (`email=$${paramCount}, `);      params.push(email);     paramCount++; 
+    if (firstName != null)  query += (`first_name=$${paramCount}, `); params.push(firstName); paramCount++; 
+    if (lastName  != null)  query += (`last_name=$${paramCount}, `);  params.push(lastName);  paramCount++; 
     query += ("updated_at=$1 WHERE id=$2 RETURNING *");
-    const params: any = [new Date(), id];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
 
   public async deleteTestUsers() {
-    const query = "DELETE FROM users WHERE email like '%example.com'";
+    const query = "DELETE FROM wb.users WHERE email like 'test_user_%example.com'";
     const params: any = [];
     const result = await this.executeQuery(query, params);
     return result;
   }
+
+
+  /**
+   * Roles 
+   */
+
+  public async roleByName(name: string) {
+    const query = "SELECT * FROM wb.roles WHERE name=$1 LIMIT 1";
+    const params: any = [name];
+    const result = await this.executeQuery(query, params);
+    if(result.success) result.payload = Role.parseResult(result.payload)[0];
+    return result;
+  }
+
+
 
 };

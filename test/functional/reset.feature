@@ -8,7 +8,7 @@ Feature:
   Scenario: Reset test data
     Given text query = 
     """
-    mutation MyMutation {
+    mutation reset {
       wbResetTestData
     }
     """

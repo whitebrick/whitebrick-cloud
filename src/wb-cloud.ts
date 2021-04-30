@@ -1,9 +1,8 @@
-import { ApolloServer } from 'apollo-server-lambda';
-import { resolvers } from './resolvers';
-import { typeDefs } from './type-defs';
+import { ApolloServer } from "apollo-server-lambda";
+import { resolvers } from "./resolvers";
+import { typeDefs } from "./type-defs";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
-import { User } from './entity/User';
 
 export const graphqlHandler = new ApolloServer({
   typeDefs,
@@ -25,31 +24,93 @@ class WbCloud {
   dal = new DAL();
 
   public async resetTestData() {
-    log.debug(`wbCloud.resetTestData()`)
-    const result = await this.dal.deleteTestUsers();
-    return result
+    var result = await this.dal.deleteTestTenants();
+    if(!result.success) return result;
+    result = await this.dal.deleteTestUsers();
+    if(!result.success) return result;
+    return result;
+  }
+
+  
+  /**
+   * Tenants 
+   */
+
+  public async tenants() {
+    return this.dal.tenants();
+  }
+
+  public async tenantById(id: number) {
+    return this.dal.tenantById(id);
+  }
+
+  public async tenantByName(name: string) {
+    return this.dal.tenantByName(name);
+  }
+
+  public async createTenant(name: string, label: string) {
+    return this.dal.createTenant(name, label);
+  }
+
+  public async updateTenant(id: number, name: string, label: string) {
+    return this.dal.updateTenant(id, name, label);
+  }
+
+  public async deleteTestTenants() {
+    return this.dal.deleteTestTenants();
   }
 
 
-  public async createUser(email: string, firstName: string, lastName: string) {
-    log.debug(`wbCloud.createUser ${email}`)
-    // TBD: authentication, save password
-    const result = await this.dal.createUser(email, firstName, lastName);
-    return result
-  }
+  /**
+   * Tenant-User-Roles
+   */
 
   public async addUserToTenant(tenantName: string, userEmail: string, tenantRole: string) {
-    log.debug(`wbCloud.addUserToTenant ${tenantName} ${userEmail} ${tenantRole}`)
+    log.debug(`wbCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`);
     const userResult = await this.dal.userByEmail(userEmail);
-    if(!userResult.success) return userResult
+    if(!userResult.success) return userResult;
     const tenantResult = await this.dal.tenantByName(tenantName);
-    if(!tenantResult.success) return tenantResult
+    if(!tenantResult.success) return tenantResult;
     const roleResult = await this.dal.roleByName(tenantRole);
-    const result = await this.dal.addUserToTenant(tenantResult.payload.id, userResult.payload.id, tenantRole);
-    return result
+    if(!roleResult.success) return roleResult;
+    const result = await this.dal.addUserToTenant(tenantResult.payload.id, userResult.payload.id, roleResult.payload.id);
+    if(!result.success) return result;
+    return userResult;
   }
 
 
+  /**
+   * Users 
+   */
 
+  public async usersByTenantId(tenantId: number) {
+    return this.dal.usersByTenantId(tenantId);
+  }
+
+  public async userById(id: number) {
+    return this.dal.userById(id);
+  }
+
+  public async userByEmail(email: string) {
+    return this.dal.userByEmail(email);
+  }
+
+  public async createUser(email: string, firstName: string, lastName: string) {
+    // TBD: authentication, save password
+    return this.dal.createUser(email, firstName, lastName);
+  }
+
+  public async updateUser(id: number, email: string, firstName: string, lastName: string) {
+    return this.dal.updateUser(id, email, firstName, lastName);
+  }
+
+
+  /**
+   * Roles 
+   */
+
+  public async roleByName(name: string) {
+    return this.dal.roleByName(name);
+  }
 
 }

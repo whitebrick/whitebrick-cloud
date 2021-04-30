@@ -11,9 +11,8 @@ Feature: Add a user to a tenant
     """
       mutation ($tenantName: String!, $userEmail: String!, $tenantRole: String!){
         wbAddUserToTenant(tenantName: $tenantName, userEmail: $userEmail, tenantRole: $tenantRole) {
-          tenantName
-          userEmail
-          tenantRole
+          id
+          email
         }
       }
     """

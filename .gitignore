@@ -103,3 +103,4 @@ dist
 .tern-port
 
 test/karate*
+test/target*
