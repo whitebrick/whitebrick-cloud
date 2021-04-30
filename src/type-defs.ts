@@ -18,13 +18,13 @@ export const typeDefs = gql`
   }
   type Query {
     wbHealthCheck: String!
-    """"
+    """
     Tenants
     """
     wbTenants: [Tenant]
     wbTenantById(id: ID!): Tenant
     wbTenantByName(name: String!): Tenant
-    """"
+    """
     Users
     """
     wbUsersByTenantId(tenantId: ID!): [User]
@@ -32,12 +32,18 @@ export const typeDefs = gql`
     wbUserByEmail(email: String!): User
   }
   type Mutation {
-    """"
+    """
+    Test
+    """
+    wbResetTestData: Boolean
+    """
     Tenants
     """
     wbCreateTenant(name: String!, label: String!): Tenant
     wbUpdateTenant(id: ID!, name: String, label: String): Tenant
-    """"
+    wbUpdateTenant(id: ID!, name: String, label: String): Tenant
+    wbAddUserToTenant(tenantName: String!, userEmail: String!, tenantRole: String!): User
+    """
     Users
     """
     wbCreateUser(email: String!, firstName: String, lastName: String): User

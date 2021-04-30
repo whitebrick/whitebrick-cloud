@@ -22,10 +22,9 @@ export class User {
     if (!data) throw new Error('User.parse: input is null');
     const user = new User();
     user.id = data.id;
-    user.tenant_id = data.tenant_id;
     user.email = data.email;
-    user.firstName = data.firstName;
-    user.lastName = data.lastName;
+    user.firstName = data.first_name;
+    user.lastName = data.last_name;
     user.createdAt = data.created_at.toString();
     user.updatedAt = data.updated_at.toString();
     return user;

@@ -1,4 +1,4 @@
-Feature:
+Feature: Create a tenant
 
   Background:
     * def wb = call read('classpath:init.feature')

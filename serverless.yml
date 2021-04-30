@@ -6,7 +6,7 @@ provider:
   profile: wb
 functions:
   graphql:
-    handler: src/apollo-server.graphqlHandler
+    handler: src/wb-cloud.graphqlHandler
     events:
       - http:
           path: graphql

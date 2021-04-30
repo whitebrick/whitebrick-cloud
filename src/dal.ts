@@ -1,5 +1,5 @@
 import { environment } from './environment';
-import { log } from "./apollo-server";
+import { log } from "./wb-cloud";
 import { Pool } from 'pg';
 import { Tenant } from './entity/Tenant';
 import { User } from './entity/User';
@@ -7,7 +7,7 @@ import { ServiceResult } from './service-result';
 
 export class DAL {
 
-  public pool: Pool;
+  private pool: Pool;
 
   constructor() {
     this.pool = new Pool({
@@ -22,11 +22,11 @@ export class DAL {
     });
   }
 
-  public async executeQuery(query: string, params: [any]) {
+  private async executeQuery(query: string, params: [any]) {
     const client = await this.pool.connect();
     let result: ServiceResult;
     try {
-      log.debug(`executeQuery: ${query}`, params);
+      log.debug(`dal.executeQuery: ${query}`, params);
       const response = await client.query(query, params);
       result = {
         success: true,
@@ -93,6 +93,14 @@ export class DAL {
     return result;
   }
 
+  public async addUserToTenant(tenantId: number, userId: number, tenantRoleId: number) {
+    const query = "INSERT INTO tenant_users(tenant_id, user_id, role_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5)";
+    const params: any = [tenantId, userId, tenantRoleId, new Date(), new Date()];
+    const result = await this.executeQuery(query, params);
+    if(result.success) result.payload = Tenant.parseResult(result.payload)[0];
+    return result;
+  }
+
   /**
    * Users 
    */
@@ -122,7 +130,7 @@ export class DAL {
   }
 
   public async createUser(email: string, firstName: string|null, lastName: string|null) {
-    const query = "INSERT INTO users(email, first_name, last_name, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6) RETURNING *";
+    const query = "INSERT INTO users(email, first_name, last_name, created_at, updated_at) VALUES($1, $2, $3, $4, $5) RETURNING *";
     const params: any = [email, firstName, lastName, new Date(), new Date()];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload)[0];
@@ -138,6 +146,13 @@ export class DAL {
     const params: any = [new Date(), id];
     const result = await this.executeQuery(query, params);
     if(result.success) result.payload = User.parseResult(result.payload)[0];
+    return result;
+  }
+
+  public async deleteTestUsers() {
+    const query = "DELETE FROM users WHERE email like '%example.com'";
+    const params: any = [];
+    const result = await this.executeQuery(query, params);
     return result;
   }
 

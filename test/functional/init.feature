@@ -1,4 +1,4 @@
-Feature:
+Feature: Initialize
 
   Scenario: Initialize
     * url baseUrl
