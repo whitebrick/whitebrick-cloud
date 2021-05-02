@@ -13,12 +13,12 @@ Feature: Tenants
   Scenario: Add users to tenants
     * table tenantUsers 
       | tenantName | userEmail | tenantRole
-      | 'test_tenant_a' | 'test_user_1@example.com' | 'Organization Admin'
-      | 'test_tenant_b' | 'test_user_1@example.com' | 'Organization User'
-      | 'test_tenant_b' | 'test_user_2@example.com' | 'Organization Admin'
-      | 'test_tenant_c' | 'test_user_1@example.com' | 'Organization User'
-      | 'test_tenant_c' | 'test_user_2@example.com' | 'Organization User'
-      | 'test_tenant_c' | 'test_user_3@example.com' | 'Organization Admin'
-      | 'test_tenant_c' | 'test_user_4@example.com' | 'Organization Admin'
+      | 'test_tenant_a' | 'test_user_1@example.com' | 'tenant_admin'
+      | 'test_tenant_b' | 'test_user_1@example.com' | 'tenant_user'
+      | 'test_tenant_b' | 'test_user_2@example.com' | 'tenant_admin'
+      | 'test_tenant_c' | 'test_user_1@example.com' | 'tenant_user'
+      | 'test_tenant_c' | 'test_user_2@example.com' | 'tenant_user'
+      | 'test_tenant_c' | 'test_user_3@example.com' | 'tenant_admin'
+      | 'test_tenant_c' | 'test_user_4@example.com' | 'tenant_admin'
     * def result = call read('tenants/tenant-add-user.feature') tenantUsers
     * def created = $result[*].response

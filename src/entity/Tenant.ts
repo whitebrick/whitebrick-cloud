@@ -22,8 +22,8 @@ export class Tenant {
     tenant.id = data.id;
     tenant.name = data.name;
     tenant.label = data.label;
-    tenant.createdAt = data.created_at.toString();
-    tenant.updatedAt = data.updated_at.toString();
+    tenant.createdAt = data.created_at;
+    tenant.updatedAt = data.updated_at;
     return tenant;
   }
 }

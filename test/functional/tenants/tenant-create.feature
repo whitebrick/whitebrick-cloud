@@ -24,4 +24,4 @@ Feature: Create a tenant
     When method POST
     Then status 200
     Then match response == "#object"
-    Then match response.data.wbCreateTenant contains { name: '#(name)', label: '#(label)' }
+    Then match response.errors == '#notpresent'

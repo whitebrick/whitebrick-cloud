@@ -25,8 +25,8 @@ export class User {
     user.email = data.email;
     user.firstName = data.first_name;
     user.lastName = data.last_name;
-    user.createdAt = data.created_at.toString();
-    user.updatedAt = data.updated_at.toString();
+    user.createdAt = data.created_at;
+    user.updatedAt = data.updated_at;
     return user;
   }
 }

@@ -21,3 +21,4 @@ Feature: Add a user to a tenant
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200
+    Then match response.errors == '#notpresent'

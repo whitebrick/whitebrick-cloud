@@ -1,10 +1,11 @@
 import { environment } from "./environment";
 import { log } from "./wb-cloud";
 import { Pool } from "pg";
+import { ServiceResult } from "./service-result";
 import { Tenant } from "./entity/Tenant";
 import { User } from "./entity/User";
 import { Role } from "./entity/Role";
-import { ServiceResult } from "./service-result";
+import { Schema } from "./entity/Schema";
 
 
 export class DAL {
@@ -24,6 +25,8 @@ export class DAL {
     });
   }
 
+  // TBD: make transactional and loop multiple queries
+  // https://node-postgres.com/features/transactions
   private async executeQuery(query: string, params: [any]) {
     const client = await this.pool.connect();
     let result: ServiceResult;
@@ -110,7 +113,7 @@ export class DAL {
 
 
   /**
-   * Tenant-Users 
+   * Tenant-User-Roles
    */
 
   public async addUserToTenant(tenantId: number, userId: number, tenantRoleId: number) {
@@ -200,6 +203,23 @@ export class DAL {
     return result;
   }
 
+
+  /**
+   * Schemas
+   */
+
+  public async createSchema(name: string, label: string, tenantOwnerId: number, userOwnerId: number) {
+    // TBD: make transactional
+    var query = `CREATE SCHEMA ${name.replace(/[^\w-]+/g,'')}`; // paramatization not supported
+    var params: any = [];
+    var result = await this.executeQuery(query, params);
+    if(!result.success) return result;
+    query = "INSERT INTO wb.schemas(name, label, tenant_owner_id, user_owner_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6) RETURNING *";
+    params = [name, label, tenantOwnerId, userOwnerId, new Date(), new Date()];
+    result = await this.executeQuery(query, params);
+    if(result.success) result.payload = Schema.parseResult(result.payload)[0];
+    return result;
+  }
 
 
 };

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS wb.tenants(
 );
 
 CREATE INDEX idx_wb_tenants_name ON wb.tenants(name);
+ALTER SEQUENCE wb.tenants_id_seq RESTART WITH 101;
 
 CREATE TABLE IF NOT EXISTS wb.users(
   id BIGSERIAL PRIMARY KEY,
@@ -20,13 +21,17 @@ CREATE TABLE IF NOT EXISTS wb.users(
 );
 
 CREATE INDEX idx_wb_users_email ON wb.users(email);
+ALTER SEQUENCE wb.users_id_seq RESTART WITH 30001;
 
 CREATE TABLE IF NOT EXISTS wb.roles (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
+  label TEXT,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
 );
+
+CREATE INDEX idx_wb_roles_name ON wb.roles(name);
 
 CREATE TABLE IF NOT EXISTS wb.tenant_users (
   tenant_id integer REFERENCES tenants(id) NOT NULL,

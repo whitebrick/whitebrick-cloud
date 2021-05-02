@@ -113,4 +113,29 @@ class WbCloud {
     return this.dal.roleByName(name);
   }
 
+  /**
+   * Schemas 
+   */
+
+  public async createSchema(name: string, label: string, tenantOwnerId: number|null, tenantOwnerName: string|null, userOwnerId: number|null, userOwnerEmail: string|null) {
+    var result;
+    if(!tenantOwnerId && !userOwnerId){
+      if(tenantOwnerName){
+        result = await this.dal.tenantByName(tenantOwnerName);
+        if(!result.success) return result;
+        tenantOwnerId = result.payload.id;
+      } else if (userOwnerEmail){
+        result = await this.dal.userByEmail(userOwnerEmail);
+        if(!result.success) return result;
+        userOwnerId = result.payload.id;
+      } else {
+        return {
+          success: false,
+          message: "Owner could not be found"
+        }
+      }
+    }
+    return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
+  }
+
 }
