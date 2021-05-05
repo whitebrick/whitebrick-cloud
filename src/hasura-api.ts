@@ -1,7 +1,7 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
-import { ServiceResult } from "./service-result";
+import { ServiceResult } from "./type-defs";
 import { log } from "./wb-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {

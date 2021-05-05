@@ -8,8 +8,6 @@ export const resolvers: IResolvers = {
     wbHealthCheck: () => 'All good',
     // Tenants
     wbTenants: async (_, __, context) => {
-      const hasuraResult = await hasuraApi.trackTable('northwind','categories');
-      log.info(hasuraResult);
       const result = await context.wbCloud.tenants();
       if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
       return result.payload;
@@ -82,6 +80,12 @@ export const resolvers: IResolvers = {
       const result = await context.wbCloud.createSchema(name, label, tenantOwnerId, tenantOwnerName, userOwnerId, userOwnerEmail);
       if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
       return result.payload;
+    },
+    // Tables
+    wbCreateTable: async (_, { schemaName, tableName }, context) => {
+      const result = await context.wbCloud.createTable(schemaName, tableName);
+      if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
+      return result.success;
     }
   },
 

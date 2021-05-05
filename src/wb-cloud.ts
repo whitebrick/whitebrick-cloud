@@ -3,6 +3,7 @@ import { resolvers } from "./resolvers";
 import { typeDefs } from "./type-defs";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
+import { hasuraApi } from "./hasura-api";
 
 export const graphqlHandler = new ApolloServer({
   typeDefs,
@@ -10,7 +11,6 @@ export const graphqlHandler = new ApolloServer({
   introspection: true,
   context: function(){
     return {
-      dal: (new DAL()),
       wbCloud: (new WbCloud())
     }
   }
@@ -23,8 +23,15 @@ export const log: Logger = new Logger({
 class WbCloud {
   dal = new DAL();
 
+
+  /**
+   * Test
+   */
+
   public async resetTestData() {
-    var result = await this.dal.deleteTestTenants();
+    var result = await this.dal.deleteTestSchemas();
+    if(!result.success) return result;
+    result = await this.dal.deleteTestTenants();
     if(!result.success) return result;
     result = await this.dal.deleteTestUsers();
     if(!result.success) return result;
@@ -33,7 +40,8 @@ class WbCloud {
 
   
   /**
-   * Tenants 
+   * Tenants
+   * TBD: validate name ~ [a-z]{1}[a-z0-9]{2,}
    */
 
   public async tenants() {
@@ -114,7 +122,8 @@ class WbCloud {
   }
 
   /**
-   * Schemas 
+   * Schemas
+   * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
    */
 
   public async createSchema(name: string, label: string, tenantOwnerId: number|null, tenantOwnerName: string|null, userOwnerId: number|null, userOwnerEmail: string|null) {
@@ -136,6 +145,12 @@ class WbCloud {
       }
     }
     return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
+  }
+
+  public async createTable(schemaName: string, tableName: string) {
+    var result = await this.dal.createTable(schemaName, tableName);
+    if(!result.success) return result
+    return await hasuraApi.trackTable(schemaName, tableName);
   }
 
 }

@@ -1,5 +1,15 @@
 import { gql } from 'apollo-server-lambda';
 
+export type ServiceResult =
+  | { success: true; payload: any }
+  | { success: false; message: string; code: string}
+  ;
+
+export type QueryParam = {
+  query: any,
+  params: [any]
+};
+
 export const typeDefs = gql`
   type Tenant{
     id:         ID!,
@@ -63,6 +73,10 @@ export const typeDefs = gql`
     Schemas
     """
     wbCreateSchema(name: String!, label: String!, tenantOwnerId: Int, tenantOwnerName: String, userOwnerId: Int, userOwnerEmail: String): Schema
+    """
+    Tables
+    """
+    wbCreateTable(schemaName: String!, tableName: String!): Boolean!
   }
 `;
 
