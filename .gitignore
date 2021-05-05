@@ -103,4 +103,4 @@ dist
 .tern-port
 
 test/karate*
-est/target*
+test/target*
