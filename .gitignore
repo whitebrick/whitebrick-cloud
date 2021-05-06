@@ -102,5 +102,9 @@ dist
 # TernJS port file
 .tern-port
 
+# Test
 test/karate*
 test/target*
+
+# Hasura
+hasura/config.yaml
