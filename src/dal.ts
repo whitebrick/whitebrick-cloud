@@ -33,7 +33,6 @@ export class DAL {
     return results[0];
   }
 
-  // https://node-postgres.com/features/transactions
   private async executeQueries(queryParams: Array<QueryParam>) {
     const client = await this.pool.connect();
     let results: Array<ServiceResult> = [];
