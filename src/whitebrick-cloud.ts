@@ -11,7 +11,7 @@ export const graphqlHandler = new ApolloServer({
   introspection: true,
   context: function(){
     return {
-      wbCloud: (new WbCloud())
+      wbCloud: (new WhitebrickCloud())
     }
   }
 }).createHandler();
@@ -20,7 +20,7 @@ export const log: Logger = new Logger({
   minLevel: "debug"
 });
 
-class WbCloud {
+class WhitebrickCloud {
   dal = new DAL();
 
 
@@ -29,12 +29,15 @@ class WbCloud {
    */
 
   public async resetTestData() {
-    var result = await this.dal.deleteTestSchemas();
+    var result = await this.dal.schemas('test_%');
     if(!result.success) return result;
+    for (let schema of result.payload) {
+      result = await this.deleteSchema(schema.name);
+      if(!result.success) return result;
+    }
     result = await this.dal.deleteTestTenants();
     if(!result.success) return result;
     result = await this.dal.deleteTestUsers();
-    if(!result.success) return result;
     return result;
   }
 
@@ -74,7 +77,7 @@ class WbCloud {
    */
 
   public async addUserToTenant(tenantName: string, userEmail: string, tenantRole: string) {
-    log.debug(`wbCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`);
+    log.debug(`whitebrickCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`);
     const userResult = await this.dal.userByEmail(userEmail);
     if(!userResult.success) return userResult;
     const tenantResult = await this.dal.tenantByName(tenantName);
@@ -147,10 +150,32 @@ class WbCloud {
     return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
   }
 
+  public async deleteSchema(schemaName: string){
+    var result = await this.dal.allTableNames(schemaName);
+    if(!result.success) return result
+    for (let tableName of result.payload) {
+      result = await this.deleteTable(schemaName, tableName);
+      if(!result.success) return result;
+    }
+    return await this.dal.deleteSchema(schemaName);
+  }
+
+
+  /**
+   * Tables
+   * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
+   */
+
   public async createTable(schemaName: string, tableName: string) {
     var result = await this.dal.createTable(schemaName, tableName);
     if(!result.success) return result
     return await hasuraApi.trackTable(schemaName, tableName);
+  }
+
+  public async deleteTable(schemaName: string, tableName: string) {
+    var result = await this.dal.deleteTable(schemaName, tableName);
+    if(!result.success) return result
+    return await hasuraApi.untrackTable(schemaName, tableName);
   }
 
 }

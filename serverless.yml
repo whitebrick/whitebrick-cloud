@@ -6,7 +6,7 @@ provider:
   profile: wb
 functions:
   graphql:
-    handler: src/wb-cloud.graphqlHandler
+    handler: src/whitebrick-cloud.graphqlHandler
     events:
       - http:
           path: graphql

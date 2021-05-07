@@ -1,5 +1,5 @@
 import { environment } from "./environment";
-import { log } from "./wb-cloud";
+import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
 import { Tenant } from "./entity/Tenant";
 import { User } from "./entity/User";
@@ -258,36 +258,42 @@ export class DAL {
     return insertResult;
   }
 
-  public async deleteTestSchemas() {
+  public async schemas(schemaNamePattern: string|undefined){
+    if(!schemaNamePattern) schemaNamePattern='%'
     var result = await this.executeQuery({
-      query: "SELECT * FROM wb.schemas where name like 'test_%';",
-      params: <any>[]
+      query: "SELECT * FROM wb.schemas WHERE name LIKE $1;",
+      params: <any>[schemaNamePattern]
     });
-    if(!result.success) return result
-    var results: Array<ServiceResult> = [];
-    for (let schema of Schema.parseResult(result.payload)) {
-      results = await this.executeQueries([
-        {
-          query: "DELETE FROM wb.schemas WHERE name=$1",
-          params: <any>[schema.name]
-        },
-        {
-          query: `DROP SCHEMA IF EXISTS "${DAL.sanitize(schema.name)}" CASCADE`,
-          params: <any>[]
-        }
-      ]);
-      if(!results[results.length-1].success) break
-    }
-    if(results.length==0){
-      return result;
-    } else {
-      return results[results.length-1];
-    }
+    if(result.success) result.payload = Schema.parseResult(result.payload);
+    return result;
+  }
+
+  public async deleteSchema(schemaName: string) {
+    var results = await this.executeQueries([
+      {
+        query: "DELETE FROM wb.schemas WHERE name=$1",
+        params: <any>[schemaName]
+      },
+      {
+        query: `DROP SCHEMA IF EXISTS "${DAL.sanitize(schemaName)}" CASCADE`,
+        params: <any>[]
+      }
+    ]);
+    return results[results.length-1]; 
   }
 
   /**
    * Tables
    */
+
+  public async allTableNames(schemaName: string) {
+    const result = await this.executeQuery({
+      query: "SELECT table_name FROM information_schema.tables WHERE table_schema=$1",
+      params: <any>[schemaName]
+    });
+    if(result.success) result.payload = result.payload.rows.map((row: { table_name: string; }) => row.table_name);
+    return result;
+  }
 
   public async createTable(schemaName: string, tableName: string) {
     const result = await this.executeQuery({
@@ -296,4 +302,13 @@ export class DAL {
     });
     return result;
   }
+
+  public async deleteTable(schemaName: string, tableName: string) {
+    const result = await this.executeQuery({
+      query: `DROP TABLE "${DAL.sanitize(schemaName)}"."${DAL.sanitize(tableName)}" CASCADE`,
+      params: <any>[]
+    });
+    return result;
+  }
+
 }

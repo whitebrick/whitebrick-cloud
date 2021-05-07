@@ -1,7 +1,6 @@
 import { IResolvers } from "apollo-server-lambda";
 import { ApolloError } from "apollo-server-lambda"
-import { log } from "./wb-cloud";
-import { hasuraApi } from "./hasura-api";
+import { log } from "./whitebrick-cloud";
 
 export const resolvers: IResolvers = {
   Query: {

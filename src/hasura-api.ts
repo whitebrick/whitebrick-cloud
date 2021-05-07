@@ -2,7 +2,7 @@
 
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 import { ServiceResult } from "./type-defs";
-import { log } from "./wb-cloud";
+import { log } from "./whitebrick-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {
   "Accept": "application/json",
@@ -57,6 +57,17 @@ class HasuraApi {
         "schema": schemaName,
         "name": tableName
       }
+    });
+    return result;
+  }
+
+  public async untrackTable(schemaName: string, tableName: string) {
+    const result = await this.post("pg_untrack_table", {
+      "table":{
+        "schema": schemaName,
+        "name": tableName
+      },
+      "cascade": true
     });
     return result;
   }
