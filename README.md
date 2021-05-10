@@ -6,7 +6,7 @@
 ![whitebrick-cloud system diagram](doc/whitebrick-diagram.png)
 
 whitebrick-cloud is a serverless application that adds multi-tenant DDL and access control functions to [Hasura](https://github.com/hasura/graphql-engine).
-Jamstack clients interface with _whitebrick-cloud_ through a remote schema stitched to the Hasura GraphQL API. The default Hasura client provides DDL functions out-of-the-box
+Jamstack clients interface with whitebrick-cloud through a remote schema stitched to the Hasura GraphQL API. The default Hasura client provides DDL functions out-of-the-box
 but achieves this by sending raw SQL to a schema endpoint which is not practical for multi-tenanted applications with varied access control.
 
 whitebrick-cloud uses the following technologies
