@@ -64,3 +64,7 @@ Launching Hasura will create data definitions and values in the `hdb_catalog` sc
 
 - ### WhitebrickCloud
     This is the top-level API that exports the Apollo Server GraphQL handler and calls the DAL and HasuraAPI.
+
+## DB Schema
+
+![whitebrick-cloud DB ERD](doc/whitebrick-db-erd.png)

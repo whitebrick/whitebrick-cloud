@@ -37,6 +37,18 @@ export const resolvers: IResolvers = {
       if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
       return result.payload;
     },
+    // Schemas
+    wbSchemas: async (_, { userEmail }, context) => {
+      const result = await context.wbCloud.accessibleSchemas(userEmail);
+      if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
+      return result.payload;
+    },
+    // Tables
+    wbSchemaTableNames: async (_, { schemaName }, context) => {
+      const result = await context.wbCloud.schemaTableNames(schemaName);
+      if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
+      return result.payload;
+    },
   },
 
   Mutation: {
@@ -80,9 +92,20 @@ export const resolvers: IResolvers = {
       if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
       return result.payload;
     },
+    // Tenant-Schema-Roles
+    wbAddUserToSchema: async (_, { schemaName, userEmail, schemaRole }, context) => {
+      const result = await context.wbCloud.addUserToSchema(schemaName, userEmail, schemaRole);
+      if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
+      return result.payload;
+    },
     // Tables
     wbCreateTable: async (_, { schemaName, tableName }, context) => {
       const result = await context.wbCloud.createTable(schemaName, tableName);
+      if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
+      return result.success;
+    },
+    wbTrackAllTables: async (_, { schemaName }, context) => {
+      const result = await context.wbCloud.trackAllTables(schemaName);
       if(!result.success) throw new ApolloError(result.message, _, {ref: result.code});
       return result.success;
     }

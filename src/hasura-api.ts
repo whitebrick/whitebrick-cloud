@@ -41,11 +41,15 @@ class HasuraApi {
         payload: response
       };
     } catch (error) {
-      log.error(error.response.data);
+      if(error.response && error.response.data){
+        log.error(error.response.data);
+      } else {
+        log.error(error);
+      }
       result = {
         success: false,
         message: error.response.data.error,
-        code: error.response.status
+        code: error.response.data.code
       };
     }
     return result
@@ -69,6 +73,12 @@ class HasuraApi {
       },
       "cascade": true
     });
+    if(!result.success && result.code=='already-untracked'){
+      return <ServiceResult>{
+        success: true,
+        payload: true
+      }
+    }
     return result;
   }
 

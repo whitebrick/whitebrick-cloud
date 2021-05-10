@@ -1,5 +1,15 @@
 import { QueryResult } from "pg";
 
+export type RoleName = 
+| 'tenant_user'
+| 'tenant_admin'
+| 'schema_owner'
+| 'schema_administrator'
+| 'schema_editor'
+| 'schema_commenter'
+| 'schema_reader'
+;
+
 export class Role {
   id!: number;
   name!: string;

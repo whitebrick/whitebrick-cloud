@@ -33,7 +33,8 @@ export const typeDefs = gql`
     tenantOwnerId:  Int,
     userOwnerId:    Int,
     createdAt:      String!,
-    updatedAt:      String!
+    updatedAt:      String!,
+    userRole:       String
   }
   type Query {
     wbHealthCheck: String!
@@ -49,6 +50,14 @@ export const typeDefs = gql`
     wbUsersByTenantId(tenantId: ID!): [User]
     wbUserById(id: ID!): User
     wbUserByEmail(email: String!): User
+    """
+    Schemas
+    """
+    wbSchemas(userEmail: String!): [Schema]
+    """
+    Tables
+    """
+    wbSchemaTableNames(schemaName: String!): [String]
   }
   type Mutation {
     """
@@ -73,6 +82,11 @@ export const typeDefs = gql`
     Schemas
     """
     wbCreateSchema(name: String!, label: String!, tenantOwnerId: Int, tenantOwnerName: String, userOwnerId: Int, userOwnerEmail: String): Schema
+    wbTrackAllTables(schemaName: String!): Boolean!
+    """
+    Schema-User-Roles
+    """
+    wbAddUserToSchema(schemaName: String!, userEmail: String!, schemaRole: String!): User
     """
     Tables
     """

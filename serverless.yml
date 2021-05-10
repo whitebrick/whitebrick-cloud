@@ -4,6 +4,8 @@ provider:
   runtime: nodejs12.x
   region: us-east-1
   profile: wb
+  environment:
+    APP: "whitebrick-cloud"
 functions:
   graphql:
     handler: src/whitebrick-cloud.graphqlHandler

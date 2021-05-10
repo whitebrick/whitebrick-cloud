@@ -4,6 +4,8 @@ import { typeDefs } from "./type-defs";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
+import { Schema } from "./entity/Schema";
+import { RoleName } from "./entity/Role";
 
 export const graphqlHandler = new ApolloServer({
   typeDefs,
@@ -129,7 +131,10 @@ class WhitebrickCloud {
    * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
    */
 
+
+
   public async createSchema(name: string, label: string, tenantOwnerId: number|null, tenantOwnerName: string|null, userOwnerId: number|null, userOwnerEmail: string|null) {
+    log.info(`wbCloud.createSchema name=${name}, label=${label}, tenantOwnerId=${tenantOwnerId}, tenantOwnerName=${tenantOwnerName}, userOwnerId=${userOwnerId}, userOwnerEmail=${userOwnerEmail}`);
     var result;
     if(!tenantOwnerId && !userOwnerId){
       if(tenantOwnerName){
@@ -151,14 +156,48 @@ class WhitebrickCloud {
   }
 
   public async deleteSchema(schemaName: string){
-    var result = await this.dal.allTableNames(schemaName);
+    var result = await this.schemaTableNames(schemaName);
     if(!result.success) return result
     for (let tableName of result.payload) {
       result = await this.deleteTable(schemaName, tableName);
       if(!result.success) return result;
     }
+    result = await this.dal.removeAllUsersFromSchema(schemaName)
+    if(!result.success) return result;
     return await this.dal.deleteSchema(schemaName);
   }
+
+  public async schemasByUserOwner(userEmail: string) {
+    return this.dal.schemasByUserOwner(userEmail);
+  }
+  
+
+  /**
+   * Schema-User-Roles
+   */
+
+  public async addUserToSchema(schemaName: string, userEmail: string, schemaRole: string) {
+    const userResult = await this.dal.userByEmail(userEmail);
+    if(!userResult.success) return userResult;
+    const schemaResult = await this.dal.schemaByName(schemaName);
+    if(!schemaResult.success) return schemaResult;
+    const roleResult = await this.dal.roleByName(schemaRole);
+    if(!roleResult.success) return roleResult;
+    const result = await this.dal.addUserToSchema(schemaResult.payload.id, userResult.payload.id, roleResult.payload.id);
+    if(!result.success) return result;
+    return userResult;
+  }
+
+  public async accessibleSchemas(userEmail: string) {
+    const result = await this.schemasByUserOwner(userEmail)
+    if(!result.success) return result
+    const userRolesResult = await this.dal.schemasByUser(userEmail)
+    if(!userRolesResult.success) return userRolesResult
+    result.payload = result.payload.concat(userRolesResult.payload)
+    return result
+  }
+
+
 
 
   /**
@@ -176,6 +215,20 @@ class WhitebrickCloud {
     var result = await this.dal.deleteTable(schemaName, tableName);
     if(!result.success) return result
     return await hasuraApi.untrackTable(schemaName, tableName);
+  }
+
+  public async schemaTableNames(schemaName: string) {
+    return this.dal.schemaTableNames(schemaName);
+  }
+
+  public async trackAllTables(schemaName: string) {
+    var result = await this.schemaTableNames(schemaName)
+    if(!result.success) return result
+    for (let tableName of result.payload) {
+      result = await hasuraApi.trackTable(schemaName, tableName);
+      if(!result.success) return result;
+    }
+    return result;
   }
 
 }

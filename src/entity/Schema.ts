@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { RoleName } from "./Role";
 
 export class Schema{
   id!: number;
@@ -8,6 +9,8 @@ export class Schema{
   userOwnerId: number | null | undefined;
   createdAt!: Date;
   updatedAt!: Date;
+  userRole: RoleName | null | undefined;
+
 
   public static parseResult(data: QueryResult | null): Array<Schema> {
     if (!data) throw new Error('Schema.parseResult: input is null');

@@ -3,9 +3,9 @@ Feature: Users
   Scenario: Create test users
     * table users 
       | email | firstName | lastName
-      | 'test_user_1@example.com' | 'Test1' | 'TestUser1'
-      | 'test_user_2@example.com' | 'Test2' | 'TestUser2'
-      | 'test_user_3@example.com' | 'Test3' | 'TestUser3'
-      | 'test_user_4@example.com' | 'Test4' | 'TestUser4'
+      | 'test_donna@example.com' | 'Donna' | 'Donna'
+      | 'test_debbie@example.com' | 'Debbie' | 'Debbie'
+      | 'test_daisy@example.com' | 'Daisy' | 'Daisy'
+      | 'test_nick_north@example.com' | 'Nick' | 'North'
     * def result = call read('users/user-create.feature') users
     * def created = $result[*].response

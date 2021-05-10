@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS wb.roles (
 CREATE INDEX idx_wb_roles_name ON wb.roles(name);
 
 CREATE TABLE IF NOT EXISTS wb.tenant_users (
-  tenant_id integer REFERENCES tenants(id) NOT NULL,
+  tenant_id integer REFERENCES wb.tenants(id) NOT NULL,
   user_id bigint REFERENCES wb.users(id) NOT NULL,
   role_id integer REFERENCES wb.roles(id) NOT NULL,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
