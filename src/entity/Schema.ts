@@ -1,7 +1,7 @@
 import { QueryResult } from "pg";
 import { RoleName } from "./Role";
 
-export class Schema{
+export class Schema {
   id!: number;
   name!: string;
   label!: string;
@@ -11,9 +11,8 @@ export class Schema{
   updatedAt!: Date;
   userRole: RoleName | null | undefined;
 
-
   public static parseResult(data: QueryResult | null): Array<Schema> {
-    if (!data) throw new Error('Schema.parseResult: input is null');
+    if (!data) throw new Error("Schema.parseResult: input is null");
     const schemas = Array<Schema>();
     data.rows.forEach((row: any) => {
       schemas.push(Schema.parse(row));
@@ -22,7 +21,7 @@ export class Schema{
   }
 
   public static parse(data: any): Schema {
-    if (!data) throw new Error('Schema.parse: input is null');
+    if (!data) throw new Error("Schema.parse: input is null");
     const schema = new Schema();
     schema.id = data.id;
     schema.name = data.name;

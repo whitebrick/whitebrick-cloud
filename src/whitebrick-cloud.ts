@@ -11,39 +11,37 @@ export const graphqlHandler = new ApolloServer({
   typeDefs,
   resolvers,
   introspection: true,
-  context: function(){
+  context: function () {
     return {
-      wbCloud: (new WhitebrickCloud())
-    }
-  }
+      wbCloud: new WhitebrickCloud(),
+    };
+  },
 }).createHandler();
 
 export const log: Logger = new Logger({
-  minLevel: "debug"
+  minLevel: "debug",
 });
 
 class WhitebrickCloud {
   dal = new DAL();
-
 
   /**
    * Test
    */
 
   public async resetTestData() {
-    var result = await this.dal.schemas('test_%');
-    if(!result.success) return result;
+    var result = await this.dal.schemas("test_%");
+    if (!result.success) return result;
     for (let schema of result.payload) {
       result = await this.deleteSchema(schema.name);
-      if(!result.success) return result;
+      if (!result.success) return result;
     }
     result = await this.dal.deleteTestTenants();
-    if(!result.success) return result;
+    if (!result.success) return result;
     result = await this.dal.deleteTestUsers();
     return result;
   }
 
-  
   /**
    * Tenants
    * TBD: validate name ~ [a-z]{1}[a-z0-9]{2,}
@@ -73,27 +71,35 @@ class WhitebrickCloud {
     return this.dal.deleteTestTenants();
   }
 
-
   /**
    * Tenant-User-Roles
    */
 
-  public async addUserToTenant(tenantName: string, userEmail: string, tenantRole: string) {
-    log.debug(`whitebrickCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`);
+  public async addUserToTenant(
+    tenantName: string,
+    userEmail: string,
+    tenantRole: string
+  ) {
+    log.debug(
+      `whitebrickCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`
+    );
     const userResult = await this.dal.userByEmail(userEmail);
-    if(!userResult.success) return userResult;
+    if (!userResult.success) return userResult;
     const tenantResult = await this.dal.tenantByName(tenantName);
-    if(!tenantResult.success) return tenantResult;
+    if (!tenantResult.success) return tenantResult;
     const roleResult = await this.dal.roleByName(tenantRole);
-    if(!roleResult.success) return roleResult;
-    const result = await this.dal.addUserToTenant(tenantResult.payload.id, userResult.payload.id, roleResult.payload.id);
-    if(!result.success) return result;
+    if (!roleResult.success) return roleResult;
+    const result = await this.dal.addUserToTenant(
+      tenantResult.payload.id,
+      userResult.payload.id,
+      roleResult.payload.id
+    );
+    if (!result.success) return result;
     return userResult;
   }
 
-
   /**
-   * Users 
+   * Users
    */
 
   public async usersByTenantId(tenantId: number) {
@@ -113,13 +119,17 @@ class WhitebrickCloud {
     return this.dal.createUser(email, firstName, lastName);
   }
 
-  public async updateUser(id: number, email: string, firstName: string, lastName: string) {
+  public async updateUser(
+    id: number,
+    email: string,
+    firstName: string,
+    lastName: string
+  ) {
     return this.dal.updateUser(id, email, firstName, lastName);
   }
 
-
   /**
-   * Roles 
+   * Roles
    */
 
   public async roleByName(name: string) {
@@ -131,74 +141,85 @@ class WhitebrickCloud {
    * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
    */
 
-
-
-  public async createSchema(name: string, label: string, tenantOwnerId: number|null, tenantOwnerName: string|null, userOwnerId: number|null, userOwnerEmail: string|null) {
-    log.info(`wbCloud.createSchema name=${name}, label=${label}, tenantOwnerId=${tenantOwnerId}, tenantOwnerName=${tenantOwnerName}, userOwnerId=${userOwnerId}, userOwnerEmail=${userOwnerEmail}`);
+  public async createSchema(
+    name: string,
+    label: string,
+    tenantOwnerId: number | null,
+    tenantOwnerName: string | null,
+    userOwnerId: number | null,
+    userOwnerEmail: string | null
+  ) {
+    log.info(
+      `wbCloud.createSchema name=${name}, label=${label}, tenantOwnerId=${tenantOwnerId}, tenantOwnerName=${tenantOwnerName}, userOwnerId=${userOwnerId}, userOwnerEmail=${userOwnerEmail}`
+    );
     var result;
-    if(!tenantOwnerId && !userOwnerId){
-      if(tenantOwnerName){
+    if (!tenantOwnerId && !userOwnerId) {
+      if (tenantOwnerName) {
         result = await this.dal.tenantByName(tenantOwnerName);
-        if(!result.success) return result;
+        if (!result.success) return result;
         tenantOwnerId = result.payload.id;
-      } else if (userOwnerEmail){
+      } else if (userOwnerEmail) {
         result = await this.dal.userByEmail(userOwnerEmail);
-        if(!result.success) return result;
+        if (!result.success) return result;
         userOwnerId = result.payload.id;
       } else {
         return {
           success: false,
-          message: "Owner could not be found"
-        }
+          message: "Owner could not be found",
+        };
       }
     }
     return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
   }
 
-  public async deleteSchema(schemaName: string){
+  public async deleteSchema(schemaName: string) {
     var result = await this.schemaTableNames(schemaName);
-    if(!result.success) return result
+    if (!result.success) return result;
     for (let tableName of result.payload) {
       result = await this.deleteTable(schemaName, tableName);
-      if(!result.success) return result;
+      if (!result.success) return result;
     }
-    result = await this.dal.removeAllUsersFromSchema(schemaName)
-    if(!result.success) return result;
+    result = await this.dal.removeAllUsersFromSchema(schemaName);
+    if (!result.success) return result;
     return await this.dal.deleteSchema(schemaName);
   }
 
   public async schemasByUserOwner(userEmail: string) {
     return this.dal.schemasByUserOwner(userEmail);
   }
-  
 
   /**
    * Schema-User-Roles
    */
 
-  public async addUserToSchema(schemaName: string, userEmail: string, schemaRole: string) {
+  public async addUserToSchema(
+    schemaName: string,
+    userEmail: string,
+    schemaRole: string
+  ) {
     const userResult = await this.dal.userByEmail(userEmail);
-    if(!userResult.success) return userResult;
+    if (!userResult.success) return userResult;
     const schemaResult = await this.dal.schemaByName(schemaName);
-    if(!schemaResult.success) return schemaResult;
+    if (!schemaResult.success) return schemaResult;
     const roleResult = await this.dal.roleByName(schemaRole);
-    if(!roleResult.success) return roleResult;
-    const result = await this.dal.addUserToSchema(schemaResult.payload.id, userResult.payload.id, roleResult.payload.id);
-    if(!result.success) return result;
+    if (!roleResult.success) return roleResult;
+    const result = await this.dal.addUserToSchema(
+      schemaResult.payload.id,
+      userResult.payload.id,
+      roleResult.payload.id
+    );
+    if (!result.success) return result;
     return userResult;
   }
 
   public async accessibleSchemas(userEmail: string) {
-    const result = await this.schemasByUserOwner(userEmail)
-    if(!result.success) return result
-    const userRolesResult = await this.dal.schemasByUser(userEmail)
-    if(!userRolesResult.success) return userRolesResult
-    result.payload = result.payload.concat(userRolesResult.payload)
-    return result
+    const result = await this.schemasByUserOwner(userEmail);
+    if (!result.success) return result;
+    const userRolesResult = await this.dal.schemasByUser(userEmail);
+    if (!userRolesResult.success) return userRolesResult;
+    result.payload = result.payload.concat(userRolesResult.payload);
+    return result;
   }
-
-
-
 
   /**
    * Tables
@@ -207,13 +228,13 @@ class WhitebrickCloud {
 
   public async createTable(schemaName: string, tableName: string) {
     var result = await this.dal.createTable(schemaName, tableName);
-    if(!result.success) return result
+    if (!result.success) return result;
     return await hasuraApi.trackTable(schemaName, tableName);
   }
 
   public async deleteTable(schemaName: string, tableName: string) {
     var result = await this.dal.deleteTable(schemaName, tableName);
-    if(!result.success) return result
+    if (!result.success) return result;
     return await hasuraApi.untrackTable(schemaName, tableName);
   }
 
@@ -222,13 +243,12 @@ class WhitebrickCloud {
   }
 
   public async trackAllTables(schemaName: string) {
-    var result = await this.schemaTableNames(schemaName)
-    if(!result.success) return result
+    var result = await this.schemaTableNames(schemaName);
+    if (!result.success) return result;
     for (let tableName of result.payload) {
       result = await hasuraApi.trackTable(schemaName, tableName);
-      if(!result.success) return result;
+      if (!result.success) return result;
     }
     return result;
   }
-
 }

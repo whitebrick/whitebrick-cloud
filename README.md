@@ -39,11 +39,11 @@ Launching Hasura will create data definitions and values in the `hdb_catalog` sc
 5. #### Create wb Schema
     Change to the `./hasura` directory, copy `config-example.yaml` to `config.yaml` and complete with `admin_secret` from (2) above.
     This config is used for the Hasura CLI.
-    Now create the whitebrick-cloud schema "`wb`" by running `bash ./_apply_latest_migration.bash`.
-    After the migration is complete, change to the `./db` directory and run `bash ./_seed.bash` to insert the initial data.
+    Now create the whitebrick-cloud schema "`wb`" by running `bash ./apply_latest_migration.bash`.
+    After the migration is complete, change to the `./db` directory and run `bash ./seed.bash` to insert the initial data.
 
 6. #### Run Serverless Listener
-    Run `bash ./_offline_start.bash` to start the serverless listener in local/offline mode
+    Run `bash ./offline_start.bash` to start the serverless listener in local/offline mode
 
 7. #### Add Remote Schema
     From The Hasura console, use the top menu to navigate to the "Remote Schemas" page, click add and enter the endpoint displayed from (6) above.

@@ -10,7 +10,7 @@ export class User {
   updatedAt!: Date;
 
   public static parseResult(data: QueryResult | null): Array<User> {
-    if (!data) throw new Error('User.parseResult: input is null');
+    if (!data) throw new Error("User.parseResult: input is null");
     const users = Array<User>();
     data.rows.forEach((row: any) => {
       users.push(User.parse(row));
@@ -19,7 +19,7 @@ export class User {
   }
 
   public static parse(data: any): User {
-    if (!data) throw new Error('User.parse: input is null');
+    if (!data) throw new Error("User.parse: input is null");
     const user = new User();
     user.id = data.id;
     user.email = data.email;

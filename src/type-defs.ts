@@ -1,40 +1,39 @@
-import { gql } from 'apollo-server-lambda';
+import { gql } from "apollo-server-lambda";
 
 export type ServiceResult =
   | { success: true; payload: any }
-  | { success: false; message: string; code: string}
-  ;
+  | { success: false; message: string; code: string };
 
 export type QueryParam = {
-  query: any,
-  params: [any]
+  query: any;
+  params: [any];
 };
 
 export const typeDefs = gql`
-  type Tenant{
-    id:         ID!,
-    name:       String!,
-    label:      String!,
-    createdAt:  String!,
-    updatedAt:  String!
+  type Tenant {
+    id: ID!
+    name: String!
+    label: String!
+    createdAt: String!
+    updatedAt: String!
   }
-  type User{
-    id:         ID!,
-    email:      String!,
-    firstName:  String,
-    lastName:   String,
-    createdAt:  String!,
-    updatedAt:  String!
+  type User {
+    id: ID!
+    email: String!
+    firstName: String
+    lastName: String
+    createdAt: String!
+    updatedAt: String!
   }
-  type Schema{
-    id:             ID!,
-    name:           String!,
-    label:          String!,
-    tenantOwnerId:  Int,
-    userOwnerId:    Int,
-    createdAt:      String!,
-    updatedAt:      String!,
-    userRole:       String
+  type Schema {
+    id: ID!
+    name: String!
+    label: String!
+    tenantOwnerId: Int
+    userOwnerId: Int
+    createdAt: String!
+    updatedAt: String!
+    userRole: String
   }
   type Query {
     wbHealthCheck: String!
@@ -72,29 +71,44 @@ export const typeDefs = gql`
     """
     Tenant-User-Roles
     """
-    wbAddUserToTenant(tenantName: String!, userEmail: String!, tenantRole: String!): User
+    wbAddUserToTenant(
+      tenantName: String!
+      userEmail: String!
+      tenantRole: String!
+    ): User
     """
     Users
     """
     wbCreateUser(email: String!, firstName: String, lastName: String): User
-    wbUpdateUser(id: ID!, email: String, firstName: String, lastName: String): User
+    wbUpdateUser(
+      id: ID!
+      email: String
+      firstName: String
+      lastName: String
+    ): User
     """
     Schemas
     """
-    wbCreateSchema(name: String!, label: String!, tenantOwnerId: Int, tenantOwnerName: String, userOwnerId: Int, userOwnerEmail: String): Schema
+    wbCreateSchema(
+      name: String!
+      label: String!
+      tenantOwnerId: Int
+      tenantOwnerName: String
+      userOwnerId: Int
+      userOwnerEmail: String
+    ): Schema
     wbTrackAllTables(schemaName: String!): Boolean!
     """
     Schema-User-Roles
     """
-    wbAddUserToSchema(schemaName: String!, userEmail: String!, schemaRole: String!): User
+    wbAddUserToSchema(
+      schemaName: String!
+      userEmail: String!
+      schemaRole: String!
+    ): User
     """
     Tables
     """
     wbCreateTable(schemaName: String!, tableName: String!): Boolean!
   }
 `;
-
-
-
-
-

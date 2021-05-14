@@ -8,7 +8,7 @@ export class Tenant {
   updatedAt!: Date;
 
   public static parseResult(data: QueryResult | null): Array<Tenant> {
-    if (!data) throw new Error('Tenant.parseResult: input is null');
+    if (!data) throw new Error("Tenant.parseResult: input is null");
     const tenants = Array<Tenant>();
     data.rows.forEach((row: any) => {
       tenants.push(Tenant.parse(row));
@@ -17,7 +17,7 @@ export class Tenant {
   }
 
   public static parse(data: any): Tenant {
-    if (!data) throw new Error('Tenant.parse: input is null');
+    if (!data) throw new Error("Tenant.parse: input is null");
     const tenant = new Tenant();
     tenant.id = data.id;
     tenant.name = data.name;

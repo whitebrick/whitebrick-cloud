@@ -108,4 +108,4 @@ test/target*
 
 # Hasura
 hasura/config.yaml
-_update_staging_db.bash
+scripts/update_staging_db.bash

@@ -5,9 +5,9 @@ import { ServiceResult } from "./type-defs";
 import { log } from "./whitebrick-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {
-  "Accept": "application/json",
+  Accept: "application/json",
   "Content-Type": "application/json; charset=utf-8",
-  "x-hasura-admin-secret": "Ha5uraWBStaging"
+  "x-hasura-admin-secret": "Ha5uraWBStaging",
 };
 
 class HasuraApi {
@@ -28,20 +28,23 @@ class HasuraApi {
     return http;
   }
 
-  private async post(type: string, args: {}){
+  private async post(type: string, args: {}) {
     let result: ServiceResult;
     try {
       log.debug(`hasuraApi.post: type: ${type}`, args);
-      const response = await this.http.post<any, AxiosResponse>('/v1/metadata', {
-        "type": type,
-        "args": args
-      });
+      const response = await this.http.post<any, AxiosResponse>(
+        "/v1/metadata",
+        {
+          type: type,
+          args: args,
+        }
+      );
       result = {
         success: true,
-        payload: response
+        payload: response,
       };
     } catch (error) {
-      if(error.response && error.response.data){
+      if (error.response && error.response.data) {
         log.error(error.response.data);
       } else {
         log.error(error);
@@ -49,39 +52,38 @@ class HasuraApi {
       result = {
         success: false,
         message: error.response.data.error,
-        code: error.response.data.code
+        code: error.response.data.code,
       };
     }
-    return result
+    return result;
   }
 
   public async trackTable(schemaName: string, tableName: string) {
     const result = await this.post("pg_track_table", {
-      "table":{
-        "schema": schemaName,
-        "name": tableName
-      }
+      table: {
+        schema: schemaName,
+        name: tableName,
+      },
     });
     return result;
   }
 
   public async untrackTable(schemaName: string, tableName: string) {
     const result = await this.post("pg_untrack_table", {
-      "table":{
-        "schema": schemaName,
-        "name": tableName
+      table: {
+        schema: schemaName,
+        name: tableName,
       },
-      "cascade": true
+      cascade: true,
     });
-    if(!result.success && result.code=='already-untracked'){
+    if (!result.success && result.code == "already-untracked") {
       return <ServiceResult>{
         success: true,
-        payload: true
-      }
+        payload: true,
+      };
     }
     return result;
   }
-
 }
 
 export const hasuraApi = new HasuraApi();
