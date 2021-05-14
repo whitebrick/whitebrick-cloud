@@ -30,9 +30,9 @@ class WhitebrickCloud {
    */
 
   public async resetTestData() {
-    var result = await this.dal.schemas("test_%");
+    let result = await this.dal.schemas("test_%");
     if (!result.success) return result;
-    for (let schema of result.payload) {
+    for (const schema of result.payload) {
       result = await this.deleteSchema(schema.name);
       if (!result.success) return result;
     }
@@ -152,7 +152,7 @@ class WhitebrickCloud {
     log.info(
       `wbCloud.createSchema name=${name}, label=${label}, tenantOwnerId=${tenantOwnerId}, tenantOwnerName=${tenantOwnerName}, userOwnerId=${userOwnerId}, userOwnerEmail=${userOwnerEmail}`
     );
-    var result;
+    let result;
     if (!tenantOwnerId && !userOwnerId) {
       if (tenantOwnerName) {
         result = await this.dal.tenantByName(tenantOwnerName);
@@ -173,9 +173,9 @@ class WhitebrickCloud {
   }
 
   public async deleteSchema(schemaName: string) {
-    var result = await this.schemaTableNames(schemaName);
+    let result = await this.schemaTableNames(schemaName);
     if (!result.success) return result;
-    for (let tableName of result.payload) {
+    for (const tableName of result.payload) {
       result = await this.deleteTable(schemaName, tableName);
       if (!result.success) return result;
     }
@@ -227,13 +227,13 @@ class WhitebrickCloud {
    */
 
   public async createTable(schemaName: string, tableName: string) {
-    var result = await this.dal.createTable(schemaName, tableName);
+    const result = await this.dal.createTable(schemaName, tableName);
     if (!result.success) return result;
     return await hasuraApi.trackTable(schemaName, tableName);
   }
 
   public async deleteTable(schemaName: string, tableName: string) {
-    var result = await this.dal.deleteTable(schemaName, tableName);
+    const result = await this.dal.deleteTable(schemaName, tableName);
     if (!result.success) return result;
     return await hasuraApi.untrackTable(schemaName, tableName);
   }
@@ -243,9 +243,9 @@ class WhitebrickCloud {
   }
 
   public async trackAllTables(schemaName: string) {
-    var result = await this.schemaTableNames(schemaName);
+    let result = await this.schemaTableNames(schemaName);
     if (!result.success) return result;
-    for (let tableName of result.payload) {
+    for (const tableName of result.payload) {
       result = await hasuraApi.trackTable(schemaName, tableName);
       if (!result.success) return result;
     }

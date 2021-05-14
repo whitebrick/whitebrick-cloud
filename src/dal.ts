@@ -3,7 +3,7 @@ import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
 import { Tenant } from "./entity/Tenant";
 import { User } from "./entity/User";
-import { Role, RoleName } from "./entity/Role";
+import { Role } from "./entity/Role";
 import { Schema } from "./entity/Schema";
 import { QueryParam, ServiceResult } from "./type-defs";
 
@@ -34,10 +34,10 @@ export class DAL {
 
   private async executeQueries(queryParams: Array<QueryParam>) {
     const client = await this.pool.connect();
-    let results: Array<ServiceResult> = [];
+    const results: Array<ServiceResult> = [];
     try {
       await client.query("BEGIN");
-      for (let queryParam of queryParams) {
+      for (const queryParam of queryParams) {
         log.debug(
           `dal.executeQuery QueryParam: ${queryParam.query}`,
           queryParam.params
@@ -122,13 +122,14 @@ export class DAL {
     name: string | null,
     label: string | null
   ) {
-    if (name == null && label == null)
+    if (name == null && label == null) {
       return {
         success: false,
         message: "updateTenant: all parameters are null",
       };
+    }
     let paramCount = 3;
-    let params: any = [new Date(), id];
+    const params: any = [new Date(), id];
     let query = "UPDATE wb.tenants SET ";
     if (name != null) query += `name=$${paramCount}, `;
     params.push(name);
@@ -182,8 +183,8 @@ export class DAL {
     userId: number,
     tenantRoleId: number | null
   ) {
-    var query = "DELETE FROM wb.tenant_users WHERE tenant_id=$1 AND user_id=$2";
-    var params: any = [tenantId, userId];
+    let query = "DELETE FROM wb.tenant_users WHERE tenant_id=$1 AND user_id=$2";
+    const params: any = [tenantId, userId];
     if (tenantRoleId) query += " AND role_id=$3";
     params.push(tenantRoleId);
     const result = await this.executeQuery({
@@ -240,10 +241,11 @@ export class DAL {
     firstName: string | null,
     lastName: string | null
   ) {
-    if (email == null && firstName == null && lastName == null)
+    if (email == null && firstName == null && lastName == null) {
       return { success: false, message: "updateUser: all parameters are null" };
+    }
     let paramCount = 3;
-    let params: any = [new Date(), id];
+    const params: any = [new Date(), id];
     let query = "UPDATE wb.users SET ";
     if (email != null) query += `email=$${paramCount}, `;
     params.push(email);
@@ -312,9 +314,8 @@ export class DAL {
         ],
       },
     ]);
-    let insertResult: ServiceResult = results[results.length - 1];
-    if (insertResult.success)
-      insertResult.payload = Schema.parseResult(insertResult.payload)[0];
+    const insertResult: ServiceResult = results[results.length - 1];
+    if (insertResult.success) insertResult.payload = Schema.parseResult(insertResult.payload)[0];
     return insertResult;
   }
 
@@ -345,7 +346,7 @@ export class DAL {
   }
 
   public async schemaByName(name: string) {
-    var result = await this.executeQuery({
+    const result = await this.executeQuery({
       query: "SELECT * FROM wb.schemas WHERE name=$1 LIMIT 1",
       params: <any>[name],
     });
@@ -364,7 +365,7 @@ export class DAL {
   }
 
   public async schemasByUserOwner(userEmail: string) {
-    var result = await this.executeQuery({
+    const result = await this.executeQuery({
       query: `
         SELECT wb.schemas.* FROM wb.schemas
         JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
@@ -375,7 +376,7 @@ export class DAL {
     if (result.success) {
       // TBD: map this instead
       const schemasWithRole = Array<Schema>();
-      for (let schema of Schema.parseResult(result.payload)) {
+      for (const schema of Schema.parseResult(result.payload)) {
         schema.userRole = "schema_owner";
         schemasWithRole.push(schema);
       }
@@ -385,7 +386,7 @@ export class DAL {
   }
 
   public async deleteSchema(schemaName: string) {
-    var results = await this.executeQueries([
+    const results = await this.executeQueries([
       {
         query: "DELETE FROM wb.schemas WHERE name=$1",
         params: <any>[schemaName],
@@ -420,8 +421,8 @@ export class DAL {
     userId: number,
     schemaRoleId: number | null
   ) {
-    var query = "DELETE FROM wb.schema_users WHERE schema_id=$1 AND user_id=$2";
-    var params: any = [schemaId, userId];
+    let query = "DELETE FROM wb.schema_users WHERE schema_id=$1 AND user_id=$2";
+    const params: any = [schemaId, userId];
     if (schemaRoleId) query += " AND role_id=$3";
     params.push(schemaRoleId);
     const result = await this.executeQuery({
@@ -441,7 +442,7 @@ export class DAL {
   }
 
   public async schemasByUser(userEmail: string) {
-    var result = await this.executeQuery({
+    const result = await this.executeQuery({
       query: `
         SELECT wb.schemas.*, wb.roles.name as role_name
         FROM wb.schemas
@@ -455,7 +456,7 @@ export class DAL {
     if (result.success) {
       // TBD: map this instead
       const schemasWithRole = Array<Schema>();
-      var schema: Schema;
+      let schema: Schema;
       result.payload.rows.forEach((row: any) => {
         schema = Schema.parse(row);
         schema.userRole = row.role_name;
@@ -476,10 +477,11 @@ export class DAL {
         "SELECT table_name FROM information_schema.tables WHERE table_schema=$1",
       params: <any>[schemaName],
     });
-    if (result.success)
+    if (result.success) {
       result.payload = result.payload.rows.map(
         (row: { table_name: string }) => row.table_name
       );
+    }
     return result;
   }
 

@@ -28,7 +28,7 @@ class HasuraApi {
     return http;
   }
 
-  private async post(type: string, args: {}) {
+  private async post(type: string, args: Record<string, any>) {
     let result: ServiceResult;
     try {
       log.debug(`hasuraApi.post: type: ${type}`, args);
