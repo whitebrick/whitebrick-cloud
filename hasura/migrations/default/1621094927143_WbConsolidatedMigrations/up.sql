@@ -1,4 +1,5 @@
 
+
 CREATE SCHEMA wb;
 
 CREATE TABLE IF NOT EXISTS wb.tenants(
@@ -56,6 +57,14 @@ CREATE TABLE IF NOT EXISTS wb.schemas(
 ALTER SEQUENCE wb.schemas_id_seq RESTART WITH 60001;
 CREATE INDEX idx_wb_schemas_name ON wb.schemas(name);
 
+CREATE TABLE IF NOT EXISTS wb.schema_users (
+  schema_id integer REFERENCES wb.schemas(id) NOT NULL,
+  user_id bigint REFERENCES wb.users(id) NOT NULL,
+  role_id integer REFERENCES wb.roles(id) NOT NULL,
+  created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+  PRIMARY KEY (schema_id, user_id, role_id)
+);
 
 -- CREATE TABLE IF NOT EXISTS wb.tables(
 --   id BIGSERIAL PRIMARY KEY,
