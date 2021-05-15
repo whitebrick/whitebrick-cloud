@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-if [[ $(basename $(pwd)) == "scripts" ]]; then
-  echo "Run this script from the parent directory"
+if [[ $(basename $(pwd)) != "hasura" ]]; then
+  echo "Run this script from the ./hasura directory"
   exit 1
 fi
 if [ $# -eq 0 ]; then
