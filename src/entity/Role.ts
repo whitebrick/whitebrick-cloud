@@ -22,7 +22,7 @@ export class Role {
     return roles;
   }
 
-  public static parse(data: any): Role {
+  public static parse(data: Record<string, any>): Role {
     if (!data) throw new Error("Role.parse: input is null");
     const role = new Role();
     role.id = data.id;

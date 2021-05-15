@@ -16,7 +16,7 @@ export class Tenant {
     return tenants;
   }
 
-  public static parse(data: any): Tenant {
+  public static parse(data: Record<string, any>): Tenant {
     if (!data) throw new Error("Tenant.parse: input is null");
     const tenant = new Tenant();
     tenant.id = data.id;

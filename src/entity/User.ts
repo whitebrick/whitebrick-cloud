@@ -18,7 +18,7 @@ export class User {
     return users;
   }
 
-  public static parse(data: any): User {
+  public static parse(data: Record<string, any>): User {
     if (!data) throw new Error("User.parse: input is null");
     const user = new User();
     user.id = data.id;

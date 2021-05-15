@@ -20,7 +20,7 @@ export class Schema {
     return schemas;
   }
 
-  public static parse(data: any): Schema {
+  public static parse(data: Record<string, any>): Schema {
     if (!data) throw new Error("Schema.parse: input is null");
     const schema = new Schema();
     schema.id = data.id;
