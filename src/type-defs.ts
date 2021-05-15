@@ -2,11 +2,11 @@ import { gql } from "apollo-server-lambda";
 
 export type ServiceResult =
   | { success: true; payload: any }
-  | { success: false; message: string; code: string };
+  | { success: false; message: string; code?: string };
 
 export type QueryParam = {
-  query: any;
-  params: [any];
+  query: string;
+  params?: any[];
 };
 
 export const typeDefs = gql`
@@ -90,7 +90,7 @@ export const typeDefs = gql`
     Schemas
     """
     wbCreateSchema(
-      name: String!
+      name: String! #@constraint(minLength: 3)
       label: String!
       tenantOwnerId: Int
       tenantOwnerName: String

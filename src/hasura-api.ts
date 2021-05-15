@@ -1,6 +1,6 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { ServiceResult } from "./type-defs";
 import { log } from "./whitebrick-cloud";
 

@@ -1,4 +1,5 @@
 import { ApolloServer } from "apollo-server-lambda";
+import { makeExecutableSchema } from "graphql-tools";
 import { resolvers } from "./resolvers";
 import { typeDefs } from "./type-defs";
 import { Logger } from "tslog";
@@ -17,6 +18,14 @@ export const graphqlHandler = new ApolloServer({
     };
   },
 }).createHandler();
+
+// Couldn't get this working (https://www.apollographql.com/blog/graphql-validation-using-directives-4908fd5c1055/)
+// const ConstraintDirective = require("graphql-constraint-directive");
+
+// export const schema = makeExecutableSchema({
+//   typeDefs,
+//   schemaDirectives: { constraint: ConstraintDirective },
+// });
 
 export const log: Logger = new Logger({
   minLevel: "debug",

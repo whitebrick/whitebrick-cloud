@@ -4,6 +4,8 @@ Feature:
     * def wb = call read('classpath:init.feature')
     * url wb.baseUrl
     * path wb.endpointPath
+    # initial reset can take some time
+    * configure readTimeout = 60000
 
   Scenario: Reset test data
     Given text query = 
