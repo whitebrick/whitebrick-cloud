@@ -1,7 +1,7 @@
 import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
-import { Tenant, User, Role, Schema } from './entity'
+import { Tenant, User, Role, Schema } from "./entity";
 import { QueryParam, ServiceResult } from "./schema";
 
 export class DAL {
