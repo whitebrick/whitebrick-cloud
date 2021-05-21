@@ -90,7 +90,7 @@ export const typeDefs = gql`
     Schemas
     """
     wbCreateSchema(
-      name: String! #@constraint(minLength: 3)
+      name: String! @constraint(minLength: 3)
       label: String!
       tenantOwnerId: Int
       tenantOwnerName: String
