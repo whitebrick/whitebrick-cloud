@@ -1,10 +1,8 @@
 import { ApolloServer } from "apollo-server-lambda";
-import { makeExecutableSchema } from "graphql-tools";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
-import { Schema } from "./entity/Schema";
-import { RoleName } from "./entity/Role";
+import { Schema, RoleName } from "./entity";
 import { schema } from "./schema";
 
 export const graphqlHandler = new ApolloServer({

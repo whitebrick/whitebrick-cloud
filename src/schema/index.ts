@@ -10,6 +10,15 @@ import {
 } from "graphql-constraint-directive";
 import { makeExecutableSchema } from "graphql-tools";
 
+export type ServiceResult =
+  | { success: true; payload: any }
+  | { success: false; message: string; code?: string };
+
+export type QueryParam = {
+  query: string;
+  params?: any[];
+};
+
 const typeDefs = gql`
   type Query {
     wbHealthCheck: String!

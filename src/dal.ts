@@ -1,11 +1,8 @@
 import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
-import { Tenant } from "./entity/Tenant";
-import { User } from "./entity/User";
-import { Role } from "./entity/Role";
-import { Schema } from "./entity/Schema";
-import { QueryParam, ServiceResult } from "./type-defs";
+import { Tenant, User, Role, Schema } from './entity'
+import { QueryParam, ServiceResult } from "./schema";
 
 export class DAL {
   private pool: Pool;
