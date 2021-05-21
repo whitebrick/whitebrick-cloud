@@ -1,22 +1,11 @@
 import { ApolloServer } from "apollo-server-lambda";
 import { makeExecutableSchema } from "graphql-tools";
-import {
-  constraintDirective,
-  constraintDirectiveTypeDefs,
-} from "graphql-constraint-directive";
-import { resolvers } from "./resolvers";
-import { typeDefs } from "./type-defs";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { Schema } from "./entity/Schema";
 import { RoleName } from "./entity/Role";
-
-const schema = makeExecutableSchema({
-  resolvers,
-  typeDefs: [constraintDirectiveTypeDefs, typeDefs],
-  schemaTransforms: [constraintDirective()],
-});
+import { schema } from "./schema";
 
 export const graphqlHandler = new ApolloServer({
   schema,
