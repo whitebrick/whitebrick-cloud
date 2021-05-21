@@ -31,22 +31,8 @@ export const typeDefs = gql`
 
 export const resolvers: IResolvers = {
   Query: {
-    wbTenants: async (_, __, context) => {
-      const result = await context.wbCloud.tenants();
-      if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
-      }
-      return result.payload;
-    },
-    wbTenantById: async (_, { id }, context) => {
-      const result = await context.wbCloud.tenantById(id);
-      if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
-      }
-      return result.payload;
-    },
-    wbTenantByName: async (_, { name }, context) => {
-      const result = await context.wbCloud.tenantByName(name);
+    wbSchemas: async (_, { userEmail }, context) => {
+      const result = await context.wbCloud.accessibleSchemas(userEmail);
       if (!result.success) {
         throw new ApolloError(result.message, _, { ref: result.code });
       }
