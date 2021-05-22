@@ -17,7 +17,9 @@ export const resolvers: IResolvers = {
     wbSchemaTableNames: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.schemaTableNames(schemaName);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -26,14 +28,18 @@ export const resolvers: IResolvers = {
     wbCreateTable: async (_, { schemaName, tableName }, context) => {
       const result = await context.wbCloud.createTable(schemaName, tableName);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.success;
     },
     wbTrackAllTables: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.trackAllTables(schemaName);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.success;
     },

@@ -27,21 +27,27 @@ export const resolvers: IResolvers = {
     wbTenants: async (_, __, context) => {
       const result = await context.wbCloud.tenants();
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
     wbTenantById: async (_, { id }, context) => {
       const result = await context.wbCloud.tenantById(id);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
     wbTenantByName: async (_, { name }, context) => {
       const result = await context.wbCloud.tenantByName(name);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -50,14 +56,18 @@ export const resolvers: IResolvers = {
     wbCreateTenant: async (_, { name, label }, context) => {
       const result = await context.wbCloud.createTenant(name, label);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
     wbUpdateTenant: async (_, { id, name, label }, context) => {
       const result = await context.wbCloud.updateTenant(id, name, label);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },

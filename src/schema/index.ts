@@ -37,7 +37,9 @@ const resolvers: IResolvers = {
     wbResetTestData: async (_, __, context) => {
       const result = await context.wbCloud.resetTestData();
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.success;
     },

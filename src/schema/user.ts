@@ -49,21 +49,27 @@ export const resolvers: IResolvers = {
     wbUsersByTenantId: async (_, { tenantId }, context) => {
       const result = await context.wbCloud.usersByTenantId(tenantId);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
     wbUserById: async (_, { id }, context) => {
       const result = await context.wbCloud.userById(id);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
     wbUserByEmail: async (_, { email }, context) => {
       const result = await context.wbCloud.userByEmail(email);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -77,7 +83,9 @@ export const resolvers: IResolvers = {
         lastName
       );
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -89,7 +97,9 @@ export const resolvers: IResolvers = {
         lastName
       );
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -105,7 +115,9 @@ export const resolvers: IResolvers = {
         tenantRole
       );
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -121,7 +133,9 @@ export const resolvers: IResolvers = {
         schemaRole
       );
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },

@@ -19,7 +19,7 @@ export const typeDefs = gql`
 
   extend type Mutation {
     wbCreateSchema(
-      name: String! @constraint(minLength: 3)
+      name: String!
       label: String!
       tenantOwnerId: Int
       tenantOwnerName: String
@@ -28,13 +28,16 @@ export const typeDefs = gql`
     ): Schema
   }
 `;
+//@constraint(minLength: 3)
 
 export const resolvers: IResolvers = {
   Query: {
     wbSchemas: async (_, { userEmail }, context) => {
       const result = await context.wbCloud.accessibleSchemas(userEmail);
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
@@ -61,7 +64,9 @@ export const resolvers: IResolvers = {
         userOwnerEmail
       );
       if (!result.success) {
-        throw new ApolloError(result.message, _, { ref: result.code });
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
       }
       return result.payload;
     },
