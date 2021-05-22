@@ -1,16 +1,12 @@
 import { ApolloServer } from "apollo-server-lambda";
-import { makeExecutableSchema } from "graphql-tools";
-import { resolvers } from "./resolvers";
-import { typeDefs } from "./type-defs";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
-import { Schema } from "./entity/Schema";
-import { RoleName } from "./entity/Role";
+import { Schema, RoleName } from "./entity";
+import { schema } from "./schema";
 
 export const graphqlHandler = new ApolloServer({
-  typeDefs,
-  resolvers,
+  schema,
   introspection: true,
   context: function () {
     return {
@@ -18,14 +14,6 @@ export const graphqlHandler = new ApolloServer({
     };
   },
 }).createHandler();
-
-// Couldn't get this working (https://www.apollographql.com/blog/graphql-validation-using-directives-4908fd5c1055/)
-// const ConstraintDirective = require("graphql-constraint-directive");
-
-// export const schema = makeExecutableSchema({
-//   typeDefs,
-//   schemaDirectives: { constraint: ConstraintDirective },
-// });
 
 export const log: Logger = new Logger({
   minLevel: "debug",
