@@ -35,6 +35,7 @@ whitebrick-cloud uses the following technologies
 
     or [Kubernetes](https://hasura.io/docs/latest/graphql/core/deployment/deployment-guides/kubernetes.html#deploy-kubernetes) and be sure to set a `HASURA_GRAPHQL_ADMIN_SECRET`.
     Launching Hasura will create data definitions and values in the `hdb_catalog` schema of the database.
+    If Hasura does not launch check and debug your DB connection/permissions with psql.
 
 3.  #### Install Hasura CLI
 
@@ -63,7 +64,7 @@ whitebrick-cloud uses the following technologies
 
 8.  #### Run Functional Tests
     Download [Karate](https://github.com/intuit/karate#getting-started) (the [stand-alone executable](https://github.com/intuit/karate/wiki/ZIP-Release) is all that is needed).
-    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) and then with Hasura running, change to the `./test` directory and run the command `karate ./functional/run.feature`
+    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test` directory and run the command `karate ./functional/run.feature`
 
 ## Architecture
 
@@ -76,7 +77,7 @@ whitebrick-cloud uses the following technologies
   Hasura needs to know about any DDL changes to update the GraphQL schema - for example, when a new table is added it must be _tracked_. This class is used to call the [Hasura Metadat API](https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/index.html) over HTTP.
 
 - ### WhitebrickCloud
-  This is the top-level API that exports the Apollo Server GraphQL handler and calls the DAL and HasuraAPI.
+  This is the top-level API that makes calls to the DAL and HasuraAPI and is called by the GraphQL resolvers.
 
 ## DB Schema
 

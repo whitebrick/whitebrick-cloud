@@ -28,7 +28,6 @@ export const typeDefs = gql`
     ): Schema
   }
 `;
-//@constraint(minLength: 3)
 
 export const resolvers: IResolvers = {
   Query: {

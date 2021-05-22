@@ -270,7 +270,8 @@ export class DAL {
 
   public async deleteTestUsers(): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "DELETE FROM wb.users WHERE email like 'test_%example.com'",
+      query:
+        "DELETE FROM wb.users WHERE email like 'test_%test.whitebrick.com'",
       params: [],
     });
     return result;
