@@ -11,6 +11,8 @@ export const typeDefs = gql`
     wbCreateTable(schemaName: String!, tableName: String!): Boolean!
   }
 `;
+// TBD-SG
+// Edit gql above to include wbTrackTableRelationships
 
 export const resolvers: IResolvers = {
   Query: {
@@ -43,5 +45,7 @@ export const resolvers: IResolvers = {
       }
       return result.success;
     },
+    // TBD-SG
+    // Add resolver for wbTrackTableRelationships
   },
 };
