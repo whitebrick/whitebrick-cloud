@@ -3,7 +3,7 @@ import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { Schema, RoleName } from "./entity";
-import { schema } from "./schema";
+import { schema } from "./gql";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -248,4 +248,11 @@ class WhitebrickCloud {
     }
     return result;
   }
+
+  // TBD-SG
+  // use trackAllTables as tamplate
+  // public async trackTableRelationships(schemaName: string, tableName: string) {
+  //  1. Get all realtionships: this.dal.tableRelationships(schemaName, tableName)
+  //  2. For each relationship: infer the object relationships and the array relationships
+  //  3. result = await hasuraApi.trackRelationship(schemaName, tableName, relationshipName, constraintTable, constraintColumn)
 }

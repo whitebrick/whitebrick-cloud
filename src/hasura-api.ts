@@ -1,7 +1,7 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
 import axios, { AxiosInstance, AxiosResponse } from "axios";
-import { ServiceResult } from "./schema";
+import { ServiceResult } from "./gql";
 import { log } from "./whitebrick-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {
@@ -84,6 +84,11 @@ class HasuraApi {
     }
     return result;
   }
+
+  // TBD-SG
+  // use trackTable as tamplate
+  // public async trackRelationship(schemaName: string, tableName: string, relationshipName: string, constraintTable: string, constraintColumn: string) {
+  // https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/relationship.html#using-foreign-key-constraint-on-a-remote-table
 }
 
 export const hasuraApi = new HasuraApi();

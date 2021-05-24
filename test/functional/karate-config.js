@@ -22,7 +22,8 @@ function fn() {
 
   config = {
     baseUrl: "http://localhost:3000",
-    endpointPath: "/graphql"
+    endpointPath: "/graphql",
+    readTimeout: 60000
   }
 
   return config;

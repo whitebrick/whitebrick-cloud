@@ -2,7 +2,7 @@ import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
 import { Tenant, User, Role, Schema } from "./entity";
-import { QueryParam, ServiceResult } from "./schema";
+import { QueryParam, ServiceResult } from "./gql";
 
 export class DAL {
   private pool: Pool;
@@ -518,4 +518,8 @@ export class DAL {
     });
     return result;
   }
+
+  // TBD-SG
+  // use schemaTableNames as tamplate
+  // public async tableRelationships(schemaName: string, tableName: string): Promise<ServiceResult> {
 }
