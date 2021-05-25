@@ -87,8 +87,9 @@ class HasuraApi {
 
   // TBD-SG
   // use trackTable as tamplate
-  // public async trackRelationship(schemaName: string, tableName: string, relationshipName: string, constraintTable: string, constraintColumn: string) {
+  // public async trackRelationship(schemaName: string, tableName: string, objectOrArray: string, relationshipName: string, constraintTable: string, constraintColumn: string) {
   // https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/relationship.html#using-foreign-key-constraint-on-a-remote-table
+  // https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/relationship.html#id3
 }
 
 export const hasuraApi = new HasuraApi();

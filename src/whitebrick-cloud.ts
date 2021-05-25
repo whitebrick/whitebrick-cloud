@@ -254,5 +254,6 @@ class WhitebrickCloud {
   // public async trackTableRelationships(schemaName: string, tableName: string) {
   //  1. Get all realtionships: this.dal.tableRelationships(schemaName, tableName)
   //  2. For each relationship: infer the object relationships and the array relationships
-  //  3. result = await hasuraApi.trackRelationship(schemaName, tableName, relationshipName, constraintTable, constraintColumn)
+  //  3. Create the relationship:
+  //     result = await hasuraApi.trackRelationship(schemaName, tableName, objectOrArray, relationshipName, constraintTable, constraintColumn)
 }
