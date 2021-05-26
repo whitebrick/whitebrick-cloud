@@ -569,7 +569,7 @@ export class DAL {
       params: [userEmail, schemaName, tableName],
     });
     if (result.success && result.payload != null) {
-      result.payload = JSON.stringify(result.payload.rows[0]);
+      result.payload = result.payload.rows[0];
     }
     return result;
   }

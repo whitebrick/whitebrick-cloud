@@ -11,7 +11,7 @@ export const typeDefs = gql`
       userEmail: String!
       schemaName: String!
       tableName: String!
-    ): String
+    ): JSON
   }
 
   extend type Mutation {
@@ -46,9 +46,9 @@ export const resolvers: IResolvers = {
       context
     ) => {
       const result = await context.wbCloud.tableUserSettings(
+        userEmail,
         schemaName,
-        tableName,
-        userEmail
+        tableName
       );
       if (!result.success) {
         throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
