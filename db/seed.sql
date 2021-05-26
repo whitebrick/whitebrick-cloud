@@ -1,4 +1,5 @@
 INSERT INTO wb.roles(name, label) VALUES
+  ('table_inherit','Inherit Table Role From Schema'),
   ('tenant_user','Organization User'),
   ('tenant_admin','Organization Admin'),
   ('schema_owner','DB Owner'),

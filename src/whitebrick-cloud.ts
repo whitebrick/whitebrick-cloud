@@ -2,7 +2,7 @@ import { ApolloServer } from "apollo-server-lambda";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
-import { Schema, RoleName } from "./entity";
+import { Table } from "./entity";
 import { schema } from "./gql";
 
 export const graphqlHandler = new ApolloServer({
@@ -229,6 +229,10 @@ class WhitebrickCloud {
     return await hasuraApi.trackTable(schemaName, tableName);
   }
 
+  public async addTable(schemaName: string, tableName: string) {
+    return await this.dal.addTable(schemaName, tableName, tableName);
+  }
+
   public async deleteTable(schemaName: string, tableName: string) {
     const result = await this.dal.deleteTable(schemaName, tableName);
     if (!result.success) return result;
@@ -243,10 +247,43 @@ class WhitebrickCloud {
     let result = await this.schemaTableNames(schemaName);
     if (!result.success) return result;
     for (const tableName of result.payload) {
+      result = await this.dal.addTable(schemaName, tableName, tableName);
+      if (!result.success) return result;
       result = await hasuraApi.trackTable(schemaName, tableName);
       if (!result.success) return result;
     }
     return result;
+  }
+
+  public async tableUserSettings(
+    userEmail: string,
+    schemaName: string,
+    tableName: string
+  ) {
+    return this.dal.tableUserSettings(userEmail, schemaName, tableName);
+  }
+
+  public async saveTableUserSettings(
+    schemaName: string,
+    tableName: string,
+    userEmail: string,
+    settings: object
+  ) {
+    const tableResult = await this.dal.tableBySchemaNameTableName(
+      schemaName,
+      tableName
+    );
+    if (!tableResult.success) return tableResult;
+    const userResult = await this.dal.userByEmail(userEmail);
+    if (!userResult.success) return userResult;
+    const roleResult = await this.dal.roleByName("table_inherit");
+    if (!roleResult.success) return roleResult;
+    return this.dal.saveTableUserSettings(
+      tableResult.payload.id,
+      userResult.payload.id,
+      roleResult.payload.id,
+      settings
+    );
   }
 
   // TBD-SG

@@ -1,7 +1,7 @@
 import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
-import { Tenant, User, Role, Schema } from "./entity";
+import { Tenant, User, Role, Schema, Table } from "./entity";
 import { QueryParam, ServiceResult } from "./gql";
 
 export class DAL {
@@ -493,6 +493,19 @@ export class DAL {
     return result;
   }
 
+  public async tableBySchemaNameTableName(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query:
+        "SELECT * FROM wb.tables JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id WHERE wb.schemas.name=$1 AND wb.tables.name=$2 LIMIT 1",
+      params: [schemaName, tableName],
+    });
+    if (result.success) result.payload = Table.parseResult(result.payload)[0];
+    return result;
+  }
+
   public async createTable(
     schemaName: string,
     tableName: string
@@ -506,6 +519,25 @@ export class DAL {
     return result;
   }
 
+  public async addTable(
+    schemaName: string,
+    tableName: string,
+    tableLabel: string
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    tableLabel = DAL.sanitize(tableLabel);
+    const result = await this.executeQuery({
+      query: `
+        INSERT INTO wb.tables(schema_id, name, label, created_at, updated_at)
+        SELECT id, '${tableName}', '${tableLabel}', current_timestamp, current_timestamp
+        FROM wb.schemas WHERE name=$1
+      `,
+      params: [schemaName],
+    });
+    return result;
+  }
+
   public async deleteTable(
     schemaName: string,
     tableName: string
@@ -515,6 +547,47 @@ export class DAL {
     const result = await this.executeQuery({
       query: `DROP TABLE "${schemaName}"."${tableName}" CASCADE`,
       params: [],
+    });
+    return result;
+  }
+
+  public async tableUserSettings(
+    userEmail: string,
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT settings
+        FROM wb.table_users
+        JOIN wb.tables ON wb.table_users.table_id=wb.tables.id
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        JOIN wb.users ON wb.table_users.user_id=wb.users.id
+        WHERE wb.users.email=$1 AND wb.schemas.name=$2 AND wb.tables.name=$3
+        LIMIT 1
+      `,
+      params: [userEmail, schemaName, tableName],
+    });
+    if (result.success && result.payload != null) {
+      result.payload = JSON.stringify(result.payload.rows[0]);
+    }
+    return result;
+  }
+
+  public async saveTableUserSettings(
+    tableId: number,
+    userId: number,
+    roleId: number,
+    settings: object
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        INSERT INTO wb.table_users (table_id, user_id, role_id, settings)
+        VALUES($1, $2, $3, $4)
+        ON CONFLICT (table_id, user_id, role_id) 
+        DO UPDATE SET settings = EXCLUDED.settings
+      `,
+      params: [tableId, userId, roleId, settings],
     });
     return result;
   }
