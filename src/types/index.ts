@@ -11,7 +11,7 @@ import {
 import { makeExecutableSchema } from "graphql-tools";
 
 export type ServiceResult =
-  | { success: true; payload: any }
+  | { success: true; payload: any; message?: string }
   | { success: false; message: string; code?: string };
 
 export type QueryParam = {

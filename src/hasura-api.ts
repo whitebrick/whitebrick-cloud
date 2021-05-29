@@ -1,7 +1,7 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
 import axios, { AxiosInstance, AxiosResponse } from "axios";
-import { ServiceResult } from "./gql";
+import { ServiceResult } from "./types";
 import { log } from "./whitebrick-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {
@@ -65,6 +65,13 @@ class HasuraApi {
         name: tableName,
       },
     });
+    if (!result.success && result.code == "already-tracked") {
+      return <ServiceResult>{
+        success: true,
+        payload: true,
+        message: "already-tracked",
+      };
+    }
     return result;
   }
 

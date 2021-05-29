@@ -5,13 +5,31 @@ import { GraphQLJSON } from "graphql-type-json";
 export const typeDefs = gql`
   scalar JSON
 
+  type Table {
+    id: ID!
+    schemaId: Int!
+    name: String!
+    label: String!
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type TableUser {
+    tableId: Int!
+    userId: Int!
+    roleId: Int!
+    settings: JSON
+    createdAt: String!
+    updatedAt: String!
+  }
+
   extend type Query {
-    wbSchemaTableNames(schemaName: String!): [String]
-    wbTableUserSettings(
+    wbTables(schemaName: String!): [Table]
+    wbTableUser(
       userEmail: String!
       schemaName: String!
       tableName: String!
-    ): JSON
+    ): TableUser
   }
 
   extend type Mutation {
@@ -31,8 +49,8 @@ export const typeDefs = gql`
 export const resolvers: IResolvers = {
   JSON: GraphQLJSON,
   Query: {
-    wbSchemaTableNames: async (_, { schemaName }, context) => {
-      const result = await context.wbCloud.schemaTableNames(schemaName);
+    wbTables: async (_, { schemaName }, context) => {
+      const result = await context.wbCloud.tables(schemaName);
       if (!result.success) {
         throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
           ref: result.code,
@@ -40,12 +58,8 @@ export const resolvers: IResolvers = {
       }
       return result.payload;
     },
-    wbTableUserSettings: async (
-      _,
-      { schemaName, tableName, userEmail },
-      context
-    ) => {
-      const result = await context.wbCloud.tableUserSettings(
+    wbTableUser: async (_, { schemaName, tableName, userEmail }, context) => {
+      const result = await context.wbCloud.tableUser(
         userEmail,
         schemaName,
         tableName

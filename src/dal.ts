@@ -1,8 +1,8 @@
 import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
-import { Tenant, User, Role, Schema, Table } from "./entity";
-import { QueryParam, ServiceResult } from "./gql";
+import { Tenant, User, Role, Schema, Table, TableUser } from "./entity";
+import { QueryParam, ServiceResult } from "./types";
 
 export class DAL {
   private pool: Pool;
@@ -71,7 +71,10 @@ export class DAL {
 
   public async tenants(): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.tenants",
+      query: `
+        SELECT wb.tenants.*
+        FROM wb.tenants
+      `,
     });
     if (result.success) result.payload = Tenant.parseResult(result.payload);
     return result;
@@ -79,7 +82,11 @@ export class DAL {
 
   public async tenantById(id: number): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.tenants WHERE id=$1 LIMIT 1",
+      query: `
+        SELECT wb.tenants.*
+        FROM wb.tenants
+        WHERE id=$1 LIMIT 1
+      `,
       params: [id],
     });
     if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
@@ -88,7 +95,11 @@ export class DAL {
 
   public async tenantByName(name: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.tenants WHERE name=$1 LIMIT 1",
+      query: `
+        SELECT wb.tenants.*
+        FROM wb.tenants
+        WHERE name=$1 LIMIT 1
+      `,
       params: [name],
     });
     if (result.success) {
@@ -110,8 +121,12 @@ export class DAL {
     label: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "INSERT INTO wb.tenants(name, label, created_at, updated_at) VALUES($1, $2, $3, $4) RETURNING *",
+      query: `
+        INSERT INTO wb.tenants(
+          name, label, created_at, updated_at
+        ) VALUES($1, $2, $3, $4)
+        RETURNING *
+      `,
       params: [name, label, new Date(), new Date()],
     });
     if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
@@ -150,11 +165,17 @@ export class DAL {
   public async deleteTestTenants(): Promise<ServiceResult> {
     const results = await this.executeQueries([
       {
-        query:
-          "DELETE FROM wb.tenant_users WHERE tenant_id IN (SELECT id FROM wb.tenants WHERE name like 'test_%')",
+        query: `
+          DELETE FROM wb.tenant_users
+          WHERE tenant_id IN (
+            SELECT id FROM wb.tenants WHERE name like 'test_%'
+          )
+        `,
       },
       {
-        query: "DELETE FROM wb.tenants WHERE name like 'test_%'",
+        query: `
+          DELETE FROM wb.tenants WHERE name like 'test_%'
+        `,
       },
     ]);
     return results[results.length - 1];
@@ -170,8 +191,11 @@ export class DAL {
     tenantRoleId: number
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "INSERT INTO wb.tenant_users(tenant_id, user_id, role_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5)",
+      query: `
+        INSERT INTO wb.tenant_users(
+          tenant_id, user_id, role_id, created_at, updated_at
+        ) VALUES($1, $2, $3, $4, $5)
+      `,
       params: [tenantId, userId, tenantRoleId, new Date(), new Date()],
     });
     return result;
@@ -182,7 +206,10 @@ export class DAL {
     userId: number,
     tenantRoleId?: number
   ): Promise<ServiceResult> {
-    let query = "DELETE FROM wb.tenant_users WHERE tenant_id=$1 AND user_id=$2";
+    let query = `
+      DELETE FROM wb.tenant_users
+      WHERE tenant_id=$1 AND user_id=$2
+    `;
     const params: (number | undefined)[] = [tenantId, userId];
     if (tenantRoleId) query += " AND role_id=$3";
     params.push(tenantRoleId);
@@ -199,7 +226,11 @@ export class DAL {
 
   public async usersByTenantId(tenantId: number): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.users WHERE tenant_id=$1",
+      query: `
+        SELECT wb.users.*
+        FROM wb.users
+        WHERE tenant_id=$1
+      `,
       params: [tenantId],
     });
     if (result.success) result.payload = User.parseResult(result.payload);
@@ -208,7 +239,11 @@ export class DAL {
 
   public async userById(id: number): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.users WHERE id=$1 LIMIT 1",
+      query: `
+        SELECT wb.users.*
+        FROM wb.users
+        WHERE id=$1 LIMIT 1
+      `,
       params: [id],
     });
     if (result.success) result.payload = User.parseResult(result.payload)[0];
@@ -217,7 +252,10 @@ export class DAL {
 
   public async userByEmail(email: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.users WHERE email=$1 LIMIT 1",
+      query: `
+        SELECT * FROM wb.users
+        WHERE email=$1 LIMIT 1
+      `,
       params: [email],
     });
     if (result.success) result.payload = User.parseResult(result.payload)[0];
@@ -230,8 +268,11 @@ export class DAL {
     lastName: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "INSERT INTO wb.users(email, first_name, last_name, created_at, updated_at) VALUES($1, $2, $3, $4, $5) RETURNING *",
+      query: `
+        INSERT INTO wb.users(
+          email, first_name, last_name, created_at, updated_at
+        ) VALUES($1, $2, $3, $4, $5) RETURNING *
+      `,
       params: [email, firstName, lastName, new Date(), new Date()],
     });
     if (result.success) result.payload = User.parseResult(result.payload)[0];
@@ -270,8 +311,10 @@ export class DAL {
 
   public async deleteTestUsers(): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "DELETE FROM wb.users WHERE email like 'test_%test.whitebrick.com'",
+      query: `
+        DELETE FROM wb.users
+        WHERE email like 'test_%test.whitebrick.com'
+      `,
       params: [],
     });
     return result;
@@ -283,7 +326,11 @@ export class DAL {
 
   public async roleByName(name: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.roles WHERE name=$1 LIMIT 1",
+      query: `
+        SELECT wb.roles.*
+        FROM wb.roles
+        WHERE name=$1 LIMIT 1
+      `,
       params: [name],
     });
     if (result.success) result.payload = Role.parseResult(result.payload)[0];
@@ -305,8 +352,11 @@ export class DAL {
         query: `CREATE SCHEMA "${DAL.sanitize(name)}"`,
       },
       {
-        query:
-          "INSERT INTO wb.schemas(name, label, tenant_owner_id, user_owner_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6) RETURNING *",
+        query: `
+          INSERT INTO wb.schemas(
+            name, label, tenant_owner_id, user_owner_id, created_at, updated_at
+          ) VALUES($1, $2, $3, $4, $5, $6) RETURNING *
+        `,
         params: [
           name,
           label,
@@ -330,12 +380,19 @@ export class DAL {
     if (!schemaNamePattern) schemaNamePattern = "%";
     const results = await this.executeQueries([
       {
-        query:
-          "SELECT * FROM information_schema.schemata WHERE schema_name LIKE $1;",
+        query: `
+          SELECT information_schema.schemata.*
+          FROM information_schema.schemata
+          WHERE schema_name LIKE $1
+        `,
         params: [schemaNamePattern],
       },
       {
-        query: "SELECT * FROM wb.schemas WHERE name LIKE $1;",
+        query: `
+          SELECT wb.schemas.*
+          FROM wb.schemas
+          WHERE name LIKE $1
+        `,
         params: [schemaNamePattern],
       },
     ]);
@@ -354,7 +411,11 @@ export class DAL {
 
   public async schemaByName(name: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query: "SELECT * FROM wb.schemas WHERE name=$1 LIMIT 1",
+      query: `
+        SELECT wb.schemas.*
+        FROM wb.schemas
+        WHERE name=$1 LIMIT 1
+      `,
       params: [name],
     });
     if (result.success) {
@@ -395,7 +456,10 @@ export class DAL {
   public async deleteSchema(schemaName: string): Promise<ServiceResult> {
     const results = await this.executeQueries([
       {
-        query: "DELETE FROM wb.schemas WHERE name=$1",
+        query: `
+          DELETE FROM wb.schemas
+          WHERE name=$1
+        `,
         params: [schemaName],
       },
       {
@@ -415,8 +479,11 @@ export class DAL {
     schemaRoleId: number
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "INSERT INTO wb.schema_users(schema_id, user_id, role_id, created_at, updated_at) VALUES($1, $2, $3, $4, $5)",
+      query: `
+        INSERT INTO wb.schema_users(
+          schema_id, user_id, role_id, created_at, updated_at
+        ) VALUES($1, $2, $3, $4, $5)
+      `,
       params: [schemaId, userId, schemaRoleId, new Date(), new Date()],
     });
     return result;
@@ -427,7 +494,10 @@ export class DAL {
     userId: number,
     schemaRoleId?: number
   ): Promise<ServiceResult> {
-    let query = "DELETE FROM wb.schema_users WHERE schema_id=$1 AND user_id=$2";
+    let query = `
+      DELETE FROM wb.schema_users
+      WHERE schema_id=$1 AND user_id=$2
+    `;
     const params: (number | undefined)[] = [schemaId, userId];
     if (schemaRoleId) query += " AND role_id=$3";
     params.push(schemaRoleId);
@@ -442,8 +512,12 @@ export class DAL {
     schemaName: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "DELETE FROM wb.schema_users WHERE schema_id IN (SELECT id FROM wb.schemas WHERE name=$1)",
+      query: `
+        DELETE FROM wb.schema_users
+        WHERE schema_id IN (
+          SELECT id FROM wb.schemas WHERE name=$1
+        )
+      `,
       params: [schemaName],
     });
     return result;
@@ -479,10 +553,27 @@ export class DAL {
    * Tables
    */
 
-  public async schemaTableNames(schemaName: string): Promise<ServiceResult> {
+  public async tables(schemaName: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "SELECT table_name FROM information_schema.tables WHERE table_schema=$1",
+      query: `
+        SELECT wb.tables.*
+        FROM wb.tables
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        WHERE wb.schemas.name=$1
+      `,
+      params: [schemaName],
+    });
+    if (result.success) result.payload = Table.parseResult(result.payload);
+    return result;
+  }
+
+  public async discoverTables(schemaName: string): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT information_schema.tables.table_name
+        FROM information_schema.tables
+        WHERE table_schema=$1
+      `,
       params: [schemaName],
     });
     if (result.success) {
@@ -498,8 +589,12 @@ export class DAL {
     tableName: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
-      query:
-        "SELECT * FROM wb.tables JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id WHERE wb.schemas.name=$1 AND wb.tables.name=$2 LIMIT 1",
+      query: `
+        SELECT wb.tables.*
+        FROM wb.tables
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        WHERE wb.schemas.name=$1 AND wb.tables.name=$2 LIMIT 1
+      `,
       params: [schemaName, tableName],
     });
     if (result.success) result.payload = Table.parseResult(result.payload)[0];
@@ -529,11 +624,31 @@ export class DAL {
     tableLabel = DAL.sanitize(tableLabel);
     const result = await this.executeQuery({
       query: `
-        INSERT INTO wb.tables(schema_id, name, label, created_at, updated_at)
+        INSERT INTO wb.tables(
+          schema_id, name, label, created_at, updated_at
+        )
         SELECT id, '${tableName}', '${tableLabel}', current_timestamp, current_timestamp
         FROM wb.schemas WHERE name=$1
       `,
       params: [schemaName],
+    });
+    return result;
+  }
+
+  public async removeTable(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        DELETE FROM wb.tables
+        WHERE schema_id IN (
+          SELECT id FROM wb.schemas
+          WHERE wb.schemas.name=$1
+        )
+        AND wb.tables.name=$2
+      `,
+      params: [schemaName, tableName],
     });
     return result;
   }
@@ -545,20 +660,24 @@ export class DAL {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
     const result = await this.executeQuery({
-      query: `DROP TABLE "${schemaName}"."${tableName}" CASCADE`,
+      query: `DROP TABLE IF EXISTS "${schemaName}"."${tableName}" CASCADE`,
       params: [],
     });
     return result;
   }
 
-  public async tableUserSettings(
+  /**
+   * Table Users
+   */
+
+  public async tableUser(
     userEmail: string,
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
-        SELECT settings
+        SELECT wb.table_users.*
         FROM wb.table_users
         JOIN wb.tables ON wb.table_users.table_id=wb.tables.id
         JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
@@ -568,9 +687,40 @@ export class DAL {
       `,
       params: [userEmail, schemaName, tableName],
     });
-    if (result.success && result.payload != null) {
-      result.payload = result.payload.rows[0];
+    if (result.success) {
+      result.payload = TableUser.parseResult(result.payload)[0];
     }
+    return result;
+  }
+
+  public async removeTableUsers(
+    schemaName: string,
+    tableName: string,
+    userEmails?: [string]
+  ): Promise<ServiceResult> {
+    let params = [schemaName, tableName];
+    let query = `
+      DELETE FROM wb.table_users
+      WHERE wb.table_users.table_id IN (
+        SELECT wb.tables.id FROM wb.tables
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        WHERE wb.schemas.name=$1
+        AND wb.tables.name=$2
+      )
+    `;
+    if (userEmails && userEmails.length > 0) {
+      params.push(userEmails.join(","));
+      query += `
+        AND wb.table_users.user_id IN (
+          SELECT wb.users.id from wb.users
+          WHERE email IN $3
+        )
+      `;
+    }
+    const result = await this.executeQuery({
+      query: query,
+      params: params,
+    });
     return result;
   }
 
@@ -582,7 +732,9 @@ export class DAL {
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
-        INSERT INTO wb.table_users (table_id, user_id, role_id, settings)
+        INSERT INTO wb.table_users (
+          table_id, user_id, role_id, settings
+        )
         VALUES($1, $2, $3, $4)
         ON CONFLICT (table_id, user_id, role_id) 
         DO UPDATE SET settings = EXCLUDED.settings
@@ -593,6 +745,6 @@ export class DAL {
   }
 
   // TBD-SG
-  // use schemaTableNames as tamplate
+  // use tables as tamplate
   // public async tableRelationships(schemaName: string, tableName: string): Promise<ServiceResult> {
 }

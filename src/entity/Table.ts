@@ -2,7 +2,7 @@ import { QueryResult } from "pg";
 
 export class Table {
   id!: number;
-  schema_id!: number;
+  schemaId!: number;
   name!: string;
   label!: string;
   createdAt!: Date;
@@ -21,6 +21,7 @@ export class Table {
     if (!data) throw new Error("Table.parse: input is null");
     const table = new Table();
     table.id = data.id;
+    table.schemaId = data.schema_id;
     table.name = data.name;
     table.label = data.label;
     table.createdAt = data.created_at;

@@ -3,7 +3,7 @@ import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { Table } from "./entity";
-import { schema } from "./gql";
+import { schema } from "./types";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -170,9 +170,13 @@ class WhitebrickCloud {
   }
 
   public async deleteSchema(schemaName: string) {
-    let result = await this.schemaTableNames(schemaName);
+    let result = await this.dal.discoverTables(schemaName);
     if (!result.success) return result;
     for (const tableName of result.payload) {
+      result = await this.dal.removeTableUsers(schemaName, tableName);
+      if (!result.success) return result;
+      result = await this.removeTable(schemaName, tableName);
+      if (!result.success) return result;
       result = await this.deleteTable(schemaName, tableName);
       if (!result.success) return result;
     }
@@ -229,8 +233,12 @@ class WhitebrickCloud {
     return await hasuraApi.trackTable(schemaName, tableName);
   }
 
-  public async addTable(schemaName: string, tableName: string) {
-    return await this.dal.addTable(schemaName, tableName, tableName);
+  public async addTable(
+    schemaName: string,
+    tableName: string,
+    tableLabel: string
+  ) {
+    return await this.dal.addTable(schemaName, tableName, tableLabel);
   }
 
   public async deleteTable(schemaName: string, tableName: string) {
@@ -239,28 +247,35 @@ class WhitebrickCloud {
     return await hasuraApi.untrackTable(schemaName, tableName);
   }
 
-  public async schemaTableNames(schemaName: string) {
-    return this.dal.schemaTableNames(schemaName);
+  public async removeTable(schemaName: string, tableName: string) {
+    return await this.dal.removeTable(schemaName, tableName);
+  }
+
+  public async tables(schemaName: string) {
+    return this.dal.tables(schemaName);
   }
 
   public async trackAllTables(schemaName: string) {
-    let result = await this.schemaTableNames(schemaName);
+    let result = await this.dal.discoverTables(schemaName);
     if (!result.success) return result;
-    for (const tableName of result.payload) {
-      result = await this.dal.addTable(schemaName, tableName, tableName);
+    const tableNames = result.payload;
+    for (const tableName of tableNames) {
+      result = await this.addTable(schemaName, tableName, tableName);
       if (!result.success) return result;
+    }
+    for (const tableName of tableNames) {
       result = await hasuraApi.trackTable(schemaName, tableName);
       if (!result.success) return result;
     }
     return result;
   }
 
-  public async tableUserSettings(
+  public async tableUser(
     userEmail: string,
     schemaName: string,
     tableName: string
   ) {
-    return this.dal.tableUserSettings(userEmail, schemaName, tableName);
+    return this.dal.tableUser(userEmail, schemaName, tableName);
   }
 
   public async saveTableUserSettings(
