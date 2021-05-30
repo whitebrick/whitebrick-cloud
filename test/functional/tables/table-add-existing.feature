@@ -5,14 +5,14 @@ Feature:
     * url wb.baseUrl
     * path wb.endpointPath
 
-  Scenario: Create a table
+    Scenario: Add all existing tables
     Given text query = 
     """
-      mutation ($schemaName: String!, $tableName: String!){
-        wbCreateTable(schemaName: $schemaName, tableName: $tableName)
+      mutation ($schemaName: String!){
+        wbAddAllExistingTables(schemaName: $schemaName)
       }
     """
-    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)'}
+    And def variables = { schemaName: '#(schemaName)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200

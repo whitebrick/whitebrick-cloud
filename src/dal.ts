@@ -601,37 +601,35 @@ export class DAL {
     return result;
   }
 
-  public async createTable(
-    schemaName: string,
-    tableName: string
-  ): Promise<ServiceResult> {
-    schemaName = DAL.sanitize(schemaName);
-    tableName = DAL.sanitize(tableName);
-    const result = await this.executeQuery({
-      query: `CREATE TABLE "${schemaName}"."${tableName}"()`,
-      params: [],
-    });
-    return result;
-  }
-
   public async addTable(
     schemaName: string,
     tableName: string,
-    tableLabel: string
+    tableLabel: string,
+    create: boolean
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
-    tableLabel = DAL.sanitize(tableLabel);
-    const result = await this.executeQuery({
+    let result = await this.schemaByName(schemaName);
+    if (!result.success) return result;
+    result = await this.executeQuery({
       query: `
-        INSERT INTO wb.tables(
-          schema_id, name, label, created_at, updated_at
-        )
-        SELECT id, '${tableName}', '${tableLabel}', current_timestamp, current_timestamp
-        FROM wb.schemas WHERE name=$1
+        INSERT INTO wb.tables(schema_id, name, label, created_at, updated_at)
+        VALUES ($1, $2, $3, $4, $5)
       `,
-      params: [schemaName],
+      params: [
+        result.payload.id,
+        tableName,
+        tableLabel,
+        new Date(),
+        new Date(),
+      ],
     });
+    if (!result.success) return result;
+    if (create) {
+      result = await this.executeQuery({
+        query: `CREATE TABLE "${schemaName}"."${tableName}"()`,
+      });
+    }
     return result;
   }
 
@@ -661,8 +659,48 @@ export class DAL {
     tableName = DAL.sanitize(tableName);
     const result = await this.executeQuery({
       query: `DROP TABLE IF EXISTS "${schemaName}"."${tableName}" CASCADE`,
-      params: [],
     });
+    return result;
+  }
+
+  public async updateTable(
+    schemaName: string,
+    tableName: string,
+    newTableName?: string,
+    newTableLabel?: string
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    let result = await this.tableBySchemaNameTableName(schemaName, tableName);
+    if (!result.success) return result;
+    let params = [];
+    let query = `
+      UPDATE wb.tables SET
+    `;
+    let updates: string[] = [];
+    if (newTableName) {
+      updates.push("name=$" + (params.length + 1));
+      params.push(newTableName);
+    }
+    if (newTableLabel) {
+      updates.push("label=$" + (params.length + 1));
+      params.push(newTableLabel);
+    }
+    query += `${updates.join(", ")} WHERE id=$${params.length + 1}`;
+    params.push(result.payload.id);
+    result = await this.executeQuery({
+      query: query,
+      params: params,
+    });
+    if (!result.success) return result;
+    if (newTableName) {
+      result = await this.executeQuery({
+        query: `
+        ALTER TABLE ${schemaName}.${tableName}
+        RENAME TO ${newTableName}
+      `,
+      });
+    }
     return result;
   }
 

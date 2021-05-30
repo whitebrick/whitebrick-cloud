@@ -3,7 +3,8 @@ import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { Table } from "./entity";
-import { schema } from "./types";
+import { schema, ServiceResult } from "./types";
+import v = require("voca");
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -146,9 +147,14 @@ class WhitebrickCloud {
     userOwnerId: number | null,
     userOwnerEmail: string | null
   ) {
-    log.info(
-      `wbCloud.createSchema name=${name}, label=${label}, tenantOwnerId=${tenantOwnerId}, tenantOwnerName=${tenantOwnerName}, userOwnerId=${userOwnerId}, userOwnerEmail=${userOwnerEmail}`
-    );
+    log.info(`
+      wbCloud.createSchema name=${name},
+      label=${label},
+      tenantOwnerId=${tenantOwnerId},
+      tenantOwnerName=${tenantOwnerName},
+      userOwnerId=${userOwnerId},
+      userOwnerEmail=${userOwnerEmail}
+    `);
     let result;
     if (!tenantOwnerId && !userOwnerId) {
       if (tenantOwnerName) {
@@ -227,8 +233,17 @@ class WhitebrickCloud {
    * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
    */
 
-  public async createTable(schemaName: string, tableName: string) {
-    const result = await this.dal.createTable(schemaName, tableName);
+  public async createTable(
+    schemaName: string,
+    tableName: string,
+    tableLabel: string
+  ) {
+    const result = await this.dal.addTable(
+      schemaName,
+      tableName,
+      tableLabel,
+      true
+    );
     if (!result.success) return result;
     return await hasuraApi.trackTable(schemaName, tableName);
   }
@@ -238,7 +253,14 @@ class WhitebrickCloud {
     tableName: string,
     tableLabel: string
   ) {
-    return await this.dal.addTable(schemaName, tableName, tableLabel);
+    const result = await this.dal.addTable(
+      schemaName,
+      tableName,
+      tableLabel,
+      false
+    );
+    if (!result.success) return result;
+    return await hasuraApi.trackTable(schemaName, tableName);
   }
 
   public async deleteTable(schemaName: string, tableName: string) {
@@ -255,16 +277,41 @@ class WhitebrickCloud {
     return this.dal.tables(schemaName);
   }
 
-  public async trackAllTables(schemaName: string) {
+  public async updateTable(
+    schemaName: string,
+    tableName: string,
+    newTableName?: string,
+    newTableLabel?: string
+  ) {
+    let result: ServiceResult;
+    if (newTableName) {
+      result = await hasuraApi.untrackTable(schemaName, tableName);
+      if (!result.success) return result;
+    }
+    result = await this.dal.updateTable(
+      schemaName,
+      tableName,
+      newTableName,
+      newTableLabel
+    );
+    if (!result.success) return result;
+    if (newTableName) {
+      result = await hasuraApi.trackTable(schemaName, newTableName);
+      if (!result.success) return result;
+    }
+    return result;
+  }
+
+  public async addAllExistingTables(schemaName: string) {
     let result = await this.dal.discoverTables(schemaName);
     if (!result.success) return result;
     const tableNames = result.payload;
     for (const tableName of tableNames) {
-      result = await this.addTable(schemaName, tableName, tableName);
-      if (!result.success) return result;
-    }
-    for (const tableName of tableNames) {
-      result = await hasuraApi.trackTable(schemaName, tableName);
+      result = await this.addTable(
+        schemaName,
+        tableName,
+        v.titleCase(tableName.replaceAll("_", " "))
+      );
       if (!result.success) return result;
     }
     return result;

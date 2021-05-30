@@ -27,12 +27,16 @@ whitebrick-cloud uses the following technologies
 
 1.  #### Configure Postgres
 
-    Create a new database in PostgreSQL and ensure `pgcrypto` is in the search path (see [Hasura requirements](https://hasura.io/docs/latest/graphql/core/deployment/postgres-requirements.html))
+    Create a new database in PostgreSQL and ensure `pgcrypto` is in the search path
+    (see [Hasura requirements](https://hasura.io/docs/latest/graphql/core/deployment/postgres-requirements.html))
+
+    ```
+    CREATE EXTENSION pgcrypto;
+    ```
 
 2.  #### Run Hasura
 
-        Add the database credentials and run Hasura from [Docker](https://hasura.io/docs/latest/graphql/core/deployment/deployment-guides/docker.html#deployment-docker)
-
+    Add the database credentials and run Hasura from [Docker](https://hasura.io/docs/latest/graphql/core/deployment/deployment-guides/docker.html#deployment-docker)
     or [Kubernetes](https://hasura.io/docs/latest/graphql/core/deployment/deployment-guides/kubernetes.html#deploy-kubernetes) and be sure to set a `HASURA_GRAPHQL_ADMIN_SECRET`.
     Launching Hasura will create data definitions and values in the `hdb_catalog` schema of the database.
     If Hasura does not launch check and debug your DB connection/permissions with psql.

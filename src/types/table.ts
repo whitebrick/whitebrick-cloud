@@ -33,8 +33,18 @@ export const typeDefs = gql`
   }
 
   extend type Mutation {
-    wbTrackAllTables(schemaName: String!): Boolean!
-    wbCreateTable(schemaName: String!, tableName: String!): Boolean!
+    wbAddAllExistingTables(schemaName: String!): Boolean!
+    wbCreateTable(
+      schemaName: String!
+      tableName: String!
+      tableLabel: String!
+    ): Boolean!
+    wbUpdateTable(
+      schemaName: String!
+      tableName: String!
+      newTableName: String
+      newTableLabel: String
+    ): Boolean!
     wbSaveTableUserSettings(
       userEmail: String!
       schemaName: String!
@@ -73,8 +83,16 @@ export const resolvers: IResolvers = {
     },
   },
   Mutation: {
-    wbCreateTable: async (_, { schemaName, tableName }, context) => {
-      const result = await context.wbCloud.createTable(schemaName, tableName);
+    wbCreateTable: async (
+      _,
+      { schemaName, tableName, tableLabel },
+      context
+    ) => {
+      const result = await context.wbCloud.createTable(
+        schemaName,
+        tableName,
+        tableLabel
+      );
       if (!result.success) {
         throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
           ref: result.code,
@@ -82,8 +100,26 @@ export const resolvers: IResolvers = {
       }
       return result.success;
     },
-    wbTrackAllTables: async (_, { schemaName }, context) => {
-      const result = await context.wbCloud.trackAllTables(schemaName);
+    wbUpdateTable: async (
+      _,
+      { schemaName, tableName, newTableName, newTableLabel },
+      context
+    ) => {
+      const result = await context.wbCloud.updateTable(
+        schemaName,
+        tableName,
+        newTableName,
+        newTableLabel
+      );
+      if (!result.success) {
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
+      }
+      return result.success;
+    },
+    wbAddAllExistingTables: async (_, { schemaName }, context) => {
+      const result = await context.wbCloud.addAllExistingTables(schemaName);
       if (!result.success) {
         throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
           ref: result.code,

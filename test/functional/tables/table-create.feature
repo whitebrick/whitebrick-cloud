@@ -5,14 +5,14 @@ Feature:
     * url wb.baseUrl
     * path wb.endpointPath
 
-    Scenario: Track all existing tables
+  Scenario: Create a table
     Given text query = 
     """
-      mutation ($schemaName: String!){
-        wbTrackAllTables(schemaName: $schemaName)
+      mutation ($schemaName: String!, $tableName: String!, $tableLabel: String!){
+        wbCreateTable(schemaName: $schemaName, tableName: $tableName, tableLabel: $tableLabel)
       }
     """
-    And def variables = { schemaName: '#(schemaName)'}
+    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', tableLabel: '#(tableLabel)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200
