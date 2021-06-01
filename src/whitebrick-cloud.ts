@@ -2,9 +2,9 @@ import { ApolloServer } from "apollo-server-lambda";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
-import { Table } from "./entity";
 import { schema, ServiceResult } from "./types";
 import v = require("voca");
+import { Schema } from "./entity";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -27,11 +27,11 @@ class WhitebrickCloud {
    * Test
    */
 
-  public async resetTestData() {
+  public async resetTestData(): Promise<ServiceResult> {
     let result = await this.dal.schemas("test_%");
     if (!result.success) return result;
     for (const schema of result.payload) {
-      result = await this.deleteSchema(schema.name);
+      result = await this.removeOrDeleteSchema(schema.name, true);
       if (!result.success) return result;
     }
     result = await this.dal.deleteTestTenants();
@@ -45,27 +45,34 @@ class WhitebrickCloud {
    * TBD: validate name ~ [a-z]{1}[a-z0-9]{2,}
    */
 
-  public async tenants() {
+  public async tenants(): Promise<ServiceResult> {
     return this.dal.tenants();
   }
 
-  public async tenantById(id: number) {
+  public async tenantById(id: number): Promise<ServiceResult> {
     return this.dal.tenantById(id);
   }
 
-  public async tenantByName(name: string) {
+  public async tenantByName(name: string): Promise<ServiceResult> {
     return this.dal.tenantByName(name);
   }
 
-  public async createTenant(name: string, label: string) {
+  public async createTenant(
+    name: string,
+    label: string
+  ): Promise<ServiceResult> {
     return this.dal.createTenant(name, label);
   }
 
-  public async updateTenant(id: number, name: string, label: string) {
+  public async updateTenant(
+    id: number,
+    name: string,
+    label: string
+  ): Promise<ServiceResult> {
     return this.dal.updateTenant(id, name, label);
   }
 
-  public async deleteTestTenants() {
+  public async deleteTestTenants(): Promise<ServiceResult> {
     return this.dal.deleteTestTenants();
   }
 
@@ -77,7 +84,7 @@ class WhitebrickCloud {
     tenantName: string,
     userEmail: string,
     tenantRole: string
-  ) {
+  ): Promise<ServiceResult> {
     log.debug(
       `whitebrickCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`
     );
@@ -100,19 +107,23 @@ class WhitebrickCloud {
    * Users
    */
 
-  public async usersByTenantId(tenantId: number) {
+  public async usersByTenantId(tenantId: number): Promise<ServiceResult> {
     return this.dal.usersByTenantId(tenantId);
   }
 
-  public async userById(id: number) {
+  public async userById(id: number): Promise<ServiceResult> {
     return this.dal.userById(id);
   }
 
-  public async userByEmail(email: string) {
+  public async userByEmail(email: string): Promise<ServiceResult> {
     return this.dal.userByEmail(email);
   }
 
-  public async createUser(email: string, firstName: string, lastName: string) {
+  public async createUser(
+    email: string,
+    firstName: string,
+    lastName: string
+  ): Promise<ServiceResult> {
     // TBD: authentication, save password
     return this.dal.createUser(email, firstName, lastName);
   }
@@ -122,7 +133,7 @@ class WhitebrickCloud {
     email: string,
     firstName: string,
     lastName: string
-  ) {
+  ): Promise<ServiceResult> {
     return this.dal.updateUser(id, email, firstName, lastName);
   }
 
@@ -130,7 +141,7 @@ class WhitebrickCloud {
    * Roles
    */
 
-  public async roleByName(name: string) {
+  public async roleByName(name: string): Promise<ServiceResult> {
     return this.dal.roleByName(name);
   }
 
@@ -146,7 +157,7 @@ class WhitebrickCloud {
     tenantOwnerName: string | null,
     userOwnerId: number | null,
     userOwnerEmail: string | null
-  ) {
+  ): Promise<ServiceResult> {
     log.info(`
       wbCloud.createSchema name=${name},
       label=${label},
@@ -172,26 +183,33 @@ class WhitebrickCloud {
         };
       }
     }
+    if (name.startsWith("pg_") || Schema.SYS_SCHEMA_NAMES.includes(name)) {
+      return {
+        success: false,
+        message: `Database name can not begin with 'pg_' or be in the reserved list: ${Schema.SYS_SCHEMA_NAMES.join(
+          ", "
+        )}`,
+      };
+    }
     return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
   }
 
-  public async deleteSchema(schemaName: string) {
+  public async removeOrDeleteSchema(
+    schemaName: string,
+    del: boolean
+  ): Promise<ServiceResult> {
     let result = await this.dal.discoverTables(schemaName);
     if (!result.success) return result;
     for (const tableName of result.payload) {
-      result = await this.dal.removeTableUsers(schemaName, tableName);
-      if (!result.success) return result;
-      result = await this.removeTable(schemaName, tableName);
-      if (!result.success) return result;
-      result = await this.deleteTable(schemaName, tableName);
+      result = await this.removeOrDeleteTable(schemaName, tableName, del);
       if (!result.success) return result;
     }
     result = await this.dal.removeAllUsersFromSchema(schemaName);
     if (!result.success) return result;
-    return await this.dal.deleteSchema(schemaName);
+    return await this.dal.removeOrDeleteSchema(schemaName, del);
   }
 
-  public async schemasByUserOwner(userEmail: string) {
+  public async schemasByUserOwner(userEmail: string): Promise<ServiceResult> {
     return this.dal.schemasByUserOwner(userEmail);
   }
 
@@ -203,7 +221,7 @@ class WhitebrickCloud {
     schemaName: string,
     userEmail: string,
     schemaRole: string
-  ) {
+  ): Promise<ServiceResult> {
     const userResult = await this.dal.userByEmail(userEmail);
     if (!userResult.success) return userResult;
     const schemaResult = await this.dal.schemaByName(schemaName);
@@ -219,7 +237,7 @@ class WhitebrickCloud {
     return userResult;
   }
 
-  public async accessibleSchemas(userEmail: string) {
+  public async accessibleSchemas(userEmail: string): Promise<ServiceResult> {
     const result = await this.schemasByUserOwner(userEmail);
     if (!result.success) return result;
     const userRolesResult = await this.dal.schemasByUser(userEmail);
@@ -233,48 +251,76 @@ class WhitebrickCloud {
    * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
    */
 
-  public async createTable(
-    schemaName: string,
-    tableName: string,
-    tableLabel: string
-  ) {
-    const result = await this.dal.addTable(
-      schemaName,
-      tableName,
-      tableLabel,
-      true
-    );
-    if (!result.success) return result;
-    return await hasuraApi.trackTable(schemaName, tableName);
-  }
-
-  public async addTable(
-    schemaName: string,
-    tableName: string,
-    tableLabel: string
-  ) {
-    const result = await this.dal.addTable(
-      schemaName,
-      tableName,
-      tableLabel,
-      false
-    );
-    if (!result.success) return result;
-    return await hasuraApi.trackTable(schemaName, tableName);
-  }
-
-  public async deleteTable(schemaName: string, tableName: string) {
-    const result = await this.dal.deleteTable(schemaName, tableName);
-    if (!result.success) return result;
-    return await hasuraApi.untrackTable(schemaName, tableName);
-  }
-
-  public async removeTable(schemaName: string, tableName: string) {
-    return await this.dal.removeTable(schemaName, tableName);
-  }
-
-  public async tables(schemaName: string) {
+  public async tables(schemaName: string): Promise<ServiceResult> {
     return this.dal.tables(schemaName);
+  }
+
+  public async columns(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    return this.dal.columns(schemaName, tableName);
+  }
+
+  public async addOrCreateTable(
+    schemaName: string,
+    tableName: string,
+    tableLabel: string,
+    create?: boolean
+  ): Promise<ServiceResult> {
+    if (!create) create = false;
+    let result = await this.dal.addOrCreateTable(
+      schemaName,
+      tableName,
+      tableLabel,
+      create
+    );
+    if (!result.success) return result;
+    return await hasuraApi.trackTable(schemaName, tableName);
+  }
+
+  public async removeOrDeleteTable(
+    schemaName: string,
+    tableName: string,
+    del?: boolean
+  ): Promise<ServiceResult> {
+    if (!del) del = false;
+    // 1. untrack
+    let result = await hasuraApi.untrackTable(schemaName, tableName);
+    if (!result.success) return result;
+    // 2. remove/delete columns
+    result = await this.dal.columns(schemaName, tableName);
+    if (!result.success) return result;
+    const columns = result.payload;
+    for (const column of columns) {
+      result = await this.removeOrDeleteColumn(
+        schemaName,
+        tableName,
+        column.name,
+        del
+      );
+      if (!result.success) return result;
+    }
+    // 3. remove user settings
+    result = await this.dal.removeTableUsers(schemaName, tableName);
+    if (!result.success) return result;
+    // 4. remove/delete the table
+    return await this.dal.removeOrDeleteTable(schemaName, tableName, del);
+  }
+
+  public async removeOrDeleteColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    del?: boolean
+  ): Promise<ServiceResult> {
+    if (!del) del = false;
+    return await this.dal.removeOrDeleteColumn(
+      schemaName,
+      tableName,
+      columnName,
+      del
+    );
   }
 
   public async updateTable(
@@ -282,7 +328,7 @@ class WhitebrickCloud {
     tableName: string,
     newTableName?: string,
     newTableLabel?: string
-  ) {
+  ): Promise<ServiceResult> {
     let result: ServiceResult;
     if (newTableName) {
       result = await hasuraApi.untrackTable(schemaName, tableName);
@@ -302,26 +348,61 @@ class WhitebrickCloud {
     return result;
   }
 
-  public async addAllExistingTables(schemaName: string) {
+  public async addAllExistingTables(
+    schemaName: string
+  ): Promise<ServiceResult> {
     let result = await this.dal.discoverTables(schemaName);
     if (!result.success) return result;
     const tableNames = result.payload;
     for (const tableName of tableNames) {
-      result = await this.addTable(
+      result = await this.addOrCreateTable(
         schemaName,
         tableName,
-        v.titleCase(tableName.replaceAll("_", " "))
+        v.titleCase(tableName.replaceAll("_", " ")),
+        false
       );
       if (!result.success) return result;
+      result = await this.dal.discoverColumns(schemaName, tableName);
+      if (!result.success) return result;
+      const columns = result.payload;
+      for (const column of columns) {
+        result = await this.addOrCreateColumn(
+          schemaName,
+          tableName,
+          column.name,
+          v.titleCase(column.name.replaceAll("_", " ")),
+          false
+        );
+        if (!result.success) return result;
+      }
     }
     return result;
+  }
+
+  public async addOrCreateColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    columnLabel: string,
+    create?: boolean,
+    columnType?: string
+  ): Promise<ServiceResult> {
+    if (!create) create = false;
+    return await this.dal.addOrCreateColumn(
+      schemaName,
+      tableName,
+      columnName,
+      columnLabel,
+      create,
+      columnType
+    );
   }
 
   public async tableUser(
     userEmail: string,
     schemaName: string,
     tableName: string
-  ) {
+  ): Promise<ServiceResult> {
     return this.dal.tableUser(userEmail, schemaName, tableName);
   }
 
@@ -330,7 +411,7 @@ class WhitebrickCloud {
     tableName: string,
     userEmail: string,
     settings: object
-  ) {
+  ): Promise<ServiceResult> {
     const tableResult = await this.dal.tableBySchemaNameTableName(
       schemaName,
       tableName

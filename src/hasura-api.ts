@@ -11,6 +11,10 @@ const headers: Readonly<Record<string, string | boolean>> = {
 };
 
 class HasuraApi {
+  static HASURA_IGNORE_CODES: string[] = [
+    "already-untracked",
+    "already-tracked",
+  ];
   private instance: AxiosInstance | null = null;
 
   private get http(): AxiosInstance {
@@ -44,10 +48,12 @@ class HasuraApi {
         payload: response,
       };
     } catch (error) {
-      if (error.response && error.response.data) {
-        log.error(error.response.data);
-      } else {
-        log.error(error);
+      if (!HasuraApi.HASURA_IGNORE_CODES.includes(error.response.data.code)) {
+        if (error.response && error.response.data) {
+          log.error(error.response.data);
+        } else {
+          log.error(error);
+        }
       }
       result = {
         success: false,
@@ -65,11 +71,15 @@ class HasuraApi {
         name: tableName,
       },
     });
-    if (!result.success && result.code == "already-tracked") {
+    if (
+      !result.success &&
+      result.code &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+    ) {
       return <ServiceResult>{
         success: true,
         payload: true,
-        message: "already-tracked",
+        message: result.code,
       };
     }
     return result;
@@ -83,10 +93,15 @@ class HasuraApi {
       },
       cascade: true,
     });
-    if (!result.success && result.code == "already-untracked") {
+    if (
+      !result.success &&
+      result.code &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+    ) {
       return <ServiceResult>{
         success: true,
         payload: true,
+        message: result.code,
       };
     }
     return result;

@@ -1,7 +1,3 @@
-
-
-
-
 CREATE SCHEMA wb;
 
 CREATE TABLE IF NOT EXISTS wb.tenants(
@@ -25,7 +21,7 @@ CREATE TABLE IF NOT EXISTS wb.users(
 );
 
 CREATE INDEX idx_wb_users_email ON wb.users(email);
-ALTER SEQUENCE wb.users_id_seq RESTART WITH 30001;
+ALTER SEQUENCE wb.users_id_seq RESTART WITH 20001;
 
 CREATE TABLE IF NOT EXISTS wb.roles (
   id SERIAL PRIMARY KEY,
@@ -56,7 +52,7 @@ CREATE TABLE IF NOT EXISTS wb.schemas(
   updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc')
 );
 
-ALTER SEQUENCE wb.schemas_id_seq RESTART WITH 60001;
+ALTER SEQUENCE wb.schemas_id_seq RESTART WITH 30001;
 CREATE INDEX idx_wb_schemas_name ON wb.schemas(name);
 
 CREATE TABLE IF NOT EXISTS wb.schema_users (
@@ -78,6 +74,9 @@ CREATE TABLE IF NOT EXISTS wb.tables(
   UNIQUE (schema_id, name)
 );
 
+ALTER SEQUENCE wb.tables_id_seq RESTART WITH 40001;
+CREATE INDEX idx_wb_tables_name ON wb.tables(name);
+
 CREATE TABLE IF NOT EXISTS wb.table_users(
   table_id bigint REFERENCES wb.tables(id) NOT NULL,
   user_id bigint REFERENCES wb.users(id) NOT NULL,
@@ -87,3 +86,16 @@ CREATE TABLE IF NOT EXISTS wb.table_users(
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   PRIMARY KEY (table_id, user_id, role_id)
 );
+
+CREATE TABLE IF NOT EXISTS wb.columns(
+  id BIGSERIAL PRIMARY KEY,
+  table_id BIGSERIAL REFERENCES wb.tables(id) NOT NULL,
+  name TEXT NOT NULL,
+  label TEXT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc'),
+  updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc'),
+  UNIQUE (table_id, name)
+);
+
+ALTER SEQUENCE wb.columns_id_seq RESTART WITH 50001;
+CREATE INDEX idx_wb_columns_name ON wb.columns(name);

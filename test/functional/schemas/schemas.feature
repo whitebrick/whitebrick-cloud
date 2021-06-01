@@ -7,7 +7,6 @@ Feature: Schemas
       | 'test_chinook' | 'Chinook Music DB' | 'test_donnas-media' |   |
       | 'test_northwind' | 'Northwind Supplies DB' | null  | 'test_nick_north@test.whitebrick.com'|
     * def result = call read('schemas/schema-create.feature') schemas
-    * def created = $result[*].response
   
   @setup
   Scenario: Add users to schemas
@@ -21,7 +20,6 @@ Feature: Schemas
       | 'test_chinook' | 'test_daisy@test.whitebrick.com' | 'schema_editor' |
       | 'test_northwind' | 'test_debbie@test.whitebrick.com' | 'schema_reader' |
     * def result = call read('schemas/schema-add-user.feature') tenantUsers
-    * def created = $result[*].response
 
   @setup
   Scenario: Load test data

@@ -8,4 +8,3 @@ Feature: Users
       | 'test_daisy@test.whitebrick.com' | 'Daisy' | 'Daisy'
       | 'test_nick_north@test.whitebrick.com' | 'Nick' | 'North'
     * def result = call read('users/user-create.feature') users
-    * def created = $result[*].response

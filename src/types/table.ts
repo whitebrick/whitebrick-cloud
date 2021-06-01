@@ -14,6 +14,16 @@ export const typeDefs = gql`
     updatedAt: String!
   }
 
+  type Column {
+    id: ID!
+    tableId: Int!
+    name: String!
+    label: String!
+    type: String!
+    createdAt: String!
+    updatedAt: String!
+  }
+
   type TableUser {
     tableId: Int!
     userId: Int!
@@ -25,6 +35,7 @@ export const typeDefs = gql`
 
   extend type Query {
     wbTables(schemaName: String!): [Table]
+    wbColumns(schemaName: String!, tableName: String!): [Column]
     wbTableUser(
       userEmail: String!
       schemaName: String!
@@ -33,17 +44,26 @@ export const typeDefs = gql`
   }
 
   extend type Mutation {
-    wbAddAllExistingTables(schemaName: String!): Boolean!
-    wbCreateTable(
+    wbAddOrCreateTable(
       schemaName: String!
       tableName: String!
       tableLabel: String!
+      create: Boolean
     ): Boolean!
     wbUpdateTable(
       schemaName: String!
       tableName: String!
       newTableName: String
       newTableLabel: String
+    ): Boolean!
+    wbAddAllExistingTables(schemaName: String!): Boolean!
+    wbAddOrCreateColumn(
+      schemaName: String!
+      tableName: String!
+      columnName: String!
+      columnLabel: String!
+      create: Boolean
+      columnType: String
     ): Boolean!
     wbSaveTableUserSettings(
       userEmail: String!
@@ -68,6 +88,15 @@ export const resolvers: IResolvers = {
       }
       return result.payload;
     },
+    wbColumns: async (_, { schemaName, tableName }, context) => {
+      const result = await context.wbCloud.columns(schemaName, tableName);
+      if (!result.success) {
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
+      }
+      return result.payload;
+    },
     wbTableUser: async (_, { schemaName, tableName, userEmail }, context) => {
       const result = await context.wbCloud.tableUser(
         userEmail,
@@ -83,15 +112,16 @@ export const resolvers: IResolvers = {
     },
   },
   Mutation: {
-    wbCreateTable: async (
+    wbAddOrCreateTable: async (
       _,
-      { schemaName, tableName, tableLabel },
+      { schemaName, tableName, tableLabel, create },
       context
     ) => {
-      const result = await context.wbCloud.createTable(
+      const result = await context.wbCloud.addOrCreateTable(
         schemaName,
         tableName,
-        tableLabel
+        tableLabel,
+        create
       );
       if (!result.success) {
         throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
@@ -120,6 +150,26 @@ export const resolvers: IResolvers = {
     },
     wbAddAllExistingTables: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.addAllExistingTables(schemaName);
+      if (!result.success) {
+        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
+          ref: result.code,
+        });
+      }
+      return result.success;
+    },
+    wbAddOrCreateColumn: async (
+      _,
+      { schemaName, tableName, columnName, columnLabel, create, columnType },
+      context
+    ) => {
+      const result = await context.wbCloud.addColumn(
+        schemaName,
+        tableName,
+        columnName,
+        columnLabel,
+        create,
+        columnType
+      );
       if (!result.success) {
         throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
           ref: result.code,

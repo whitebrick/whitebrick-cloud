@@ -11,31 +11,22 @@ Feature: Tables
     * def created = $result[*].response
 
   @setup
-  Scenario: Create and track test tables
+  Scenario: Create and track test table in existing DB
     * table tables 
       | schemaName | tableName | tableLabel
-      | 'test_chinook'   | 'test_table' | 'Chinook Test Table'
       | 'test_donnasdvd' | 'test_table' | 'Donnas DVD Test Table'
-      | 'test_northwind' | 'test_table' | 'Northwind Test Table'
     * def result = call read('tables/table-create.feature') tables
-    * def created = $result[*].response
 
   @setup
-  Scenario: Rename test tables
+  Scenario: Rename test table in existing DB
     * table tables 
       | schemaName | tableName | newTableName
-      | 'test_chinook'   | 'test_table' | 'test_table_renamed'
       | 'test_donnasdvd' | 'test_table' | 'test_table_renamed'
-      | 'test_northwind' | 'test_table' | 'test_table_renamed'
     * def result = call read('tables/table-rename.feature') tables
-    * def created = $result[*].response
 
  @setup
-  Scenario: Relabel test tables
+  Scenario: Relabel test table in existing DB
     * table tables 
       | schemaName | tableName | newTableLabel
-      | 'test_chinook'   | 'test_table_renamed' | 'Test Table Relabeled'
       | 'test_donnasdvd' | 'test_table_renamed' | 'Test Table Relabeled'
-      | 'test_northwind' | 'test_table_renamed' | 'Test Table Relabeled'
     * def result = call read('tables/table-relabel.feature') tables
-    * def created = $result[*].response

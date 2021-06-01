@@ -2,6 +2,13 @@ import { QueryResult } from "pg";
 import { RoleName } from "./Role";
 
 export class Schema {
+  static SYS_SCHEMA_NAMES: string[] = [
+    "public",
+    "information_schema",
+    "hdb_catalog",
+    "wb",
+  ];
+
   id!: number;
   name!: string;
   label!: string;

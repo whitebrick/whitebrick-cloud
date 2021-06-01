@@ -9,7 +9,7 @@ Feature:
     Given text query = 
     """
       mutation ($schemaName: String!, $tableName: String!, $tableLabel: String!){
-        wbCreateTable(schemaName: $schemaName, tableName: $tableName, tableLabel: $tableLabel)
+        wbAddOrCreateTable(schemaName: $schemaName, tableName: $tableName, tableLabel: $tableLabel, create: true)
       }
     """
     And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', tableLabel: '#(tableLabel)'}

@@ -1,8 +1,8 @@
 import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
-import { Tenant, User, Role, Schema, Table, TableUser } from "./entity";
-import { QueryParam, ServiceResult } from "./types";
+import { Tenant, User, Role, Schema, Table, Column, TableUser } from "./entity";
+import { QueryParams, ServiceResult } from "./types";
 
 export class DAL {
   private pool: Pool;
@@ -21,29 +21,29 @@ export class DAL {
   }
 
   public static sanitize(str: string): string {
-    return str.replace(/[\\"]+/g, "");
+    return str.replace(/[\\"\\'\\`]+/g, "");
   }
 
-  private async executeQuery(queryParam: QueryParam) {
-    const results = await this.executeQueries([queryParam]);
+  private async executeQuery(queryParams: QueryParams): Promise<ServiceResult> {
+    const results = await this.executeQueries([queryParams]);
     return results[0];
   }
 
   private async executeQueries(
-    queryParams: Array<QueryParam>
+    queriesAndParams: Array<QueryParams>
   ): Promise<ServiceResult[]> {
     const client = await this.pool.connect();
     const results: Array<ServiceResult> = [];
     try {
       await client.query("BEGIN");
-      for (const queryParam of queryParams) {
+      for (const queryParams of queriesAndParams) {
         log.debug(
-          `dal.executeQuery QueryParam: ${queryParam.query}`,
-          queryParam.params
+          `dal.executeQuery QueryParams: ${queryParams.query}`,
+          queryParams.params
         );
         const response = await client.query(
-          queryParam.query,
-          queryParam.params
+          queryParams.query,
+          queryParams.params
         );
         results.push(<ServiceResult>{
           success: true,
@@ -374,16 +374,17 @@ export class DAL {
     return insertResult;
   }
 
-  public async schemas(
-    schemaNamePattern: string | undefined
-  ): Promise<ServiceResult> {
+  public async schemas(schemaNamePattern?: string): Promise<ServiceResult> {
     if (!schemaNamePattern) schemaNamePattern = "%";
+    schemaNamePattern = DAL.sanitize(schemaNamePattern);
     const results = await this.executeQueries([
       {
         query: `
           SELECT information_schema.schemata.*
           FROM information_schema.schemata
           WHERE schema_name LIKE $1
+          AND schema_name NOT LIKE 'pg_%'
+          AND schema_name NOT IN ('${Schema.SYS_SCHEMA_NAMES.join("','")}')
         `,
         params: [schemaNamePattern],
       },
@@ -406,7 +407,7 @@ export class DAL {
         };
       }
     }
-    return results[1];
+    return results[results.length - 1];
   }
 
   public async schemaByName(name: string): Promise<ServiceResult> {
@@ -453,8 +454,11 @@ export class DAL {
     return result;
   }
 
-  public async deleteSchema(schemaName: string): Promise<ServiceResult> {
-    const results = await this.executeQueries([
+  public async removeOrDeleteSchema(
+    schemaName: string,
+    del: boolean
+  ): Promise<ServiceResult> {
+    const queriesAndParams: Array<QueryParams> = [
       {
         query: `
           DELETE FROM wb.schemas
@@ -462,10 +466,15 @@ export class DAL {
         `,
         params: [schemaName],
       },
-      {
+    ];
+    if (del) {
+      queriesAndParams.push({
         query: `DROP SCHEMA IF EXISTS "${DAL.sanitize(schemaName)}" CASCADE`,
-      },
-    ]);
+      });
+    }
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
     return results[results.length - 1];
   }
 
@@ -584,6 +593,45 @@ export class DAL {
     return result;
   }
 
+  public async columns(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT wb.columns.*, information_schema.columns.data_type as type
+        FROM wb.columns
+        JOIN wb.tables ON wb.columns.table_id=wb.tables.id
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        JOIN information_schema.columns ON (
+          wb.columns.name=information_schema.columns.column_name
+          AND wb.schemas.name=information_schema.columns.table_schema
+        )
+        WHERE wb.schemas.name=$1 AND wb.tables.name=$2 AND information_schema.columns.table_name=$2
+      `,
+      params: [schemaName, tableName],
+    });
+    if (result.success) result.payload = Column.parseResult(result.payload);
+    return result;
+  }
+
+  public async discoverColumns(
+    schemaName: string,
+    tableNme: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT column_name as name, data_type as type
+        FROM information_schema.columns
+        WHERE table_schema=$1
+        AND table_name=$2
+      `,
+      params: [schemaName, tableNme],
+    });
+    if (result.success) result.payload = Column.parseResult(result.payload);
+    return result;
+  }
+
   public async tableBySchemaNameTableName(
     schemaName: string,
     tableName: string
@@ -601,66 +649,72 @@ export class DAL {
     return result;
   }
 
-  public async addTable(
+  public async addOrCreateTable(
     schemaName: string,
     tableName: string,
     tableLabel: string,
     create: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `dal.addOrCreateTable ${schemaName} ${tableName} ${tableLabel} ${create}`
+    );
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
     let result = await this.schemaByName(schemaName);
     if (!result.success) return result;
-    result = await this.executeQuery({
-      query: `
+    const queriesAndParams: Array<QueryParams> = [
+      {
+        query: `
         INSERT INTO wb.tables(schema_id, name, label, created_at, updated_at)
         VALUES ($1, $2, $3, $4, $5)
       `,
-      params: [
-        result.payload.id,
-        tableName,
-        tableLabel,
-        new Date(),
-        new Date(),
-      ],
-    });
-    if (!result.success) return result;
+        params: [
+          result.payload.id,
+          tableName,
+          tableLabel,
+          new Date(),
+          new Date(),
+        ],
+      },
+    ];
     if (create) {
-      result = await this.executeQuery({
+      queriesAndParams.push({
         query: `CREATE TABLE "${schemaName}"."${tableName}"()`,
       });
     }
-    return result;
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    return results[results.length - 1];
   }
 
-  public async removeTable(
+  public async removeOrDeleteTable(
     schemaName: string,
-    tableName: string
-  ): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        DELETE FROM wb.tables
-        WHERE schema_id IN (
-          SELECT id FROM wb.schemas
-          WHERE wb.schemas.name=$1
-        )
-        AND wb.tables.name=$2
-      `,
-      params: [schemaName, tableName],
-    });
-    return result;
-  }
-
-  public async deleteTable(
-    schemaName: string,
-    tableName: string
+    tableName: string,
+    del: boolean
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
-    const result = await this.executeQuery({
-      query: `DROP TABLE IF EXISTS "${schemaName}"."${tableName}" CASCADE`,
-    });
-    return result;
+    let result = await this.schemaByName(schemaName);
+    if (!result.success) return result;
+    const queriesAndParams: Array<QueryParams> = [
+      {
+        query: `
+          DELETE FROM wb.tables
+          WHERE schema_id=$1 AND name=$2
+        `,
+        params: [result.payload.id, tableName],
+      },
+    ];
+    if (del) {
+      queriesAndParams.push({
+        query: `DROP TABLE IF EXISTS "${schemaName}"."${tableName}" CASCADE`,
+      });
+    }
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    return results[results.length - 1];
   }
 
   public async updateTable(
@@ -688,20 +742,103 @@ export class DAL {
     }
     query += `${updates.join(", ")} WHERE id=$${params.length + 1}`;
     params.push(result.payload.id);
-    result = await this.executeQuery({
-      query: query,
-      params: params,
-    });
-    if (!result.success) return result;
+    const queriesAndParams: Array<QueryParams> = [
+      {
+        query: query,
+        params: params,
+      },
+    ];
     if (newTableName) {
-      result = await this.executeQuery({
+      queriesAndParams.push({
         query: `
-        ALTER TABLE ${schemaName}.${tableName}
-        RENAME TO ${newTableName}
-      `,
+          ALTER TABLE "${schemaName}"."${tableName}"
+          RENAME TO ${newTableName}
+        `,
       });
     }
-    return result;
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    return results[results.length - 1];
+  }
+
+  public async addOrCreateColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    columnLabel: string,
+    create: boolean,
+    columnPGType?: string
+  ): Promise<ServiceResult> {
+    log.debug(
+      `dal.addOrCreateColumn ${schemaName} ${tableName} ${columnName} ${columnLabel} ${columnPGType} ${create}`
+    );
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    columnName = DAL.sanitize(columnName);
+    let result = await this.tableBySchemaNameTableName(schemaName, tableName);
+    if (!result.success) return result;
+    const queriesAndParams: Array<QueryParams> = [
+      {
+        query: `
+          INSERT INTO wb.columns(table_id, name, label, created_at, updated_at)
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        params: [
+          result.payload.id,
+          columnName,
+          columnLabel,
+          new Date(),
+          new Date(),
+        ],
+      },
+    ];
+    if (create) {
+      queriesAndParams.push({
+        query: `
+          ALTER TABLE "${schemaName}"."${tableName}"
+          ADD ${columnName} ${columnPGType}
+        `,
+      });
+    }
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    return results[results.length - 1];
+  }
+
+  public async removeOrDeleteColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    del: boolean
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    columnName = DAL.sanitize(columnName);
+    let result = await this.tableBySchemaNameTableName(schemaName, tableName);
+    if (!result.success) return result;
+    const queriesAndParams: Array<QueryParams> = [
+      {
+        query: `
+          DELETE FROM wb.columns
+          WHERE table_id=$1 AND name=$2
+        `,
+        params: [result.payload.id, columnName],
+      },
+    ];
+    if (del) {
+      queriesAndParams.push({
+        query: `
+          ALTER TABLE "${schemaName}"."${tableName}"
+          DROP COLUMN IF EXISTS ${columnName} CASCADE
+        `,
+      });
+    }
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    return results[results.length - 1];
   }
 
   /**

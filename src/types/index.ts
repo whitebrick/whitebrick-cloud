@@ -14,7 +14,7 @@ export type ServiceResult =
   | { success: true; payload: any; message?: string }
   | { success: false; message: string; code?: string };
 
-export type QueryParam = {
+export type QueryParams = {
   query: string;
   params?: any[];
 };
