@@ -6,7 +6,6 @@ Feature: Create a tenant
     * path wb.endpointPath
     * print "*** background name=", name
     * print "*** background label=", label
-
   Scenario: Create a tenant
     Given text query = 
     """

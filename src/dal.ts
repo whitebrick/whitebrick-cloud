@@ -20,8 +20,9 @@ export class DAL {
     });
   }
 
+  // used for DDL identifiers (eg CREATE TABLE sanitize(tableName))
   public static sanitize(str: string): string {
-    return str.replace(/[\\"\\'\\`]+/g, "");
+    return str.replace(/[^\w%]+/g, "");
   }
 
   private async executeQuery(queryParams: QueryParams): Promise<ServiceResult> {
@@ -53,11 +54,11 @@ export class DAL {
       await client.query("COMMIT");
     } catch (error) {
       await client.query("ROLLBACK");
-      log.error(error);
+      log.error(JSON.stringify(error));
       results.push(<ServiceResult>{
         success: false,
-        message: error.detail,
-        code: error.code,
+        message: error.message,
+        code: "PG_" + error.code,
       });
     } finally {
       client.release();
@@ -349,7 +350,7 @@ export class DAL {
   ): Promise<ServiceResult> {
     const results = await this.executeQueries([
       {
-        query: `CREATE SCHEMA "${DAL.sanitize(name)}"`,
+        query: `CREATE SCHEMA ${DAL.sanitize(name)}`,
       },
       {
         query: `
@@ -469,7 +470,7 @@ export class DAL {
     ];
     if (del) {
       queriesAndParams.push({
-        query: `DROP SCHEMA IF EXISTS "${DAL.sanitize(schemaName)}" CASCADE`,
+        query: `DROP SCHEMA IF EXISTS ${DAL.sanitize(schemaName)} CASCADE`,
       });
     }
     const results: Array<ServiceResult> = await this.executeQueries(
@@ -617,7 +618,7 @@ export class DAL {
 
   public async discoverColumns(
     schemaName: string,
-    tableNme: string
+    tableName: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
@@ -626,9 +627,128 @@ export class DAL {
         WHERE table_schema=$1
         AND table_name=$2
       `,
-      params: [schemaName, tableNme],
+      params: [schemaName, tableName],
     });
     if (result.success) result.payload = Column.parseResult(result.payload);
+    return result;
+  }
+
+  // eg type = "PRIMARY KEY", "FOREIGN KEY"
+  public async discoverConstraint(
+    schemaName: string,
+    tableName: string,
+    type: string
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    let columnNameSql: string = "c.column_name";
+    let joinSql: string = `
+      JOIN information_schema.constraint_column_usage AS ccu
+      USING (constraint_schema, constraint_name)
+      JOIN information_schema.columns AS c
+      ON c.table_schema = tc.constraint_schema
+      AND tc.table_name = c.table_name
+      AND ccu.column_name = c.column_name
+    `;
+    if (type == "FOREIGN KEY") {
+      columnNameSql = "kcu.column_name";
+      joinSql = `
+        JOIN information_schema.key_column_usage AS kcu
+        ON tc.constraint_name = kcu.constraint_name
+        AND tc.table_schema = kcu.table_schema
+        JOIN information_schema.columns AS c
+        ON c.table_schema = tc.constraint_schema
+        AND tc.table_name = c.table_name
+      `;
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT DISTINCT ${columnNameSql}, tc.constraint_name
+        FROM information_schema.table_constraints tc 
+        ${joinSql}
+        WHERE constraint_type = '${type}'
+        AND c.table_schema='${schemaName}'
+        AND tc.table_name = '${tableName}'
+      `,
+    });
+    if (result.success) {
+      const pKColsConstraints: Record<string, string> = {};
+      for (const row of result.payload.rows) {
+        pKColsConstraints[row.column_name] = row.constraint_name;
+      }
+      result.payload = pKColsConstraints;
+    }
+    return result;
+  }
+
+  public async removeConstraint(
+    schemaName: string,
+    tableName: string,
+    constraintName: string
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    constraintName = DAL.sanitize(constraintName);
+    const result = await this.executeQuery({
+      query: `
+        ALTER TABLE ${schemaName}.${tableName}
+        DROP CONSTRAINT ${constraintName}
+      `,
+    });
+    return result;
+  }
+
+  public async setPrimaryKey(
+    schemaName: string,
+    tableName: string,
+    columnNames: string[]
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    const sanitizedColumnNames: string[] = [];
+    for (const columnName of columnNames) {
+      sanitizedColumnNames.push(DAL.sanitize(columnName));
+    }
+    const result = await this.executeQuery({
+      query: `
+        ALTER TABLE ${schemaName}.${tableName}
+        ADD PRIMARY KEY (${sanitizedColumnNames.join(",")});
+      `,
+    });
+    return result;
+  }
+
+  public async setForeignKey(
+    schemaName: string,
+    tableName: string,
+    columnNames: string[],
+    parentTableName: string,
+    parentColumnNames: string[]
+  ): Promise<ServiceResult> {
+    log.debug(
+      `dal.setForeignKey(${schemaName},${tableName},${columnNames},${parentTableName},${parentColumnNames})`
+    );
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    const sanitizedColumnNames: string[] = [];
+    for (const columnName of columnNames) {
+      sanitizedColumnNames.push(DAL.sanitize(columnName));
+    }
+    parentTableName = DAL.sanitize(parentTableName);
+    const sanitizedParentColumnNames: string[] = [];
+    for (const parentColumnName of parentColumnNames) {
+      sanitizedParentColumnNames.push(DAL.sanitize(parentColumnName));
+    }
+    const result = await this.executeQuery({
+      query: `
+        ALTER TABLE ${schemaName}.${tableName}
+        ADD CONSTRAINT ${tableName}_${sanitizedColumnNames.join("_")}_fkey
+        FOREIGN KEY (${sanitizedColumnNames.join(",")})
+        REFERENCES ${schemaName}.${parentTableName}
+          (${sanitizedParentColumnNames.join(",")})
+        ON DELETE SET NULL
+      `,
+    });
     return result;
   }
 

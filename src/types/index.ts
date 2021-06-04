@@ -12,7 +12,7 @@ import { makeExecutableSchema } from "graphql-tools";
 
 export type ServiceResult =
   | { success: true; payload: any; message?: string }
-  | { success: false; message: string; code?: string };
+  | { success: false; message: string; code?: string; apolloError?: string };
 
 export type QueryParams = {
   query: string;
@@ -36,11 +36,7 @@ const resolvers: IResolvers = {
   Mutation: {
     wbResetTestData: async (_, __, context) => {
       const result = await context.wbCloud.resetTestData();
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
   },

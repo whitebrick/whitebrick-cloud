@@ -8,9 +8,10 @@ export const typeDefs = gql`
     label: String!
     tenantOwnerId: Int
     userOwnerId: Int
+    userRole: String
+    context: JSON
     createdAt: String!
     updatedAt: String!
-    userRole: String
   }
 
   extend type Query {
@@ -33,11 +34,7 @@ export const resolvers: IResolvers = {
   Query: {
     wbSchemas: async (_, { userEmail }, context) => {
       const result = await context.wbCloud.accessibleSchemas(userEmail);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
   },
@@ -62,11 +59,7 @@ export const resolvers: IResolvers = {
         userOwnerId,
         userOwnerEmail
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
   },

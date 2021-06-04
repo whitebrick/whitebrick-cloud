@@ -4,14 +4,18 @@ Feature:
     * def wb = call read('classpath:init.feature')
     * url wb.baseUrl
     * path wb.endpointPath
-  Scenario: Rename a table
+  Scenario: Set primary key
     Given text query = 
     """
-      mutation ($schemaName: String!, $tableName: String!, $newTableName: String){
-        wbUpdateTable(schemaName: $schemaName, tableName: $tableName, newTableName: $newTableName)
+      mutation ($schemaName: String!, $tableName: String!){
+        wbSetPrimaryKey(
+          schemaName: $schemaName,
+          tableName: $tableName,
+          columnNames: ["id"]
+        )
       }
     """
-    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', newTableName: '#(newTableName)'}
+    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200

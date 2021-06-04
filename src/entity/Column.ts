@@ -17,6 +17,9 @@ export class Column {
   type!: string;
   createdAt!: Date;
   updatedAt!: Date;
+  // not persisted
+  isPrimaryKey!: boolean;
+  isForeignKey!: boolean;
 
   public static parseResult(data: QueryResult | null): Array<Column> {
     if (!data) throw new Error("Column.parseResult: input is null");

@@ -5,7 +5,7 @@ Feature: Add a user to a schema
     * url wb.baseUrl
     * path wb.endpointPath
 
-  @setup
+  
   Scenario: Add a user to a schema
     Given text query = 
     """

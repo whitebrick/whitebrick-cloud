@@ -107,6 +107,120 @@ class HasuraApi {
     return result;
   }
 
+  // a post has one author (constraint posts.author_id -> authors.id)
+  public async createObjectRelationship(
+    schemaName: string,
+    tableName: string, // posts
+    columnName: string, // author_id
+    parentTableName: string // authors
+  ) {
+    log.debug(
+      `hasuraApi.createObjectRelationship(${schemaName}, ${tableName}, ${columnName}, ${parentTableName})`
+    );
+    const result = await this.post("pg_create_object_relationship", {
+      name: `obj_${tableName}_${parentTableName}`, // obj_posts_authors
+      table: {
+        schema: schemaName,
+        name: tableName, // posts
+      },
+      using: {
+        foreign_key_constraint_on: columnName, // author_id
+      },
+    });
+    if (
+      !result.success &&
+      result.code &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+    ) {
+      return <ServiceResult>{
+        success: true,
+        payload: true,
+        message: result.code,
+      };
+    }
+    return result;
+  }
+
+  // an author has many posts (constraint posts.author_id -> authors.id)
+  public async createArrayRelationship(
+    schemaName: string,
+    tableName: string, // authors
+    childTableName: string, // posts
+    childColumnNames: string[] // author_id
+  ) {
+    log.debug(
+      `hasuraApi.createArrayRelationship(${schemaName}, ${tableName}, ${childTableName}, ${childColumnNames})`
+    );
+    const result = await this.post("pg_create_array_relationship", {
+      name: `arr_${tableName}_${childTableName}`, // arr_authors_posts
+      table: {
+        schema: schemaName,
+        name: tableName, // authors
+      },
+      using: {
+        foreign_key_constraint_on: {
+          column: childColumnNames[0], // author_id
+          table: {
+            schema: schemaName,
+            name: childTableName, // posts
+          },
+        },
+      },
+    });
+    if (
+      !result.success &&
+      result.code &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+    ) {
+      return <ServiceResult>{
+        success: true,
+        payload: true,
+        message: result.code,
+      };
+    }
+    return result;
+  }
+
+  public async dropRelationships(
+    schemaName: string,
+    tableName: string, // posts
+    parentTableName: string // authors
+  ) {
+    let result = await this.post("pg_drop_relationship", {
+      table: {
+        schema: schemaName,
+        name: tableName, // posts
+      },
+      relationship: `obj_${tableName}_${parentTableName}`, // obj_posts_authors
+    });
+    if (
+      !result.success &&
+      (!result.code ||
+        (result.code && !HasuraApi.HASURA_IGNORE_CODES.includes(result.code)))
+    ) {
+      return result;
+    }
+    result = await this.post("pg_drop_relationship", {
+      table: {
+        schema: schemaName,
+        name: parentTableName, // authors
+      },
+      relationship: `arr_${parentTableName}_${tableName}`, // arr_authors_posts
+    });
+    if (
+      !result.success &&
+      result.code &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+    ) {
+      return <ServiceResult>{
+        success: true,
+        payload: true,
+        message: result.code,
+      };
+    }
+    return result;
+  }
+
   // TBD-SG
   // use trackTable as tamplate
   // public async trackRelationship(schemaName: string, tableName: string, objectOrArray: string, relationshipName: string, constraintTable: string, constraintColumn: string) {

@@ -48,29 +48,17 @@ export const resolvers: IResolvers = {
   Query: {
     wbUsersByTenantId: async (_, { tenantId }, context) => {
       const result = await context.wbCloud.usersByTenantId(tenantId);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     wbUserById: async (_, { id }, context) => {
       const result = await context.wbCloud.userById(id);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     wbUserByEmail: async (_, { email }, context) => {
       const result = await context.wbCloud.userByEmail(email);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
   },
@@ -82,11 +70,7 @@ export const resolvers: IResolvers = {
         firstName,
         lastName
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     wbUpdateUser: async (_, { id, email, firstName, lastName }, context) => {
@@ -96,11 +80,7 @@ export const resolvers: IResolvers = {
         firstName,
         lastName
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     // Tenant-User-Roles
@@ -114,11 +94,7 @@ export const resolvers: IResolvers = {
         userEmail,
         tenantRole
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     // Tenant-Schema-Roles
@@ -132,11 +108,7 @@ export const resolvers: IResolvers = {
         userEmail,
         schemaRole
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
   },

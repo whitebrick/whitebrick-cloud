@@ -4,7 +4,6 @@ Feature:
     * def wb = call read('classpath:init.feature')
     * url wb.baseUrl
     * path wb.endpointPath
-
   Scenario: Create a user
     Given text query = 
     """

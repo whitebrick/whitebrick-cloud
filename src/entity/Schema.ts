@@ -12,11 +12,13 @@ export class Schema {
   id!: number;
   name!: string;
   label!: string;
-  tenantOwnerId: number | null | undefined;
-  userOwnerId: number | null | undefined;
+  tenantOwnerId?: number;
+  userOwnerId?: number;
   createdAt!: Date;
   updatedAt!: Date;
-  userRole: RoleName | null | undefined;
+  // not persisted
+  userRole?: RoleName;
+  context!: object;
 
   public static parseResult(data: QueryResult | null): Array<Schema> {
     if (!data) throw new Error("Schema.parseResult: input is null");

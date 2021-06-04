@@ -1,10 +1,10 @@
-import { ApolloServer } from "apollo-server-lambda";
+import { ApolloServer, ApolloError } from "apollo-server-lambda";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { schema, ServiceResult } from "./types";
 import v = require("voca");
-import { Schema } from "./entity";
+import { Column, Schema } from "./entity";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -22,6 +22,26 @@ export const log: Logger = new Logger({
 
 class WhitebrickCloud {
   dal = new DAL();
+
+  public err(result: ServiceResult): Error {
+    if (result.success) {
+      return new Error(
+        "WhitebrickCloud.err: result is not an error (success==true)"
+      );
+    }
+    let apolloError = "INTERNAL_SERVER_ERROR";
+    if (result.apolloError) apolloError = result.apolloError;
+    return new ApolloError(result.message, apolloError, {
+      ref: result.code,
+    });
+  }
+
+  public addSchemaContext(schema: Schema): Schema {
+    schema.context = {
+      defaultColumnTypes: Column.COMMON_TYPES,
+    };
+    return schema;
+  }
 
   /**
    * Test
@@ -238,12 +258,20 @@ class WhitebrickCloud {
   }
 
   public async accessibleSchemas(userEmail: string): Promise<ServiceResult> {
-    const result = await this.schemasByUserOwner(userEmail);
-    if (!result.success) return result;
+    const schemaOwnerResult = await this.schemasByUserOwner(userEmail);
+    if (!schemaOwnerResult.success) return schemaOwnerResult;
     const userRolesResult = await this.dal.schemasByUser(userEmail);
     if (!userRolesResult.success) return userRolesResult;
-    result.payload = result.payload.concat(userRolesResult.payload);
-    return result;
+    const schemas: Schema[] = [];
+    for (const schema of schemaOwnerResult.payload.concat(
+      userRolesResult.payload
+    )) {
+      schemas.push(this.addSchemaContext(schema));
+    }
+    return {
+      success: true,
+      payload: schemas,
+    };
   }
 
   /**
@@ -259,7 +287,29 @@ class WhitebrickCloud {
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
-    return this.dal.columns(schemaName, tableName);
+    let result = await this.dal.discoverConstraint(
+      schemaName,
+      tableName,
+      "PRIMARY KEY"
+    );
+    if (!result.success) return result;
+    const pKColsConstraints: Record<string, string> = result.payload;
+    const pKColumnNames: string[] = Object.keys(pKColsConstraints);
+    result = await this.dal.discoverConstraint(
+      schemaName,
+      tableName,
+      "FOREIGN KEY"
+    );
+    if (!result.success) return result;
+    const fKColsConstraints: Record<string, string> = result.payload;
+    const fKColumnNames: string[] = Object.keys(fKColsConstraints);
+    result = await this.dal.columns(schemaName, tableName);
+    if (!result.success) return result;
+    for (const column of result.payload) {
+      column.isPrimaryKey = pKColumnNames.includes(column.name);
+      column.isForeignKey = fKColumnNames.includes(column.name);
+    }
+    return result;
   }
 
   public async addOrCreateTable(
@@ -331,6 +381,19 @@ class WhitebrickCloud {
   ): Promise<ServiceResult> {
     let result: ServiceResult;
     if (newTableName) {
+      result = await this.tables(schemaName);
+      if (!result.success) return result;
+      const existingTableNames = result.payload.map(
+        (table: { name: string }) => table.name
+      );
+      if (existingTableNames.includes(newTableName)) {
+        return {
+          success: false,
+          message: "The new table name must be unique",
+          code: "WB_TABLE_NAME_EXISTS",
+          apolloError: "BAD_USER_INPUT",
+        };
+      }
       result = await hasuraApi.untrackTable(schemaName, tableName);
       if (!result.success) return result;
     }
@@ -388,7 +451,7 @@ class WhitebrickCloud {
     columnType?: string
   ): Promise<ServiceResult> {
     if (!create) create = false;
-    return await this.dal.addOrCreateColumn(
+    let result = await this.dal.addOrCreateColumn(
       schemaName,
       tableName,
       columnName,
@@ -396,6 +459,136 @@ class WhitebrickCloud {
       create,
       columnType
     );
+    if (!result.success) return result;
+    if (create) {
+      result = await hasuraApi.untrackTable(schemaName, tableName);
+      if (!result.success) return result;
+      result = await hasuraApi.trackTable(schemaName, tableName);
+    }
+    return result;
+  }
+
+  // Pass empty columnNames[] to clear
+  public async setPrimaryKey(
+    schemaName: string,
+    tableName: string,
+    columnNames: string[]
+  ): Promise<ServiceResult> {
+    let result = await this.dal.discoverConstraint(
+      schemaName,
+      tableName,
+      "PRIMARY KEY"
+    );
+    if (!result.success) return result;
+    const existingConstraintNames = Object.values(result.payload);
+    // Clearing primary key
+    if (columnNames.length == 0) {
+      if (existingConstraintNames.length > 0) {
+        // multiple coulmn primary keys will all have same constraint name
+        result = await this.dal.removeConstraint(
+          schemaName,
+          tableName,
+          existingConstraintNames[0] as string
+        );
+      }
+    } else {
+      if (existingConstraintNames.length > 0) {
+        return {
+          success: false,
+          message: "Remove existing primary key first",
+          code: "WB_PK_EXISTS",
+          apolloError: "BAD_USER_INPUT",
+        };
+      }
+      result = await hasuraApi.untrackTable(schemaName, tableName);
+      if (!result.success) return result;
+      result = await this.dal.setPrimaryKey(schemaName, tableName, columnNames);
+      if (!result.success) return result;
+      result = await hasuraApi.trackTable(schemaName, tableName);
+    }
+    return result;
+  }
+
+  // Pass empty parentColumnNames[] to clear
+  public async setForeignKey(
+    schemaName: string,
+    tableName: string,
+    columnNames: string[],
+    parentTableName: string,
+    parentColumnNames: string[]
+  ): Promise<ServiceResult> {
+    let result = await this.dal.discoverConstraint(
+      schemaName,
+      tableName,
+      "FOREIGN KEY"
+    );
+    if (!result.success) return result;
+    const existingConstraints = result.payload;
+    // Check for existing foreign keys
+    for (const columnName of columnNames) {
+      if (Object.keys(existingConstraints).includes(columnName)) {
+        if (parentColumnNames.length == 0) {
+          result = await hasuraApi.dropRelationships(
+            schemaName,
+            tableName,
+            parentTableName
+          );
+          if (!result.success) return result;
+          result = await this.dal.removeConstraint(
+            schemaName,
+            tableName,
+            existingConstraints[columnName] as string
+          );
+          return result;
+        } else {
+          return {
+            success: false,
+            message: `Remove existing foreign key on ${columnName} first`,
+            code: "WB_FK_EXISTS",
+            apolloError: "BAD_USER_INPUT",
+          };
+        }
+      }
+    }
+    log.debug(`parentColumnNames ${parentColumnNames}`);
+    if (parentColumnNames.length > 0) {
+      if (!parentTableName) {
+        return {
+          success: false,
+          message: "Parent table name is required if not clearing foreign key",
+          code: "WB_FK_TABLE_REQUIRED",
+          apolloError: "BAD_USER_INPUT",
+        };
+      }
+      // result = await hasuraApi.untrackTable(schemaName, tableName);
+      // if (!result.success) return result;
+      result = await this.dal.setForeignKey(
+        schemaName,
+        tableName,
+        columnNames,
+        parentTableName,
+        parentColumnNames
+      );
+      if (!result.success) return result;
+      result = await hasuraApi.createObjectRelationship(
+        schemaName,
+        tableName, // posts
+        columnNames[0], // author_id
+        parentTableName // authors
+      );
+      if (!result.success) return result;
+      result = await hasuraApi.createArrayRelationship(
+        schemaName,
+        parentTableName, // authors
+        tableName, // posts
+        columnNames // author_id
+      );
+      if (!result.success) return result;
+
+      // if (!result.success) return result;
+      // result = await hasuraApi.trackTable(schemaName, tableName);
+    }
+    return result;
   }
 
   public async tableUser(

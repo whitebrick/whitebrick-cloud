@@ -1,5 +1,5 @@
 Feature: Users 
-  @setup
+  
   Scenario: Create test users
     * table users 
       | email | firstName | lastName

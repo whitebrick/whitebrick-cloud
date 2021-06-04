@@ -1,5 +1,5 @@
 Feature: Tenants
-  @setup
+  
   Scenario: Create test tenants
     * table tenants 
       | name | label |
@@ -7,7 +7,7 @@ Feature: Tenants
     * def result = call read('tenants/tenant-create.feature') tenants
     # * def created = $result[*].response
 
-  @setup
+  
   Scenario: Add users to tenants
     * table tenantUsers 
       | tenantName | userEmail | tenantRole

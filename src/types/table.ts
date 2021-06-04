@@ -1,5 +1,4 @@
 import { gql, IResolvers } from "apollo-server-lambda";
-import { ApolloError } from "apollo-server-lambda";
 import { GraphQLJSON } from "graphql-type-json";
 
 export const typeDefs = gql`
@@ -20,6 +19,8 @@ export const typeDefs = gql`
     name: String!
     label: String!
     type: String!
+    isPrimaryKey: Boolean!
+    isForeignKey: Boolean!
     createdAt: String!
     updatedAt: String!
   }
@@ -65,6 +66,24 @@ export const typeDefs = gql`
       create: Boolean
       columnType: String
     ): Boolean!
+    """
+    Pass empty columnNames array to remove Primary key
+    """
+    wbSetPrimaryKey(
+      schemaName: String!
+      tableName: String!
+      columnNames: [String]!
+    ): Boolean!
+    """
+    Pass empty columnNames array to remove Foreign key
+    """
+    wbSetForeignKey(
+      schemaName: String!
+      tableName: String!
+      columnNames: [String]!
+      parentTableName: String!
+      parentColumnNames: [String]!
+    ): Boolean!
     wbSaveTableUserSettings(
       userEmail: String!
       schemaName: String!
@@ -81,20 +100,12 @@ export const resolvers: IResolvers = {
   Query: {
     wbTables: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.tables(schemaName);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     wbColumns: async (_, { schemaName, tableName }, context) => {
       const result = await context.wbCloud.columns(schemaName, tableName);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     wbTableUser: async (_, { schemaName, tableName, userEmail }, context) => {
@@ -103,11 +114,7 @@ export const resolvers: IResolvers = {
         schemaName,
         tableName
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
   },
@@ -123,11 +130,7 @@ export const resolvers: IResolvers = {
         tableLabel,
         create
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbUpdateTable: async (
@@ -141,20 +144,12 @@ export const resolvers: IResolvers = {
         newTableName,
         newTableLabel
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbAddAllExistingTables: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.addAllExistingTables(schemaName);
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbAddOrCreateColumn: async (
@@ -162,7 +157,7 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, columnName, columnLabel, create, columnType },
       context
     ) => {
-      const result = await context.wbCloud.addColumn(
+      const result = await context.wbCloud.addOrCreateColumn(
         schemaName,
         tableName,
         columnName,
@@ -170,11 +165,41 @@ export const resolvers: IResolvers = {
         create,
         columnType
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbSetPrimaryKey: async (
+      _,
+      { schemaName, tableName, columnNames },
+      context
+    ) => {
+      const result = await context.wbCloud.setPrimaryKey(
+        schemaName,
+        tableName,
+        columnNames
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbSetForeignKey: async (
+      _,
+      {
+        schemaName,
+        tableName,
+        columnNames,
+        parentTableName,
+        parentColumnNames,
+      },
+      context
+    ) => {
+      const result = await context.wbCloud.setForeignKey(
+        schemaName,
+        tableName,
+        columnNames,
+        parentTableName,
+        parentColumnNames
+      );
+      if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbSaveTableUserSettings: async (
@@ -188,11 +213,7 @@ export const resolvers: IResolvers = {
         userEmail,
         settings
       );
-      if (!result.success) {
-        throw new ApolloError(result.message, "INTERNAL_SERVER_ERROR", {
-          ref: result.code,
-        });
-      }
+      if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     // TBD-SG

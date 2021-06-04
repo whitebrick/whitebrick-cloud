@@ -4,7 +4,6 @@ Feature:
     * def wb = call read('classpath:init.feature')
     * url wb.baseUrl
     * path wb.endpointPath
-
   Scenario: Reset test data
     Given text query = 
     """

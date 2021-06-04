@@ -1,5 +1,4 @@
 Feature: Initialize
-
   Scenario: Initialize
     * url baseUrl
     * path endpointPath

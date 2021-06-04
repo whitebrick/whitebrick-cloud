@@ -5,7 +5,7 @@ Feature: Add a user to a tenant
     * url wb.baseUrl
     * path wb.endpointPath
 
-  @setup
+  
   Scenario: Add a user to a tenant
     Given text query = 
     """
