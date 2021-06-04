@@ -1,9 +1,8 @@
 Feature:
 
   Background:
-    * def wb = call read('classpath:init.feature')
-    * url wb.baseUrl
-    * path wb.endpointPath
+    * url baseUrl
+    * path endpointPath
     # Could not get ##(<var>) working, below is work around for an empty tenant/user owner https://github.com/intuit/karate/issues/145
     * def tenantOwnerNameChk = typeof tenantOwnerName == 'undefined' ? null : tenantOwnerName
     * def userOwnerEmailChk = typeof userOwnerEmail == 'undefined' ? null : userOwnerEmail

@@ -1,9 +1,8 @@
 Feature:
 
   Background:
-    * def wb = call read('classpath:init.feature')
-    * url wb.baseUrl
-    * path wb.endpointPath
+    * url baseUrl
+    * path endpointPath
   Scenario: Rename a table
     Given text query = 
     """

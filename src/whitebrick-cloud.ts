@@ -2,9 +2,10 @@ import { ApolloServer, ApolloError } from "apollo-server-lambda";
 import { Logger } from "tslog";
 import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
-import { schema, ServiceResult } from "./types";
+import { ConstraintId, schema, ServiceResult } from "./types";
 import v = require("voca");
 import { Column, Schema } from "./entity";
+import { isThisTypeNode } from "typescript";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -280,34 +281,43 @@ class WhitebrickCloud {
    */
 
   public async tables(schemaName: string): Promise<ServiceResult> {
-    return this.dal.tables(schemaName);
+    const result = await this.dal.tables(schemaName);
+    if (!result.success) return result;
+    for (const table of result.payload) {
+      const columnsResult = await this.columns(schemaName, table.name);
+      if (!columnsResult.success) return columnsResult;
+      table.columns = columnsResult.payload;
+    }
+    return result;
   }
 
   public async columns(
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
-    let result = await this.dal.discoverConstraint(
-      schemaName,
-      tableName,
-      "PRIMARY KEY"
-    );
+    let result = await this.dal.primaryKeys(schemaName, tableName);
     if (!result.success) return result;
     const pKColsConstraints: Record<string, string> = result.payload;
     const pKColumnNames: string[] = Object.keys(pKColsConstraints);
-    result = await this.dal.discoverConstraint(
-      schemaName,
-      tableName,
-      "FOREIGN KEY"
-    );
-    if (!result.success) return result;
-    const fKColsConstraints: Record<string, string> = result.payload;
-    const fKColumnNames: string[] = Object.keys(fKColsConstraints);
     result = await this.dal.columns(schemaName, tableName);
     if (!result.success) return result;
     for (const column of result.payload) {
       column.isPrimaryKey = pKColumnNames.includes(column.name);
-      column.isForeignKey = fKColumnNames.includes(column.name);
+      const foreignKeysResult = await this.dal.foreignKeysOrReferences(
+        schemaName,
+        tableName,
+        column.name
+      );
+      if (!foreignKeysResult.success) return result;
+      column.foreignKeys = foreignKeysResult.payload;
+      const referencesResult = await this.dal.foreignKeysOrReferences(
+        schemaName,
+        tableName,
+        column.name,
+        true
+      );
+      if (!referencesResult.success) return result;
+      column.referencedBy = referencesResult.payload;
     }
     return result;
   }
@@ -474,11 +484,7 @@ class WhitebrickCloud {
     tableName: string,
     columnNames: string[]
   ): Promise<ServiceResult> {
-    let result = await this.dal.discoverConstraint(
-      schemaName,
-      tableName,
-      "PRIMARY KEY"
-    );
+    let result = await this.dal.primaryKeys(schemaName, tableName);
     if (!result.success) return result;
     const existingConstraintNames = Object.values(result.payload);
     // Clearing primary key
@@ -517,11 +523,7 @@ class WhitebrickCloud {
     parentTableName: string,
     parentColumnNames: string[]
   ): Promise<ServiceResult> {
-    let result = await this.dal.discoverConstraint(
-      schemaName,
-      tableName,
-      "FOREIGN KEY"
-    );
+    let result = await this.dal.primaryKeys(schemaName, tableName);
     if (!result.success) return result;
     const existingConstraints = result.payload;
     // Check for existing foreign keys

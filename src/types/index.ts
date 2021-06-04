@@ -19,6 +19,12 @@ export type QueryParams = {
   params?: any[];
 };
 
+export type ConstraintId = {
+  name: string;
+  table: string;
+  column: string;
+};
+
 const typeDefs = gql`
   type Query {
     wbHealthCheck: String!

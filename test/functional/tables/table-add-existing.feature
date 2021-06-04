@@ -1,9 +1,8 @@
 Feature:
 
   Background:
-    * def wb = call read('classpath:init.feature')
-    * url wb.baseUrl
-    * path wb.endpointPath
+    * url baseUrl
+    * path endpointPath
 
     Scenario: Add all existing tables
     Given text query = 

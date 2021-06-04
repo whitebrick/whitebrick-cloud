@@ -1,13 +1,12 @@
 Feature:
 
   Background:
-    * def wb = call read('classpath:init.feature')
-    * url wb.baseUrl
-    * path wb.endpointPath
+    * url baseUrl
+    * path endpointPath
   Scenario: Set foreign key
     Given text query = 
     """
-      mutation ($schemaName: String!, $tableName: String!, $columnNames: [String]!, $parentTableName: String, $parentColumnNames: [String]!){
+      mutation ($schemaName: String!, $tableName: String!, $columnNames: [String]!, $parentTableName: String!, $parentColumnNames: [String]!){
         wbSetForeignKey(
           schemaName: $schemaName,
           tableName: $tableName,

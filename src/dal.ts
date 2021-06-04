@@ -2,7 +2,7 @@ import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
 import { Tenant, User, Role, Schema, Table, Column, TableUser } from "./entity";
-import { QueryParams, ServiceResult } from "./types";
+import { ConstraintId, QueryParams, ServiceResult } from "./types";
 
 export class DAL {
   private pool: Pool;
@@ -633,40 +633,90 @@ export class DAL {
     return result;
   }
 
-  // eg type = "PRIMARY KEY", "FOREIGN KEY"
-  public async discoverConstraint(
+  public async foreignKeysOrReferences(
     schemaName: string,
     tableName: string,
-    type: string
+    columnName: string,
+    references: boolean = false
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
-    let columnNameSql: string = "c.column_name";
-    let joinSql: string = `
-      JOIN information_schema.constraint_column_usage AS ccu
-      USING (constraint_schema, constraint_name)
-      JOIN information_schema.columns AS c
-      ON c.table_schema = tc.constraint_schema
-      AND tc.table_name = c.table_name
-      AND ccu.column_name = c.column_name
+    let whereSql: string = `
+      AND fk.table_name = '${tableName}'
+      AND fk.column_name = '${columnName}'
     `;
-    if (type == "FOREIGN KEY") {
-      columnNameSql = "kcu.column_name";
-      joinSql = `
-        JOIN information_schema.key_column_usage AS kcu
-        ON tc.constraint_name = kcu.constraint_name
-        AND tc.table_schema = kcu.table_schema
-        JOIN information_schema.columns AS c
-        ON c.table_schema = tc.constraint_schema
-        AND tc.table_name = c.table_name
+    if (references) {
+      whereSql = `
+        AND ref.table_name ='${tableName}'
+        AND ref.column_name ='${columnName}'
       `;
     }
     const result = await this.executeQuery({
       query: `
-        SELECT DISTINCT ${columnNameSql}, tc.constraint_name
+        SELECT
+        -- unique reference info
+        ref.table_name       AS ref_table,
+        ref.column_name      AS ref_column,
+        refd.constraint_type AS ref_type, -- e.g. UNIQUE or PRIMARY KEY
+        -- foreign key info
+        fk.table_name        AS fk_table,
+        fk.column_name       AS fk_column,
+        fk.constraint_name   AS fk_name,
+        map.update_rule      AS fk_on_update,
+        map.delete_rule      AS fk_on_delete
+        -- lists fk constraints AND maps them to pk constraints
+        FROM information_schema.referential_constraints AS map
+        -- join unique constraints (e.g. PKs constraints) to ref columns info
+        INNER JOIN information_schema.key_column_usage AS ref
+        ON  ref.constraint_catalog = map.unique_constraint_catalog
+        AND ref.constraint_schema = map.unique_constraint_schema
+        AND ref.constraint_name = map.unique_constraint_name
+        -- optional: to include reference constraint type
+        LEFT JOIN information_schema.table_constraints AS refd
+        ON  refd.constraint_catalog = ref.constraint_catalog
+        AND refd.constraint_schema = ref.constraint_schema
+        AND refd.constraint_name = ref.constraint_name
+        -- join fk columns to the correct ref columns using ordinal positions
+        INNER JOIN information_schema.key_column_usage AS fk
+        ON  fk.constraint_catalog = map.constraint_catalog
+        AND fk.constraint_schema = map.constraint_schema
+        AND fk.constraint_name = map.constraint_name
+        AND fk.position_in_unique_constraint = ref.ordinal_position --IMPORTANT!
+        WHERE ref.table_schema='${schemaName}'
+        AND fk.table_schema='${schemaName}'
+        ${whereSql}
+      `,
+    });
+    if (!result.success) return result;
+    const constraints: ConstraintId[] = [];
+    for (const row of result.payload.rows) {
+      constraints.push({
+        name: row.fk_name,
+        table: row.fk_table,
+        column: row.fk_column,
+      } as ConstraintId);
+    }
+    result.payload = constraints;
+    return result;
+  }
+
+  public async primaryKeys(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    const result = await this.executeQuery({
+      query: `
+        SELECT DISTINCT c.column_name, tc.constraint_name
         FROM information_schema.table_constraints tc 
-        ${joinSql}
-        WHERE constraint_type = '${type}'
+        JOIN information_schema.constraint_column_usage AS ccu
+        USING (constraint_schema, constraint_name)
+        JOIN information_schema.columns AS c
+        ON c.table_schema = tc.constraint_schema
+        AND tc.table_name = c.table_name
+        AND ccu.column_name = c.column_name
+        WHERE constraint_type = 'PRIMARY KEY'
         AND c.table_schema='${schemaName}'
         AND tc.table_name = '${tableName}'
       `,

@@ -39,8 +39,13 @@ INSERT INTO test_the_daisy_blog.post_tags(post_id, tag_id) VALUES
   (14,105)
 ON CONFLICT DO NOTHING;
 
--- ALTER TABLE test_the_daisy_blog.posts
--- ADD CONSTRAINT posts_author_id_fkey
--- FOREIGN KEY (author_id)
--- REFERENCES test_the_daisy_blog.authors(id)
--- ON DELETE SET NULL
+INSERT INTO test_the_daisy_blog.post_links(post_id, url) VALUES
+  (10,'http://harrypotter.com'),
+  (11,'http://nimbus2000.com'),
+  (12,'http://bitcoin.com'),
+  (12,'http://bitcoin-market.com'),
+  (14,'http://linux.com'),
+  (14,'http://linux-news.com'),
+  (14,'http://linux-help.com')
+ON CONFLICT DO NOTHING;
+

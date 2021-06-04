@@ -1,9 +1,8 @@
 Feature: Add a user to a schema
 
   Background:
-    * def wb = call read('classpath:init.feature')
-    * url wb.baseUrl
-    * path wb.endpointPath
+    * url baseUrl
+    * path endpointPath
 
   
   Scenario: Add a user to a schema

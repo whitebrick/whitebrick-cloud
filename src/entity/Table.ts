@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { Column } from ".";
 
 export class Table {
   id!: number;
@@ -7,6 +8,8 @@ export class Table {
   label!: string;
   createdAt!: Date;
   updatedAt!: Date;
+  // not persisted
+  columns!: [Column];
 
   public static parseResult(data: QueryResult | null): Array<Table> {
     if (!data) throw new Error("Table.parseResult: input is null");

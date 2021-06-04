@@ -1,9 +1,8 @@
 Feature: Create a tenant
 
   Background:
-    * def wb = call read('classpath:init.feature')
-    * url wb.baseUrl
-    * path wb.endpointPath
+    * url baseUrl
+    * path endpointPath
     * print "*** background name=", name
     * print "*** background label=", label
   Scenario: Create a tenant

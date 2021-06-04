@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { ConstraintId, ServiceResult } from "../types";
 
 export class Column {
   static COMMON_TYPES: Record<string, string> = {
@@ -19,7 +20,8 @@ export class Column {
   updatedAt!: Date;
   // not persisted
   isPrimaryKey!: boolean;
-  isForeignKey!: boolean;
+  foreignKeys!: [ConstraintId];
+  referencedBy!: [ConstraintId];
 
   public static parseResult(data: QueryResult | null): Array<Column> {
     if (!data) throw new Error("Column.parseResult: input is null");

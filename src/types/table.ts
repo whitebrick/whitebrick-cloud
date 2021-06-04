@@ -11,6 +11,7 @@ export const typeDefs = gql`
     label: String!
     createdAt: String!
     updatedAt: String!
+    columns: [Column]!
   }
 
   type Column {
@@ -20,9 +21,16 @@ export const typeDefs = gql`
     label: String!
     type: String!
     isPrimaryKey: Boolean!
-    isForeignKey: Boolean!
+    foreignKeys: [ConstraintId]!
+    referencedBy: [ConstraintId]!
     createdAt: String!
     updatedAt: String!
+  }
+
+  type ConstraintId {
+    name: String!
+    table: String!
+    column: String!
   }
 
   type TableUser {
