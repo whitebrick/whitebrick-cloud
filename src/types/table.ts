@@ -1,5 +1,6 @@
 import { gql, IResolvers } from "apollo-server-lambda";
 import { GraphQLJSON } from "graphql-type-json";
+import { log } from "../whitebrick-cloud";
 
 export const typeDefs = gql`
   scalar JSON
@@ -28,9 +29,9 @@ export const typeDefs = gql`
   }
 
   type ConstraintId {
-    name: String!
-    table: String!
-    column: String!
+    constraintName: String!
+    tableName: String!
+    columnName: String!
   }
 
   type TableUser {
@@ -74,23 +75,26 @@ export const typeDefs = gql`
       create: Boolean
       columnType: String
     ): Boolean!
-    """
-    Pass empty columnNames array to remove Primary key
-    """
-    wbSetPrimaryKey(
+    wbCreateOrDeletePrimaryKey(
       schemaName: String!
       tableName: String!
       columnNames: [String]!
+      del: Boolean
     ): Boolean!
-    """
-    Pass empty columnNames array to remove Foreign key
-    """
-    wbSetForeignKey(
+    wbAddOrCreateForeignKey(
       schemaName: String!
       tableName: String!
       columnNames: [String]!
       parentTableName: String!
       parentColumnNames: [String]!
+      create: Boolean
+    ): Boolean!
+    wbRemoveOrDeleteForeignKey(
+      schemaName: String!
+      tableName: String!
+      columnNames: [String]!
+      parentTableName: String!
+      del: Boolean
     ): Boolean!
     wbSaveTableUserSettings(
       userEmail: String!
@@ -100,8 +104,6 @@ export const typeDefs = gql`
     ): Boolean!
   }
 `;
-// TBD-SG
-// Edit gql above to include wbTrackTableRelationships
 
 export const resolvers: IResolvers = {
   JSON: GraphQLJSON,
@@ -176,20 +178,21 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbSetPrimaryKey: async (
+    wbCreateOrDeletePrimaryKey: async (
       _,
-      { schemaName, tableName, columnNames },
+      { schemaName, tableName, columnNames, del },
       context
     ) => {
-      const result = await context.wbCloud.setPrimaryKey(
+      const result = await context.wbCloud.createOrDeletePrimaryKey(
         schemaName,
         tableName,
-        columnNames
+        columnNames,
+        del
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbSetForeignKey: async (
+    wbAddOrCreateForeignKey: async (
       _,
       {
         schemaName,
@@ -197,15 +200,39 @@ export const resolvers: IResolvers = {
         columnNames,
         parentTableName,
         parentColumnNames,
+        create,
       },
       context
     ) => {
-      const result = await context.wbCloud.setForeignKey(
+      const result = await context.wbCloud.addOrCreateForeignKey(
         schemaName,
         tableName,
         columnNames,
         parentTableName,
-        parentColumnNames
+        parentColumnNames,
+        create
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbRemoveOrDeleteForeignKey: async (
+      _,
+      {
+        schemaName,
+        tableName,
+        columnNames,
+        parentTableName,
+        parentColumnNames,
+        del,
+      },
+      context
+    ) => {
+      const result = await context.wbCloud.removeOrDeleteForeignKey(
+        schemaName,
+        tableName,
+        columnNames,
+        parentTableName,
+        del
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
@@ -224,7 +251,5 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    // TBD-SG
-    // Add resolver for wbTrackTableRelationships
   },
 };

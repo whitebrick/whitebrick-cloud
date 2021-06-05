@@ -691,9 +691,9 @@ export class DAL {
     const constraints: ConstraintId[] = [];
     for (const row of result.payload.rows) {
       constraints.push({
-        name: row.fk_name,
-        table: row.fk_table,
-        column: row.fk_column,
+        constraintName: row.fk_name,
+        tableName: row.fk_table,
+        columnName: row.fk_column,
       } as ConstraintId);
     }
     result.payload = constraints;
@@ -731,7 +731,7 @@ export class DAL {
     return result;
   }
 
-  public async removeConstraint(
+  public async deleteConstraint(
     schemaName: string,
     tableName: string,
     constraintName: string
@@ -742,13 +742,13 @@ export class DAL {
     const result = await this.executeQuery({
       query: `
         ALTER TABLE ${schemaName}.${tableName}
-        DROP CONSTRAINT ${constraintName}
+        DROP CONSTRAINT IF EXISTS ${constraintName}
       `,
     });
     return result;
   }
 
-  public async setPrimaryKey(
+  public async createPrimaryKey(
     schemaName: string,
     tableName: string,
     columnNames: string[]
@@ -768,7 +768,7 @@ export class DAL {
     return result;
   }
 
-  public async setForeignKey(
+  public async createForeignKey(
     schemaName: string,
     tableName: string,
     columnNames: string[],
@@ -776,7 +776,7 @@ export class DAL {
     parentColumnNames: string[]
   ): Promise<ServiceResult> {
     log.debug(
-      `dal.setForeignKey(${schemaName},${tableName},${columnNames},${parentTableName},${parentColumnNames})`
+      `dal.createForeignKey(${schemaName},${tableName},${columnNames},${parentTableName},${parentColumnNames})`
     );
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
@@ -1088,8 +1088,4 @@ export class DAL {
     });
     return result;
   }
-
-  // TBD-SG
-  // use tables as tamplate
-  // public async tableRelationships(schemaName: string, tableName: string): Promise<ServiceResult> {
 }

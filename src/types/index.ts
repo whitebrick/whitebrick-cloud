@@ -20,9 +20,9 @@ export type QueryParams = {
 };
 
 export type ConstraintId = {
-  name: string;
-  table: string;
-  column: string;
+  constraintName: string;
+  tableName: string;
+  columnName: string;
 };
 
 const typeDefs = gql`

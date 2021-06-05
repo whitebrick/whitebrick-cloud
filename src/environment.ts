@@ -8,6 +8,8 @@ type Environment = {
   dbPoolMax: number;
   dbPoolIdleTimeoutMillis: number;
   dbPoolConnectionTimeoutMillis: number;
+  hasuraHost: string;
+  hasuraAdminSecret: string;
 };
 
 export const environment: Environment = {
@@ -24,4 +26,6 @@ export const environment: Environment = {
   dbPoolConnectionTimeoutMillis: parseInt(
     process.env.DB_POOL_CONNECTION_TIMEOUT_MILLIS || ""
   ) as number,
+  hasuraHost: process.env.HASURA_HOST as string,
+  hasuraAdminSecret: process.env.HASURA_ADMIN_SECRET as string,
 };

@@ -479,19 +479,20 @@ class WhitebrickCloud {
   }
 
   // Pass empty columnNames[] to clear
-  public async setPrimaryKey(
+  public async createOrDeletePrimaryKey(
     schemaName: string,
     tableName: string,
-    columnNames: string[]
+    columnNames: string[],
+    del?: boolean
   ): Promise<ServiceResult> {
+    if (!del) del = false;
     let result = await this.dal.primaryKeys(schemaName, tableName);
     if (!result.success) return result;
     const existingConstraintNames = Object.values(result.payload);
-    // Clearing primary key
-    if (columnNames.length == 0) {
+    if (del) {
       if (existingConstraintNames.length > 0) {
         // multiple coulmn primary keys will all have same constraint name
-        result = await this.dal.removeConstraint(
+        result = await this.dal.deleteConstraint(
           schemaName,
           tableName,
           existingConstraintNames[0] as string
@@ -508,39 +509,92 @@ class WhitebrickCloud {
       }
       result = await hasuraApi.untrackTable(schemaName, tableName);
       if (!result.success) return result;
-      result = await this.dal.setPrimaryKey(schemaName, tableName, columnNames);
+      result = await this.dal.createPrimaryKey(
+        schemaName,
+        tableName,
+        columnNames
+      );
       if (!result.success) return result;
       result = await hasuraApi.trackTable(schemaName, tableName);
     }
     return result;
   }
 
-  // Pass empty parentColumnNames[] to clear
+  public async addOrCreateForeignKey(
+    schemaName: string,
+    tableName: string,
+    columnNames: string[],
+    parentTableName: string,
+    parentColumnNames: string[],
+    create?: boolean
+  ): Promise<ServiceResult> {
+    let operation: string = "CREATE";
+    if (!create) operation = "ADD";
+    return await this.setForeignKey(
+      schemaName,
+      tableName,
+      columnNames,
+      parentTableName,
+      parentColumnNames,
+      operation
+    );
+  }
+
+  public async removeOrDeleteForeignKey(
+    schemaName: string,
+    tableName: string,
+    columnNames: string[],
+    parentTableName: string,
+    del?: boolean
+  ): Promise<ServiceResult> {
+    let operation: string = "DELETE";
+    if (!del) operation = "REMOVE";
+    return await this.setForeignKey(
+      schemaName,
+      tableName,
+      columnNames,
+      parentTableName,
+      [],
+      operation
+    );
+  }
+
+  // operation = "ADD|CREATE|REMOVE|DELETE"
   public async setForeignKey(
     schemaName: string,
     tableName: string,
     columnNames: string[],
     parentTableName: string,
-    parentColumnNames: string[]
+    parentColumnNames: string[],
+    operation: string
   ): Promise<ServiceResult> {
-    let result = await this.dal.primaryKeys(schemaName, tableName);
+    let result = await this.dal.foreignKeysOrReferences(
+      schemaName,
+      tableName,
+      columnNames[0]
+    );
     if (!result.success) return result;
-    const existingConstraints = result.payload;
+    const existingForeignKeys: Record<string, string> = {};
+    for (const constraintId of result.payload) {
+      existingForeignKeys[constraintId.columnName] =
+        constraintId.constraintName;
+    }
     // Check for existing foreign keys
     for (const columnName of columnNames) {
-      if (Object.keys(existingConstraints).includes(columnName)) {
-        if (parentColumnNames.length == 0) {
+      if (Object.keys(existingForeignKeys).includes(columnName)) {
+        if (operation == "REMOVE" || operation == "DELETE") {
           result = await hasuraApi.dropRelationships(
             schemaName,
             tableName,
             parentTableName
           );
-          if (!result.success) return result;
-          result = await this.dal.removeConstraint(
-            schemaName,
-            tableName,
-            existingConstraints[columnName] as string
-          );
+          if (result.success && operation == "DELETE") {
+            result = await this.dal.deleteConstraint(
+              schemaName,
+              tableName,
+              existingForeignKeys[columnName] as string
+            );
+          }
           return result;
         } else {
           return {
@@ -552,26 +606,19 @@ class WhitebrickCloud {
         }
       }
     }
-    log.debug(`parentColumnNames ${parentColumnNames}`);
-    if (parentColumnNames.length > 0) {
-      if (!parentTableName) {
-        return {
-          success: false,
-          message: "Parent table name is required if not clearing foreign key",
-          code: "WB_FK_TABLE_REQUIRED",
-          apolloError: "BAD_USER_INPUT",
-        };
-      }
+    if (operation == "ADD" || operation == "CREATE") {
       // result = await hasuraApi.untrackTable(schemaName, tableName);
       // if (!result.success) return result;
-      result = await this.dal.setForeignKey(
-        schemaName,
-        tableName,
-        columnNames,
-        parentTableName,
-        parentColumnNames
-      );
-      if (!result.success) return result;
+      if (operation == "CREATE") {
+        result = await this.dal.createForeignKey(
+          schemaName,
+          tableName,
+          columnNames,
+          parentTableName,
+          parentColumnNames
+        );
+        if (!result.success) return result;
+      }
       result = await hasuraApi.createObjectRelationship(
         schemaName,
         tableName, // posts
@@ -586,9 +633,6 @@ class WhitebrickCloud {
         columnNames // author_id
       );
       if (!result.success) return result;
-
-      // if (!result.success) return result;
-      // result = await hasuraApi.trackTable(schemaName, tableName);
     }
     return result;
   }
@@ -623,12 +667,4 @@ class WhitebrickCloud {
       settings
     );
   }
-
-  // TBD-SG
-  // use trackAllTables as tamplate
-  // public async trackTableRelationships(schemaName: string, tableName: string) {
-  //  1. Get all realtionships: this.dal.tableRelationships(schemaName, tableName)
-  //  2. For each relationship: infer the object relationships and the array relationships
-  //  3. Create the relationship:
-  //     result = await hasuraApi.trackRelationship(schemaName, tableName, objectOrArray, relationshipName, constraintTable, constraintColumn)
 }

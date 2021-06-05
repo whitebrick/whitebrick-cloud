@@ -54,22 +54,22 @@ Feature: Tables
       | 'test_the_daisy_blog' | 'post_links' | 'url'       | 'Link URL'  | 'text'
     * def result = call read('tables/column-create.feature') columns
 
-  Scenario: Set ID primary keys
+  Scenario: Create primary keys
     * table tables 
-      | schemaName | tableName
-      | 'test_the_daisy_blog' | 'posts'
-      | 'test_the_daisy_blog' | 'authors'
-      | 'test_the_daisy_blog' | 'tags'
+      | schemaName            | tableName | columnNames | del
+      | 'test_the_daisy_blog' | 'posts'   | ["id"]      | false
+      | 'test_the_daisy_blog' | 'authors' | ["id"]      | false
+      | 'test_the_daisy_blog' | 'tags'    | ["id"]      | false
     * def result = call read('tables/primary_key-set.feature') tables
 
-  Scenario: Set foreign keys
+  Scenario: Create foreign keys
     * table columns 
-      | schemaName            | tableName    | columnNames     | parentColumnNames | parentTableName
-      | 'test_the_daisy_blog' | 'posts'      | ["author_id"]   | ["id"]            | 'authors'
-      | 'test_the_daisy_blog' | 'post_tags'  | ["post_id"]     | ["id"]            | 'posts'
-      | 'test_the_daisy_blog' | 'post_tags'  | ["tag_id"]      | ["id"]            | 'tags'
-      | 'test_the_daisy_blog' | 'post_links' | ["post_id"]     | ["id"]            | 'posts'
-    * def result = call read('tables/foreign_key-set.feature') columns
+      | schemaName            | tableName    | columnNames     | parentColumnNames | parentTableName | create
+      | 'test_the_daisy_blog' | 'posts'      | ["author_id"]   | ["id"]            | 'authors'       | true
+      | 'test_the_daisy_blog' | 'post_tags'  | ["post_id"]     | ["id"]            | 'posts'         | true
+      | 'test_the_daisy_blog' | 'post_tags'  | ["tag_id"]      | ["id"]            | 'tags'          | true
+      | 'test_the_daisy_blog' | 'post_links' | ["post_id"]     | ["id"]            | 'posts'         | true
+    * def result = call read('tables/foreign_key-add.feature') columns
 
   Scenario: Load test data for new DB
     * karate.exec("bash load_test_data.bash")

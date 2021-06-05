@@ -1,19 +1,21 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
 import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { environment } from "./environment";
 import { ServiceResult } from "./types";
 import { log } from "./whitebrick-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {
   Accept: "application/json",
   "Content-Type": "application/json; charset=utf-8",
-  "x-hasura-admin-secret": "Ha5uraWBStaging",
+  "x-hasura-admin-secret": environment.hasuraAdminSecret,
 };
 
 class HasuraApi {
   static HASURA_IGNORE_CODES: string[] = [
     "already-untracked",
     "already-tracked",
+    "not-exists", // dropping a relationship
   ];
   private instance: AxiosInstance | null = null;
 
@@ -23,7 +25,7 @@ class HasuraApi {
 
   initHasuraApi() {
     const http = axios.create({
-      baseURL: "http://localhost:8080",
+      baseURL: environment.hasuraHost,
       headers,
       withCredentials: false,
     });
@@ -33,7 +35,7 @@ class HasuraApi {
   }
 
   private async post(type: string, args: Record<string, any>) {
-    let result: ServiceResult;
+    let result: ServiceResult = { success: false } as ServiceResult;
     try {
       log.debug(`hasuraApi.post: type: ${type}`, args);
       const response = await this.http.post<any, AxiosResponse>(
@@ -46,20 +48,27 @@ class HasuraApi {
       result = {
         success: true,
         payload: response,
-      };
+      } as ServiceResult;
     } catch (error) {
-      if (!HasuraApi.HASURA_IGNORE_CODES.includes(error.response.data.code)) {
-        if (error.response && error.response.data) {
+      if (error.response && error.response.data) {
+        if (!HasuraApi.HASURA_IGNORE_CODES.includes(error.response.data.code)) {
           log.error(error.response.data);
+          result = {
+            success: false,
+            message: error.response.data.error,
+            code: error.response.data.code,
+          } as ServiceResult;
         } else {
-          log.error(error);
+          result = {
+            success: true,
+          } as ServiceResult;
         }
+      } else {
+        result = {
+          success: false,
+          message: error.message,
+        } as ServiceResult;
       }
-      result = {
-        success: false,
-        message: error.response.data.error,
-        code: error.response.data.code,
-      };
     }
     return result;
   }
@@ -220,12 +229,6 @@ class HasuraApi {
     }
     return result;
   }
-
-  // TBD-SG
-  // use trackTable as tamplate
-  // public async trackRelationship(schemaName: string, tableName: string, objectOrArray: string, relationshipName: string, constraintTable: string, constraintColumn: string) {
-  // https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/relationship.html#using-foreign-key-constraint-on-a-remote-table
-  // https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/relationship.html#id3
 }
 
 export const hasuraApi = new HasuraApi();
