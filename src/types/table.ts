@@ -32,6 +32,8 @@ export const typeDefs = gql`
     constraintName: String!
     tableName: String!
     columnName: String!
+    relTableName: String
+    relColumnName: String
   }
 
   type TableUser {
@@ -104,6 +106,7 @@ export const typeDefs = gql`
     ): Boolean!
   }
 `;
+// SG-TBD: copy above wbAddAllExistingTables and edit for wbAddAllExistingRelationships
 
 export const resolvers: IResolvers = {
   JSON: GraphQLJSON,
@@ -162,6 +165,7 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
+    // SG-TBD: copy above block and edit for wbAddAllExistingRelationships
     wbAddOrCreateColumn: async (
       _,
       { schemaName, tableName, columnName, columnLabel, create, columnType },

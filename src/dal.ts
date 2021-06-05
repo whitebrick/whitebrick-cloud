@@ -633,23 +633,33 @@ export class DAL {
     return result;
   }
 
+  // type = foreignKeys|references|all
   public async foreignKeysOrReferences(
     schemaName: string,
-    tableName: string,
-    columnName: string,
-    references: boolean = false
+    tableNamePattern: string,
+    columnNamePattern: string,
+    type: string
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
-    tableName = DAL.sanitize(tableName);
-    let whereSql: string = `
-      AND fk.table_name = '${tableName}'
-      AND fk.column_name = '${columnName}'
-    `;
-    if (references) {
-      whereSql = `
-        AND ref.table_name ='${tableName}'
-        AND ref.column_name ='${columnName}'
-      `;
+    tableNamePattern = DAL.sanitize(tableNamePattern);
+    columnNamePattern = DAL.sanitize(columnNamePattern);
+    let whereSql: string = "";
+    switch (type) {
+      case "FOREIGN_KEYS":
+        whereSql = `
+          AND fk.table_name LIKE '${tableNamePattern}'
+          AND fk.column_name LIKE '${columnNamePattern}'
+        `;
+      case "REFERENCES":
+        whereSql = `
+          AND ref.table_name LIKE '${tableNamePattern}'
+          AND ref.column_name LIKE '${columnNamePattern}'
+        `;
+      case "ALL":
+        whereSql = `
+          AND fk.table_name LIKE '${tableNamePattern}'
+          AND fk.column_name LIKE '${columnNamePattern}'
+        `;
     }
     const result = await this.executeQuery({
       query: `
@@ -690,11 +700,14 @@ export class DAL {
     if (!result.success) return result;
     const constraints: ConstraintId[] = [];
     for (const row of result.payload.rows) {
-      constraints.push({
+      const constraint: ConstraintId = {
         constraintName: row.fk_name,
         tableName: row.fk_table,
         columnName: row.fk_column,
-      } as ConstraintId);
+        relTableName: row.ref_table,
+        relColumnName: row.ref_column,
+      };
+      constraints.push(constraint);
     }
     result.payload = constraints;
     return result;

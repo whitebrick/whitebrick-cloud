@@ -23,6 +23,8 @@ export type ConstraintId = {
   constraintName: string;
   tableName: string;
   columnName: string;
+  relTableName?: string;
+  relColumnName?: string;
 };
 
 const typeDefs = gql`

@@ -306,7 +306,8 @@ class WhitebrickCloud {
       const foreignKeysResult = await this.dal.foreignKeysOrReferences(
         schemaName,
         tableName,
-        column.name
+        column.name,
+        "FOREIGN_KEYS"
       );
       if (!foreignKeysResult.success) return result;
       column.foreignKeys = foreignKeysResult.payload;
@@ -314,7 +315,7 @@ class WhitebrickCloud {
         schemaName,
         tableName,
         column.name,
-        true
+        "REFERENCES"
       );
       if (!referencesResult.success) return result;
       column.referencedBy = referencesResult.payload;
@@ -452,6 +453,27 @@ class WhitebrickCloud {
     return result;
   }
 
+  public async addAllExistingRelationships(
+    schemaName: string
+  ): Promise<ServiceResult> {
+    log.warn("********** All existing relationships:");
+    let result = await this.dal.foreignKeysOrReferences(
+      schemaName,
+      "%",
+      "%",
+      "ALL"
+    );
+    if (!result.success) return result;
+    const relationships: ConstraintId[] = result.payload;
+    if (relationships.length > 0) {
+      for (const relationship of relationships) {
+        log.warn(JSON.stringify(relationship));
+        // TBD: Call addOrCreateForeignKey with the correct table/parentTable col/parentCol combinations
+      }
+    }
+    return result;
+  }
+
   public async addOrCreateColumn(
     schemaName: string,
     tableName: string,
@@ -571,7 +593,8 @@ class WhitebrickCloud {
     let result = await this.dal.foreignKeysOrReferences(
       schemaName,
       tableName,
-      columnNames[0]
+      columnNames[0],
+      "FOREIGN_KEYS"
     );
     if (!result.success) return result;
     const existingForeignKeys: Record<string, string> = {};
