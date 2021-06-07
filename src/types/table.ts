@@ -104,6 +104,7 @@ export const typeDefs = gql`
       tableName: String!
       settings: JSON!
     ): Boolean!
+    wbAddAllExistingRelationships(schemaName: String!): Boolean!
   }
 `;
 // SG-TBD: copy above wbAddAllExistingTables and edit for wbAddAllExistingRelationships
@@ -162,6 +163,11 @@ export const resolvers: IResolvers = {
     },
     wbAddAllExistingTables: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.addAllExistingTables(schemaName);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbAddAllExistingRelationships: async (_, { schemaName }, context) => {
+      const result = await context.wbCloud.addAllExistingRelationships(schemaName);
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
