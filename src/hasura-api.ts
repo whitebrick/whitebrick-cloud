@@ -85,11 +85,11 @@ class HasuraApi {
       result.code &&
       HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
     ) {
-      return <ServiceResult>{
+      return {
         success: true,
         payload: true,
         message: result.code,
-      };
+      } as ServiceResult;
     }
     return result;
   }
@@ -107,11 +107,11 @@ class HasuraApi {
       result.code &&
       HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
     ) {
-      return <ServiceResult>{
+      return {
         success: true,
         payload: true,
         message: result.code,
-      };
+      } as ServiceResult;
     }
     return result;
   }
@@ -141,11 +141,11 @@ class HasuraApi {
       result.code &&
       HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
     ) {
-      return <ServiceResult>{
+      return {
         success: true,
         payload: true,
         message: result.code,
-      };
+      } as ServiceResult;
     }
     return result;
   }
@@ -181,11 +181,11 @@ class HasuraApi {
       result.code &&
       HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
     ) {
-      return <ServiceResult>{
+      return {
         success: true,
         payload: true,
         message: result.code,
-      };
+      } as ServiceResult;
     }
     return result;
   }
@@ -221,11 +221,11 @@ class HasuraApi {
       result.code &&
       HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
     ) {
-      return <ServiceResult>{
+      return {
         success: true,
         payload: true,
         message: result.code,
-      };
+      } as ServiceResult;
     }
     return result;
   }

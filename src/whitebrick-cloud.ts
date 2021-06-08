@@ -200,8 +200,8 @@ class WhitebrickCloud {
       } else {
         return {
           success: false,
-          message: "Owner could not be found",
-        };
+          message: "createSchema: Owner could not be found",
+        } as ServiceResult;
       }
     }
     if (name.startsWith("pg_") || Schema.SYS_SCHEMA_NAMES.includes(name)) {
@@ -210,7 +210,9 @@ class WhitebrickCloud {
         message: `Database name can not begin with 'pg_' or be in the reserved list: ${Schema.SYS_SCHEMA_NAMES.join(
           ", "
         )}`,
-      };
+        code: "WB_SCHEMA_NAME",
+        apolloError: "BAD_USER_INPUT",
+      } as ServiceResult;
     }
     return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
   }
@@ -272,7 +274,7 @@ class WhitebrickCloud {
     return {
       success: true,
       payload: schemas,
-    };
+    } as ServiceResult;
   }
 
   /**
@@ -403,7 +405,7 @@ class WhitebrickCloud {
           message: "The new table name must be unique",
           code: "WB_TABLE_NAME_EXISTS",
           apolloError: "BAD_USER_INPUT",
-        };
+        } as ServiceResult;
       }
       result = await hasuraApi.untrackTable(schemaName, tableName);
       if (!result.success) return result;
@@ -456,7 +458,6 @@ class WhitebrickCloud {
   public async addAllExistingRelationships(
     schemaName: string
   ): Promise<ServiceResult> {
-    log.warn("********** All existing relationships:");
     let result = await this.dal.foreignKeysOrReferences(
       schemaName,
       "%",
@@ -465,25 +466,23 @@ class WhitebrickCloud {
     );
     if (!result.success) return result;
     const relationships: ConstraintId[] = result.payload;
-    log.warn("********** relationships", relationships);
     if (relationships.length > 0) {
       for (const relationship of relationships) {
-        log.warn(JSON.stringify(relationship));
-        if (
-          relationship.tableName && 
-          relationship.columnName && 
-          relationship.relTableName && 
-          relationship.relColumnName
-        ) {
+        if (relationship.relTableName && relationship.relColumnName) {
           this.addOrCreateForeignKey(
-            schemaName, 
-            relationship.tableName, 
+            schemaName,
+            relationship.tableName,
             [relationship.columnName],
             relationship.relTableName,
             [relationship.relColumnName]
-          )
+          );
+        } else {
+          return {
+            success: false,
+            message:
+              "addAllExistingRelationships: ConstraintId must have relTableName and relColumnName",
+          } as ServiceResult;
         }
-        // TBD: Call addOrCreateForeignKey with the correct table/parentTable col/parentCol combinations
       }
     }
     return result;
@@ -542,7 +541,7 @@ class WhitebrickCloud {
           message: "Remove existing primary key first",
           code: "WB_PK_EXISTS",
           apolloError: "BAD_USER_INPUT",
-        };
+        } as ServiceResult;
       }
       result = await hasuraApi.untrackTable(schemaName, tableName);
       if (!result.success) return result;
@@ -640,7 +639,7 @@ class WhitebrickCloud {
             message: `Remove existing foreign key on ${columnName} first`,
             code: "WB_FK_EXISTS",
             apolloError: "BAD_USER_INPUT",
-          };
+          } as ServiceResult;
         }
       }
     }

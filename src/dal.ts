@@ -46,10 +46,10 @@ export class DAL {
           queryParams.query,
           queryParams.params
         );
-        results.push(<ServiceResult>{
+        results.push({
           success: true,
           payload: response,
-        });
+        } as ServiceResult);
       }
       await client.query("COMMIT");
     } catch (error) {
@@ -106,10 +106,10 @@ export class DAL {
     if (result.success) {
       result.payload = Tenant.parseResult(result.payload);
       if (result.payload.length == 0) {
-        return <ServiceResult>{
+        return (<ServiceResult>{
           success: false,
-          message: `Could not find tenant where name=${name}`,
-        };
+          message: `dal.tenantByName: Could not find tenant where name=${name}`,
+        }) as ServiceResult;
       } else {
         result.payload = result.payload[0];
       }
@@ -143,7 +143,7 @@ export class DAL {
       return {
         success: false,
         message: "dal.updateTenant: all parameters are null",
-      };
+      } as ServiceResult;
     }
     let paramCount = 3;
     const params: (number | Date | string)[] = [new Date(), id];
@@ -294,7 +294,7 @@ export class DAL {
       return {
         success: false,
         message: "dal.updateUser: all parameters are null",
-      };
+      } as ServiceResult;
     }
     let paramCount = 3;
     const params: (Date | number | string)[] = [new Date(), id];
@@ -415,10 +415,11 @@ export class DAL {
       results[0].payload = Schema.parseResult(results[0].payload);
       results[1].payload = Schema.parseResult(results[1].payload);
       if (results[0].payload.length != results[1].payload.length) {
-        return <ServiceResult>{
+        return {
           success: false,
-          message: "wb.schemas out of sync with information_schema.schemata",
-        };
+          message:
+            "dal.schemas: wb.schemas out of sync with information_schema.schemata",
+        } as ServiceResult;
       }
     }
     return results[results.length - 1];
@@ -436,10 +437,10 @@ export class DAL {
     if (result.success) {
       result.payload = Schema.parseResult(result.payload);
       if (result.payload.length == 0) {
-        return <ServiceResult>{
+        return (<ServiceResult>{
           success: false,
-          message: `Could not find schema where name=${name}`,
-        };
+          message: `dal.schemaByName: Could not find schema where name=${name}`,
+        }) as ServiceResult;
       } else {
         result.payload = result.payload[0];
       }
