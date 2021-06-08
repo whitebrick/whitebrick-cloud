@@ -174,10 +174,10 @@ class WhitebrickCloud {
   public async createSchema(
     name: string,
     label: string,
-    tenantOwnerId: number | null,
-    tenantOwnerName: string | null,
-    userOwnerId: number | null,
-    userOwnerEmail: string | null
+    tenantOwnerId?: number,
+    tenantOwnerName?: string,
+    userOwnerId?: number,
+    userOwnerEmail?: string
   ): Promise<ServiceResult> {
     log.info(`
       wbCloud.createSchema name=${name},
@@ -674,7 +674,7 @@ class WhitebrickCloud {
     userEmail: string,
     settings: object
   ): Promise<ServiceResult> {
-    const tableResult = await this.dal.tableBySchemaNameTableName(
+    const tableResult = await this.dal.tableBySchemaTable(
       schemaName,
       tableName
     );

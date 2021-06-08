@@ -136,28 +136,32 @@ export class DAL {
 
   public async updateTenant(
     id: number,
-    name: string | null,
-    label: string | null
+    name?: string,
+    label?: string
   ): Promise<ServiceResult> {
-    if (name == null && label == null) {
+    if (!name && !label) {
       return {
         success: false,
-        message: "updateTenant: all parameters are null",
+        message: "dal.updateTenant: all parameters are null",
       };
     }
     let paramCount = 3;
-    const params: (number | Date | string | null)[] = [new Date(), id];
+    const params: (number | Date | string)[] = [new Date(), id];
     let query = "UPDATE wb.tenants SET ";
-    if (name != null) query += `name=$${paramCount}, `;
-    params.push(name);
-    paramCount++;
-    if (label != null) query += `label=$${paramCount}, `;
-    params.push(label);
-    paramCount++;
+    if (name) {
+      query += `name=$${paramCount}, `;
+      params.push(name);
+      paramCount++;
+    }
+    if (label) {
+      query += `label=$${paramCount}, `;
+      params.push(label);
+      paramCount++;
+    }
     query += "updated_at=$1 WHERE id=$2 RETURNING *";
     const result = await this.executeQuery({
       query: query,
-      params: [new Date(), id],
+      params: params,
     });
     if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
     return result;
@@ -282,25 +286,34 @@ export class DAL {
 
   public async updateUser(
     id: number,
-    email: string | null,
-    firstName: string | null,
-    lastName: string | null
+    email?: string,
+    firstName?: string,
+    lastName?: string
   ): Promise<ServiceResult> {
-    if (email == null && firstName == null && lastName == null) {
-      return { success: false, message: "updateUser: all parameters are null" };
+    if (!email && !firstName && !lastName) {
+      return {
+        success: false,
+        message: "dal.updateUser: all parameters are null",
+      };
     }
     let paramCount = 3;
-    const params: (Date | number | string | null)[] = [new Date(), id];
+    const params: (Date | number | string)[] = [new Date(), id];
     let query = "UPDATE wb.users SET ";
-    if (email != null) query += `email=$${paramCount}, `;
-    params.push(email);
-    paramCount++;
-    if (firstName != null) query += `first_name=$${paramCount}, `;
-    params.push(firstName);
-    paramCount++;
-    if (lastName != null) query += `last_name=$${paramCount}, `;
-    params.push(lastName);
-    paramCount++;
+    if (email) {
+      query += `email=$${paramCount}, `;
+      params.push(email);
+      paramCount++;
+    }
+    if (firstName) {
+      query += `first_name=$${paramCount}, `;
+      params.push(firstName);
+      paramCount++;
+    }
+    if (lastName) {
+      query += `last_name=$${paramCount}, `;
+      params.push(lastName);
+      paramCount++;
+    }
     query += "updated_at=$1 WHERE id=$2 RETURNING *";
     const result = await this.executeQuery({
       query: query,
@@ -345,8 +358,8 @@ export class DAL {
   public async createSchema(
     name: string,
     label: string,
-    tenantOwnerId: number | null,
-    userOwnerId: number | null
+    tenantOwnerId?: number,
+    userOwnerId?: number
   ): Promise<ServiceResult> {
     const results = await this.executeQueries([
       {
@@ -815,7 +828,7 @@ export class DAL {
     return result;
   }
 
-  public async tableBySchemaNameTableName(
+  public async tableBySchemaTable(
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
@@ -908,7 +921,7 @@ export class DAL {
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
-    let result = await this.tableBySchemaNameTableName(schemaName, tableName);
+    let result = await this.tableBySchemaTable(schemaName, tableName);
     if (!result.success) return result;
     let params = [];
     let query = `
@@ -959,7 +972,7 @@ export class DAL {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
     columnName = DAL.sanitize(columnName);
-    let result = await this.tableBySchemaNameTableName(schemaName, tableName);
+    let result = await this.tableBySchemaTable(schemaName, tableName);
     if (!result.success) return result;
     const queriesAndParams: Array<QueryParams> = [
       {
@@ -999,7 +1012,7 @@ export class DAL {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
     columnName = DAL.sanitize(columnName);
-    let result = await this.tableBySchemaNameTableName(schemaName, tableName);
+    let result = await this.tableBySchemaTable(schemaName, tableName);
     if (!result.success) return result;
     const queriesAndParams: Array<QueryParams> = [
       {
