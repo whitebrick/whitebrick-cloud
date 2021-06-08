@@ -465,9 +465,24 @@ class WhitebrickCloud {
     );
     if (!result.success) return result;
     const relationships: ConstraintId[] = result.payload;
+    log.warn("********** relationships", relationships);
     if (relationships.length > 0) {
       for (const relationship of relationships) {
         log.warn(JSON.stringify(relationship));
+        if (
+          relationship.tableName && 
+          relationship.columnName && 
+          relationship.relTableName && 
+          relationship.relColumnName
+        ) {
+          this.addOrCreateForeignKey(
+            schemaName, 
+            relationship.tableName, 
+            [relationship.columnName],
+            relationship.relTableName,
+            [relationship.relColumnName]
+          )
+        }
         // TBD: Call addOrCreateForeignKey with the correct table/parentTable col/parentCol combinations
       }
     }
