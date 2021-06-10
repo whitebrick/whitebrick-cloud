@@ -3,6 +3,7 @@ Feature:
   Background:
     * url baseUrl
     * path endpointPath
+    
   Scenario: Create a column
     Given text query = 
     """

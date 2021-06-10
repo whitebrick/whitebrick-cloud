@@ -68,6 +68,11 @@ export const typeDefs = gql`
       newTableName: String
       newTableLabel: String
     ): Boolean!
+    wbRemoveOrDeleteTable(
+      schemaName: String!
+      tableName: String!
+      del: Boolean
+    ): Boolean!
     wbAddAllExistingTables(schemaName: String!): Boolean!
     wbAddOrCreateColumn(
       schemaName: String!
@@ -76,6 +81,20 @@ export const typeDefs = gql`
       columnLabel: String!
       create: Boolean
       columnType: String
+    ): Boolean!
+    wbUpdateColumn(
+      schemaName: String!
+      tableName: String!
+      columnName: String!
+      newColumnName: String
+      newColumnLabel: String
+      newType: String
+    ): Boolean!
+    wbRemoveOrDeleteColumn(
+      schemaName: String!
+      tableName: String!
+      columnName: String!
+      del: Boolean
     ): Boolean!
     wbCreateOrDeletePrimaryKey(
       schemaName: String!
@@ -160,6 +179,19 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
+    wbRemoveOrDeleteTable: async (
+      _,
+      { schemaName, tableName, del },
+      context
+    ) => {
+      const result = await context.wbCloud.removeOrDeleteTable(
+        schemaName,
+        tableName,
+        del
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
     wbAddAllExistingTables: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.addAllExistingTables(schemaName);
       if (!result.success) throw context.wbCloud.err(result);
@@ -184,6 +216,43 @@ export const resolvers: IResolvers = {
         columnLabel,
         create,
         columnType
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbUpdateColumn: async (
+      _,
+      {
+        schemaName,
+        tableName,
+        columnName,
+        newColumnName,
+        newColumnLabel,
+        newType,
+      },
+      context
+    ) => {
+      const result = await context.wbCloud.updateColumn(
+        schemaName,
+        tableName,
+        columnName,
+        newColumnName,
+        newColumnLabel,
+        newType
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbRemoveOrDeleteColumn: async (
+      _,
+      { schemaName, tableName, columnName, del },
+      context
+    ) => {
+      const result = await context.wbCloud.removeOrDeleteColumn(
+        schemaName,
+        tableName,
+        columnName,
+        del
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

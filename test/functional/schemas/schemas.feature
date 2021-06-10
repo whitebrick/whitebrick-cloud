@@ -26,5 +26,5 @@ Feature: Schemas
       | 'test_northwind' | 'test_debbie@test.whitebrick.com' | 'schema_reader' |
     * def result = call read('schemas/schema-add-user.feature') tenantUsers
 
-  Scenario: Load test data for existing DBs
-    * karate.exec("bash load_test_schemas.bash")
+  # Scenario: Load test data for existing DBs
+  #   * karate.exec("bash load_test_schemas.bash")

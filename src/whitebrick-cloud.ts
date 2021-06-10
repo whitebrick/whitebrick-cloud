@@ -514,6 +514,50 @@ class WhitebrickCloud {
     return result;
   }
 
+  public async updateColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    newColumnName?: string,
+    newColumnLabel?: string,
+    newType?: string
+  ): Promise<ServiceResult> {
+    let result: ServiceResult;
+    if (newColumnName) {
+      result = await this.columns(schemaName, tableName);
+      if (!result.success) return result;
+      const existingColumnNames = result.payload.map(
+        (table: { name: string }) => table.name
+      );
+      if (existingColumnNames.includes(newColumnName)) {
+        return {
+          success: false,
+          message: "The new column name must be unique",
+          code: "WB_COLUMN_NAME_EXISTS",
+          apolloError: "BAD_USER_INPUT",
+        } as ServiceResult;
+      }
+    }
+    if (newColumnName || newType) {
+      result = await hasuraApi.untrackTable(schemaName, tableName);
+      if (!result.success) return result;
+    }
+    result = await this.dal.updateColumn(
+      schemaName,
+      tableName,
+      columnName,
+      newColumnName,
+      newColumnLabel,
+      newType
+    );
+    if (!result.success) return result;
+    if (newColumnName || newType) {
+      result = await hasuraApi.trackTable(schemaName, tableName);
+      if (!result.success) return result;
+    }
+    return result;
+  }
+
   // Pass empty columnNames[] to clear
   public async createOrDeletePrimaryKey(
     schemaName: string,

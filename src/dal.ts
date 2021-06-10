@@ -76,7 +76,7 @@ export class DAL {
         SELECT wb.tenants.*
         FROM wb.tenants
       `,
-    });
+    } as QueryParams);
     if (result.success) result.payload = Tenant.parseResult(result.payload);
     return result;
   }
@@ -89,7 +89,7 @@ export class DAL {
         WHERE id=$1 LIMIT 1
       `,
       params: [id],
-    });
+    } as QueryParams);
     if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
     return result;
   }
@@ -102,7 +102,7 @@ export class DAL {
         WHERE name=$1 LIMIT 1
       `,
       params: [name],
-    });
+    } as QueryParams);
     if (result.success) {
       result.payload = Tenant.parseResult(result.payload);
       if (result.payload.length == 0) {
@@ -129,7 +129,7 @@ export class DAL {
         RETURNING *
       `,
       params: [name, label, new Date(), new Date()],
-    });
+    } as QueryParams);
     if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
     return result;
   }
@@ -162,7 +162,7 @@ export class DAL {
     const result = await this.executeQuery({
       query: query,
       params: params,
-    });
+    } as QueryParams);
     if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
     return result;
   }
@@ -176,12 +176,12 @@ export class DAL {
             SELECT id FROM wb.tenants WHERE name like 'test_%'
           )
         `,
-      },
+      } as QueryParams,
       {
         query: `
           DELETE FROM wb.tenants WHERE name like 'test_%'
         `,
-      },
+      } as QueryParams,
     ]);
     return results[results.length - 1];
   }
@@ -202,7 +202,7 @@ export class DAL {
         ) VALUES($1, $2, $3, $4, $5)
       `,
       params: [tenantId, userId, tenantRoleId, new Date(), new Date()],
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -221,7 +221,7 @@ export class DAL {
     const result = await this.executeQuery({
       query: query,
       params: params,
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -237,7 +237,7 @@ export class DAL {
         WHERE tenant_id=$1
       `,
       params: [tenantId],
-    });
+    } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload);
     return result;
   }
@@ -250,7 +250,7 @@ export class DAL {
         WHERE id=$1 LIMIT 1
       `,
       params: [id],
-    });
+    } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
@@ -262,7 +262,7 @@ export class DAL {
         WHERE email=$1 LIMIT 1
       `,
       params: [email],
-    });
+    } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
@@ -279,7 +279,7 @@ export class DAL {
         ) VALUES($1, $2, $3, $4, $5) RETURNING *
       `,
       params: [email, firstName, lastName, new Date(), new Date()],
-    });
+    } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
@@ -318,7 +318,7 @@ export class DAL {
     const result = await this.executeQuery({
       query: query,
       params: params,
-    });
+    } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
   }
@@ -330,7 +330,7 @@ export class DAL {
         WHERE email like 'test_%test.whitebrick.com'
       `,
       params: [],
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -346,7 +346,7 @@ export class DAL {
         WHERE name=$1 LIMIT 1
       `,
       params: [name],
-    });
+    } as QueryParams);
     if (result.success) result.payload = Role.parseResult(result.payload)[0];
     return result;
   }
@@ -364,7 +364,7 @@ export class DAL {
     const results = await this.executeQueries([
       {
         query: `CREATE SCHEMA ${DAL.sanitize(name)}`,
-      },
+      } as QueryParams,
       {
         query: `
           INSERT INTO wb.schemas(
@@ -379,7 +379,7 @@ export class DAL {
           new Date(),
           new Date(),
         ],
-      },
+      } as QueryParams,
     ]);
     const insertResult: ServiceResult = results[results.length - 1];
     if (insertResult.success) {
@@ -401,7 +401,7 @@ export class DAL {
           AND schema_name NOT IN ('${Schema.SYS_SCHEMA_NAMES.join("','")}')
         `,
         params: [schemaNamePattern],
-      },
+      } as QueryParams,
       {
         query: `
           SELECT wb.schemas.*
@@ -409,7 +409,7 @@ export class DAL {
           WHERE name LIKE $1
         `,
         params: [schemaNamePattern],
-      },
+      } as QueryParams,
     ]);
     if (results[0].success && results[1].success) {
       results[0].payload = Schema.parseResult(results[0].payload);
@@ -433,7 +433,7 @@ export class DAL {
         WHERE name=$1 LIMIT 1
       `,
       params: [name],
-    });
+    } as QueryParams);
     if (result.success) {
       result.payload = Schema.parseResult(result.payload);
       if (result.payload.length == 0) {
@@ -456,7 +456,7 @@ export class DAL {
         WHERE wb.users.email=$1
       `,
       params: [userEmail],
-    });
+    } as QueryParams);
     if (result.success) {
       // TBD: map this instead
       const schemasWithRole = Array<Schema>();
@@ -480,7 +480,7 @@ export class DAL {
           WHERE name=$1
         `,
         params: [schemaName],
-      },
+      } as QueryParams,
     ];
     if (del) {
       queriesAndParams.push({
@@ -509,7 +509,7 @@ export class DAL {
         ) VALUES($1, $2, $3, $4, $5)
       `,
       params: [schemaId, userId, schemaRoleId, new Date(), new Date()],
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -528,7 +528,7 @@ export class DAL {
     const result = await this.executeQuery({
       query: query,
       params: params,
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -543,7 +543,7 @@ export class DAL {
         )
       `,
       params: [schemaName],
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -558,7 +558,7 @@ export class DAL {
         WHERE wb.users.email=$1
       `,
       params: [userEmail],
-    });
+    } as QueryParams);
     if (result.success) {
       // TBD: map this instead
       const schemasWithRole = Array<Schema>();
@@ -586,7 +586,7 @@ export class DAL {
         WHERE wb.schemas.name=$1
       `,
       params: [schemaName],
-    });
+    } as QueryParams);
     if (result.success) result.payload = Table.parseResult(result.payload);
     return result;
   }
@@ -599,7 +599,7 @@ export class DAL {
         WHERE table_schema=$1
       `,
       params: [schemaName],
-    });
+    } as QueryParams);
     if (result.success) {
       result.payload = result.payload.rows.map(
         (row: { table_name: string }) => row.table_name
@@ -608,24 +608,41 @@ export class DAL {
     return result;
   }
 
+  public async columnBySchemaTableColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string
+  ): Promise<ServiceResult> {
+    const result = await this.columns(schemaName, tableName, columnName);
+    if (result.success) result.payload = result.payload[0];
+    return result;
+  }
+
   public async columns(
     schemaName: string,
-    tableName: string
+    tableName: string,
+    columnName?: string
   ): Promise<ServiceResult> {
+    let query: string = `
+      SELECT wb.columns.*, information_schema.columns.data_type as type
+      FROM wb.columns
+      JOIN wb.tables ON wb.columns.table_id=wb.tables.id
+      JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+      JOIN information_schema.columns ON (
+        wb.columns.name=information_schema.columns.column_name
+        AND wb.schemas.name=information_schema.columns.table_schema
+      )
+      WHERE wb.schemas.name=$1 AND wb.tables.name=$2 AND information_schema.columns.table_name=$2
+    `;
+    let params: string[] = [schemaName, tableName];
+    if (columnName) {
+      query = `${query} AND wb.columns.name=$3 AND information_schema.columns.column_name=$3`;
+      params.push(columnName);
+    }
     const result = await this.executeQuery({
-      query: `
-        SELECT wb.columns.*, information_schema.columns.data_type as type
-        FROM wb.columns
-        JOIN wb.tables ON wb.columns.table_id=wb.tables.id
-        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
-        JOIN information_schema.columns ON (
-          wb.columns.name=information_schema.columns.column_name
-          AND wb.schemas.name=information_schema.columns.table_schema
-        )
-        WHERE wb.schemas.name=$1 AND wb.tables.name=$2 AND information_schema.columns.table_name=$2
-      `,
-      params: [schemaName, tableName],
-    });
+      query: query,
+      params: params,
+    } as QueryParams);
     if (result.success) result.payload = Column.parseResult(result.payload);
     return result;
   }
@@ -642,7 +659,7 @@ export class DAL {
         AND table_name=$2
       `,
       params: [schemaName, tableName],
-    });
+    } as QueryParams);
     if (result.success) result.payload = Column.parseResult(result.payload);
     return result;
   }
@@ -710,7 +727,7 @@ export class DAL {
         AND fk.table_schema='${schemaName}'
         ${whereSql}
       `,
-    });
+    } as QueryParams);
     if (!result.success) return result;
     const constraints: ConstraintId[] = [];
     for (const row of result.payload.rows) {
@@ -747,7 +764,7 @@ export class DAL {
         AND c.table_schema='${schemaName}'
         AND tc.table_name = '${tableName}'
       `,
-    });
+    } as QueryParams);
     if (result.success) {
       const pKColsConstraints: Record<string, string> = {};
       for (const row of result.payload.rows) {
@@ -771,7 +788,7 @@ export class DAL {
         ALTER TABLE ${schemaName}.${tableName}
         DROP CONSTRAINT IF EXISTS ${constraintName}
       `,
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -791,7 +808,7 @@ export class DAL {
         ALTER TABLE ${schemaName}.${tableName}
         ADD PRIMARY KEY (${sanitizedColumnNames.join(",")});
       `,
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -825,7 +842,7 @@ export class DAL {
           (${sanitizedParentColumnNames.join(",")})
         ON DELETE SET NULL
       `,
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -841,7 +858,7 @@ export class DAL {
         WHERE wb.schemas.name=$1 AND wb.tables.name=$2 LIMIT 1
       `,
       params: [schemaName, tableName],
-    });
+    } as QueryParams);
     if (result.success) result.payload = Table.parseResult(result.payload)[0];
     return result;
   }
@@ -872,12 +889,12 @@ export class DAL {
           new Date(),
           new Date(),
         ],
-      },
+      } as QueryParams,
     ];
     if (create) {
       queriesAndParams.push({
         query: `CREATE TABLE "${schemaName}"."${tableName}"()`,
-      });
+      } as QueryParams);
     }
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
@@ -901,12 +918,12 @@ export class DAL {
           WHERE schema_id=$1 AND name=$2
         `,
         params: [result.payload.id, tableName],
-      },
+      } as QueryParams,
     ];
     if (del) {
       queriesAndParams.push({
         query: `DROP TABLE IF EXISTS "${schemaName}"."${tableName}" CASCADE`,
-      });
+      } as QueryParams);
     }
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
@@ -930,20 +947,20 @@ export class DAL {
     `;
     let updates: string[] = [];
     if (newTableName) {
-      updates.push("name=$" + (params.length + 1));
       params.push(newTableName);
+      updates.push("name=$" + params.length);
     }
     if (newTableLabel) {
-      updates.push("label=$" + (params.length + 1));
       params.push(newTableLabel);
+      updates.push("label=$" + params.length);
     }
-    query += `${updates.join(", ")} WHERE id=$${params.length + 1}`;
     params.push(result.payload.id);
+    query += `${updates.join(", ")} WHERE id=$${params.length}`;
     const queriesAndParams: Array<QueryParams> = [
       {
         query: query,
         params: params,
-      },
+      } as QueryParams,
     ];
     if (newTableName) {
       queriesAndParams.push({
@@ -951,7 +968,7 @@ export class DAL {
           ALTER TABLE "${schemaName}"."${tableName}"
           RENAME TO ${newTableName}
         `,
-      });
+      } as QueryParams);
     }
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
@@ -988,7 +1005,7 @@ export class DAL {
           new Date(),
           new Date(),
         ],
-      },
+      } as QueryParams,
     ];
     if (create) {
       queriesAndParams.push({
@@ -996,7 +1013,68 @@ export class DAL {
           ALTER TABLE "${schemaName}"."${tableName}"
           ADD ${columnName} ${columnPGType}
         `,
-      });
+      } as QueryParams);
+    }
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    return results[results.length - 1];
+  }
+
+  public async updateColumn(
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    newColumnName?: string,
+    newColumnLabel?: string,
+    newType?: string
+  ): Promise<ServiceResult> {
+    schemaName = DAL.sanitize(schemaName);
+    tableName = DAL.sanitize(tableName);
+    columnName = DAL.sanitize(columnName);
+    const queriesAndParams: Array<QueryParams> = [];
+    if (newColumnName || newColumnLabel) {
+      let result = await this.columnBySchemaTableColumn(
+        schemaName,
+        tableName,
+        columnName
+      );
+      if (!result.success) return result;
+      let params = [];
+      let query = `
+        UPDATE wb.columns SET
+      `;
+      let updates: string[] = [];
+      if (newColumnName) {
+        params.push(newColumnName);
+        updates.push("name=$" + params.length);
+      }
+      if (newColumnLabel) {
+        params.push(newColumnLabel);
+        updates.push("label=$" + params.length);
+      }
+      params.push(result.payload.id);
+      query += `${updates.join(", ")} WHERE id=$${params.length}`;
+      queriesAndParams.push({
+        query: query,
+        params: params,
+      } as QueryParams);
+    }
+    if (newType) {
+      queriesAndParams.push({
+        query: `
+          ALTER TABLE "${schemaName}"."${tableName}"
+          ALTER COLUMN ${columnName} TYPE ${newType}
+        `,
+      } as QueryParams);
+    }
+    if (newColumnName) {
+      queriesAndParams.push({
+        query: `
+          ALTER TABLE "${schemaName}"."${tableName}"
+          RENAME COLUMN ${columnName} TO ${newColumnName}
+        `,
+      } as QueryParams);
     }
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
@@ -1022,7 +1100,7 @@ export class DAL {
           WHERE table_id=$1 AND name=$2
         `,
         params: [result.payload.id, columnName],
-      },
+      } as QueryParams,
     ];
     if (del) {
       queriesAndParams.push({
@@ -1030,7 +1108,7 @@ export class DAL {
           ALTER TABLE "${schemaName}"."${tableName}"
           DROP COLUMN IF EXISTS ${columnName} CASCADE
         `,
-      });
+      } as QueryParams);
     }
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
@@ -1058,7 +1136,7 @@ export class DAL {
         LIMIT 1
       `,
       params: [userEmail, schemaName, tableName],
-    });
+    } as QueryParams);
     if (result.success) {
       result.payload = TableUser.parseResult(result.payload)[0];
     }
@@ -1092,7 +1170,7 @@ export class DAL {
     const result = await this.executeQuery({
       query: query,
       params: params,
-    });
+    } as QueryParams);
     return result;
   }
 
@@ -1112,7 +1190,7 @@ export class DAL {
         DO UPDATE SET settings = EXCLUDED.settings
       `,
       params: [tableId, userId, roleId, settings],
-    });
+    } as QueryParams);
     return result;
   }
 }

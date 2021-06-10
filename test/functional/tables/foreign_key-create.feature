@@ -3,7 +3,8 @@ Feature:
   Background:
     * url baseUrl
     * path endpointPath
-  Scenario: Ad or create a foreign key
+    
+  Scenario: Add or create a foreign key
     Given text query = 
     """
       mutation ($schemaName: String!, $tableName: String!, $columnNames: [String]!, $parentTableName: String!, $parentColumnNames: [String]!, $create: Boolean){

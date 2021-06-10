@@ -4,19 +4,20 @@ Feature:
     * url baseUrl
     * path endpointPath
     
-  Scenario: Create or delete primary key
+  Scenario: Remove or Delete a foreign key
     Given text query = 
     """
-      mutation ($schemaName: String!, $tableName: String!, $columnNames: [String]!, $del: Boolean!){
-        wbCreateOrDeletePrimaryKey(
+      mutation ($schemaName: String!, $tableName: String!, $columnNames: [String]!, $parentTableName: String!, $del: Boolean){
+        wbRemoveOrDeleteForeignKey(
           schemaName: $schemaName,
           tableName: $tableName,
           columnNames: $columnNames,
+          parentTableName: $parentTableName,
           del: $del
         )
       }
     """
-    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', columnNames: '#(columnNames)', del: '#(del)'}
+    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', columnNames: '#(columnNames)', parentTableName: '#(parentTableName)', del: '#(del)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200

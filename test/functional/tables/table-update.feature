@@ -3,14 +3,15 @@ Feature:
   Background:
     * url baseUrl
     * path endpointPath
-  Scenario: Rename a table
+    
+  Scenario: Re-name or re-label a table
     Given text query = 
     """
-      mutation ($schemaName: String!, $tableName: String!, $newTableName: String){
+      mutation ($schemaName: String!, $tableName: String!, $newTableName: String, $newTableLabel: String){
         wbUpdateTable(schemaName: $schemaName, tableName: $tableName, newTableName: $newTableName)
       }
     """
-    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', newTableName: '#(newTableName)'}
+    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', newTableName: '#(newTableName)', newTableLabel: '#(newTableLabel)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200

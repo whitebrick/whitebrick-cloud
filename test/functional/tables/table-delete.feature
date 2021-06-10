@@ -4,14 +4,14 @@ Feature:
     * url baseUrl
     * path endpointPath
 
-  Scenario: Add all existing tables
+  Scenario: Delete a table
     Given text query = 
     """
-      mutation ($schemaName: String!){
-        wbAddAllExistingTables(schemaName: $schemaName)
+      mutation ($schemaName: String!, $tableName: String!){
+        wbRemoveOrDeleteTable(schemaName: $schemaName, tableName: $tableName, del: true)
       }
     """
-    And def variables = { schemaName: '#(schemaName)'}
+    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200
