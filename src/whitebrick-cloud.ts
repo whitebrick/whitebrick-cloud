@@ -4,14 +4,16 @@ import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { ConstraintId, schema, ServiceResult } from "./types";
 import v = require("voca");
-import { Column, Schema } from "./entity";
+import { Column, Organization, Role, RoleLevel, Schema, User } from "./entity";
 import { isThisTypeNode } from "typescript";
 
 export const graphqlHandler = new ApolloServer({
   schema,
   introspection: true,
-  context: function () {
+  context: ({ event, context }) => {
     return {
+      headers: event.headers,
+      multiValueHeaders: event.multiValueHeaders,
       wbCloud: new WhitebrickCloud(),
     };
   },
@@ -23,6 +25,11 @@ export const log: Logger = new Logger({
 
 class WhitebrickCloud {
   dal = new DAL();
+
+  static RESULT_DEFAULT: ServiceResult = {
+    success: false,
+    message: "RESULT_DEFAULT: result has not been assigned",
+  };
 
   public err(result: ServiceResult): Error {
     if (result.success) {
@@ -37,11 +44,57 @@ class WhitebrickCloud {
     });
   }
 
-  public addSchemaContext(schema: Schema): Schema {
-    schema.context = {
+  public async uidFromHeaders(
+    headers: Record<string, string>
+  ): Promise<ServiceResult> {
+    log.warn("========== HEADERS: " + JSON.stringify(headers));
+    const headersLowerCase = Object.entries(headers).reduce(
+      (acc: Record<string, string>, [key, val]) => (
+        (acc[key.toLowerCase()] = val), acc
+      ),
+      {}
+    );
+    let result: ServiceResult = WhitebrickCloud.RESULT_DEFAULT;
+    if (
+      headersLowerCase["x-hasura-role"] &&
+      headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
+    ) {
+      return {
+        success: true,
+        payload: User.HASURA_ADMIN_ID,
+      } as ServiceResult;
+    } else if (
+      process.env.NODE_ENV == "development" &&
+      headersLowerCase["x-test-user-id"]
+    ) {
+      // log.warn("uid: " + headersLowerCase["x-test-user-id"]);
+      result = await this.userByEmail(headersLowerCase["x-test-user-id"]);
+      if (result.success) result.payload = result.payload.id;
+    } else if (headersLowerCase["x-hasura-user-id"]) {
+      result = {
+        success: true,
+        payload: parseInt(headersLowerCase["x-hasura-user-id"]),
+      } as ServiceResult;
+    } else {
+      result = {
+        success: false,
+        message: `uidFromHeaders: Could not find headers for Admin, Test or User in: ${JSON.stringify(
+          headers
+        )}`,
+      } as ServiceResult;
+    }
+    return result;
+  }
+
+  public cloudContext(): object {
+    return {
       defaultColumnTypes: Column.COMMON_TYPES,
+      roles: {
+        organizations: Role.SYSROLES_ORGANIZATIONS,
+        schemas: Role.SYSROLES_SCHEMAS,
+        tables: Role.SYSROLES_TABLES,
+      },
     };
-    return schema;
   }
 
   /**
@@ -55,89 +108,273 @@ class WhitebrickCloud {
       result = await this.removeOrDeleteSchema(schema.name, true);
       if (!result.success) return result;
     }
-    result = await this.dal.deleteTestTenants();
+    result = await this.dal.deleteTestOrganizations();
     if (!result.success) return result;
     result = await this.dal.deleteTestUsers();
     return result;
   }
 
   /**
-   * Tenants
-   * TBD: validate name ~ [a-z]{1}[a-z0-9]{2,}
+   * Auth
    */
 
-  public async tenants(): Promise<ServiceResult> {
-    return this.dal.tenants();
-  }
-
-  public async tenantById(id: number): Promise<ServiceResult> {
-    return this.dal.tenantById(id);
-  }
-
-  public async tenantByName(name: string): Promise<ServiceResult> {
-    return this.dal.tenantByName(name);
-  }
-
-  public async createTenant(
-    name: string,
-    label: string
+  public async auth(
+    schemaName: string,
+    authUserId: string,
+    authUserName?: string
   ): Promise<ServiceResult> {
-    return this.dal.createTenant(name, label);
-  }
-
-  public async updateTenant(
-    id: number,
-    name: string,
-    label: string
-  ): Promise<ServiceResult> {
-    return this.dal.updateTenant(id, name, label);
-  }
-
-  public async deleteTestTenants(): Promise<ServiceResult> {
-    return this.dal.deleteTestTenants();
+    const randomNumber = Math.floor(Math.random() * 10000);
+    return {
+      success: true,
+      payload: {
+        "x-hasura-allowed-roles": [
+          `RANDOM_ROLE_${randomNumber}`,
+          "tr40320",
+          "tr40321",
+        ],
+        "x-hasura-default-role": "tr40321",
+        "x-hasura-user-id": authUserId,
+      },
+    } as ServiceResult;
   }
 
   /**
-   * Tenant-User-Roles
+   * Organizations
    */
 
-  public async addUserToTenant(
-    tenantName: string,
-    userEmail: string,
-    tenantRole: string
+  public async organizations(
+    userId?: number,
+    userEmail?: string,
+    organizationId?: number
   ): Promise<ServiceResult> {
-    log.debug(
-      `whitebrickCloud.addUserToTenant: ${tenantName}, ${userEmail}, ${tenantRole}`
+    return this.dal.organizations(userId, userEmail, organizationId);
+  }
+
+  public async organizationsByUserId(userId: number): Promise<ServiceResult> {
+    return this.dal.organizations(userId);
+  }
+
+  public async organizationsByUserEmail(
+    userEmail: string
+  ): Promise<ServiceResult> {
+    return this.dal.organizations(undefined, userEmail);
+  }
+
+  public async organizationAccess(
+    userId: number,
+    organizationId: number
+  ): Promise<ServiceResult> {
+    const orgsResult = await this.dal.organizations(
+      userId,
+      undefined,
+      organizationId
     );
-    const userResult = await this.dal.userByEmail(userEmail);
-    if (!userResult.success) return userResult;
-    const tenantResult = await this.dal.tenantByName(tenantName);
-    if (!tenantResult.success) return tenantResult;
-    const roleResult = await this.dal.roleByName(tenantRole);
-    if (!roleResult.success) return roleResult;
-    const result = await this.dal.addUserToTenant(
-      tenantResult.payload.id,
-      userResult.payload.id,
-      roleResult.payload.id
+    if (orgsResult.success) orgsResult.payload = orgsResult.payload[0];
+    return orgsResult;
+  }
+
+  public async organizationsByIds(ids: number[]): Promise<ServiceResult> {
+    return this.dal.organizationsByIdsOrNames(ids);
+  }
+
+  public async organizationById(id: number): Promise<ServiceResult> {
+    const result = await this.organizationsByIds([id]);
+    if (result.success) result.payload = result.payload[0];
+    return result;
+  }
+
+  public async organizationsByNames(names: string[]): Promise<ServiceResult> {
+    return this.dal.organizationsByIdsOrNames(undefined, names);
+  }
+
+  public async organizationByName(name: string): Promise<ServiceResult> {
+    const result = await this.organizationsByNames([name]);
+    if (result.success) result.payload = result.payload[0];
+    return result;
+  }
+
+  public async organizationUsers(
+    name: string,
+    roles?: string[]
+  ): Promise<ServiceResult> {
+    const result = await this.organizationByName(name);
+    if (!result.success) return result;
+    if (!result.payload) {
+      return {
+        success: false,
+        message: `Organization with name '${name}' could not be found`,
+        code: "WB_ORGANIZATION_NOT_FOUND",
+        apolloError: "BAD_USER_INPUT",
+      } as ServiceResult;
+    }
+    if (roles && !Role.areRoles(roles)) {
+      return {
+        success: false,
+        message:
+          "organizationUsers: roles contains one or more unrecognized strings",
+      } as ServiceResult;
+    }
+    return this.dal.organizationUsers(name, roles);
+  }
+
+  public async createOrganization(
+    currentUserEmail: string, // TBD: repace with uid
+    name: string,
+    label: string
+  ): Promise<ServiceResult> {
+    const checkNameResult = await this.organizationByName(name);
+    if (!checkNameResult.success) return checkNameResult;
+    if (checkNameResult.payload) {
+      return {
+        success: false,
+        message: `This organization name has already been taken.`,
+        code: "WB_ORGANIZATION_NAME_TAKEN",
+        apolloError: "BAD_USER_INPUT",
+      } as ServiceResult;
+    }
+    const createOrgResult = await this.dal.createOrganization(name, label);
+    if (!createOrgResult.success) return createOrgResult;
+    const result = await this.setOrganizationUserRole(
+      name,
+      currentUserEmail,
+      "organization_administrator"
     );
     if (!result.success) return result;
-    return userResult;
+    return createOrgResult;
+  }
+
+  public async updateOrganization(
+    name: string,
+    newName?: string,
+    newLabel?: string
+  ): Promise<ServiceResult> {
+    return this.dal.updateOrganization(name, newName, newLabel);
+  }
+
+  public async deleteOrganization(name: string): Promise<ServiceResult> {
+    const result = await this.organizationUsers(name, [
+      "organization_user",
+      "organization_external_user",
+    ]);
+    if (!result.success) return result;
+    if (result.payload.length > 0) {
+      return {
+        success: false,
+        message: `Remove all non-administrative users from Organization before deleting.`,
+        code: "WB_ORGANIZATION_NOT_EMPTY",
+        apolloError: "BAD_USER_INPUT",
+      } as ServiceResult;
+    }
+    return this.dal.deleteOrganization(name);
+  }
+
+  public async deleteTestOrganizations(): Promise<ServiceResult> {
+    return this.dal.deleteTestOrganizations();
+  }
+
+  /**
+   * Organization-User-Roles
+   */
+
+  public async setOrganizationUserRole(
+    organizationName: string,
+    userEmail: string,
+    role: string
+  ): Promise<ServiceResult> {
+    return await this.setOrganizationUsersRole(
+      organizationName,
+      [userEmail],
+      role
+    );
+  }
+
+  public async setOrganizationUsersRole(
+    organizationName: string,
+    userEmails: string[],
+    role: string
+  ): Promise<ServiceResult> {
+    const usersResult = await this.usersByEmails(userEmails);
+    if (!usersResult.success) return usersResult;
+    if (usersResult.payload.length != userEmails) {
+      return {
+        success: false,
+        message: `setOrganizationUsersRole: ${
+          userEmails.length - usersResult.payload.length
+        } missing user(s)`,
+      } as ServiceResult;
+    }
+    const organizationResult = await this.organizationByName(organizationName);
+    if (!organizationResult.success) return organizationResult;
+    const roleResult = await this.dal.roleByName(role);
+    if (!roleResult.success) return roleResult;
+    const result = await this.dal.setOrganizationUsersRole(
+      organizationResult.payload.id,
+      usersResult.payload,
+      roleResult.payload.id
+    );
+    return result;
+  }
+
+  public async removeUsersFromOrganization(
+    userEmails: string[],
+    organizationName: string
+  ): Promise<ServiceResult> {
+    const usersResult = await this.usersByEmails(userEmails);
+    if (!usersResult.success) return usersResult;
+    const userIds = usersResult.payload.map((user: { id: number }) => user.id);
+    // check not all the admins will be removed
+    const adminsResult = await this.organizationUsers(organizationName, [
+      "organization_administrator",
+    ]);
+    if (!adminsResult.success) return adminsResult;
+    const allAdminIds = adminsResult.payload.map(
+      (user: { id: number }) => user.id
+    );
+    if (allAdminIds.every((elem: number) => userIds.includes(elem))) {
+      return {
+        success: false,
+        message: `You can not remove all Administrators from an Organization - you must leave at least one.`,
+        code: "WB_ORGANIZATION_NO_ADMINS",
+        apolloError: "BAD_USER_INPUT",
+      } as ServiceResult;
+    }
+    const organizationResult = await this.organizationByName(organizationName);
+    if (!organizationResult.success) return organizationResult;
+    const result = await this.dal.removeUsersFromOrganization(
+      usersResult.payload,
+      organizationResult.payload.id
+    );
+    return result;
   }
 
   /**
    * Users
    */
 
-  public async usersByTenantId(tenantId: number): Promise<ServiceResult> {
-    return this.dal.usersByTenantId(tenantId);
+  public async usersByOrganizationId(
+    organizationId: number
+  ): Promise<ServiceResult> {
+    return this.dal.usersByOrganizationId(organizationId);
+  }
+
+  public async usersByIds(ids: number[]): Promise<ServiceResult> {
+    return this.dal.usersByIdsOrEmails(ids);
   }
 
   public async userById(id: number): Promise<ServiceResult> {
-    return this.dal.userById(id);
+    const result = await this.usersByIds([id]);
+    if (result.success) result.payload = result.payload[0];
+    return result;
+  }
+
+  public async usersByEmails(userEmails: string[]): Promise<ServiceResult> {
+    return this.dal.usersByIdsOrEmails(undefined, userEmails);
   }
 
   public async userByEmail(email: string): Promise<ServiceResult> {
-    return this.dal.userByEmail(email);
+    const result = await this.usersByEmails([email]);
+    if (result.success) result.payload = result.payload[0];
+    return result;
   }
 
   public async createUser(
@@ -172,38 +409,14 @@ class WhitebrickCloud {
    */
 
   public async createSchema(
+    uid: number,
     name: string,
     label: string,
-    tenantOwnerId?: number,
-    tenantOwnerName?: string,
+    organizationOwnerId?: number,
+    organizationOwnerName?: string,
     userOwnerId?: number,
     userOwnerEmail?: string
   ): Promise<ServiceResult> {
-    log.info(`
-      wbCloud.createSchema name=${name},
-      label=${label},
-      tenantOwnerId=${tenantOwnerId},
-      tenantOwnerName=${tenantOwnerName},
-      userOwnerId=${userOwnerId},
-      userOwnerEmail=${userOwnerEmail}
-    `);
-    let result;
-    if (!tenantOwnerId && !userOwnerId) {
-      if (tenantOwnerName) {
-        result = await this.dal.tenantByName(tenantOwnerName);
-        if (!result.success) return result;
-        tenantOwnerId = result.payload.id;
-      } else if (userOwnerEmail) {
-        result = await this.dal.userByEmail(userOwnerEmail);
-        if (!result.success) return result;
-        userOwnerId = result.payload.id;
-      } else {
-        return {
-          success: false,
-          message: "createSchema: Owner could not be found",
-        } as ServiceResult;
-      }
-    }
     if (name.startsWith("pg_") || Schema.SYS_SCHEMA_NAMES.includes(name)) {
       return {
         success: false,
@@ -214,7 +427,83 @@ class WhitebrickCloud {
         apolloError: "BAD_USER_INPUT",
       } as ServiceResult;
     }
-    return await this.dal.createSchema(name, label, tenantOwnerId, userOwnerId);
+    let result: ServiceResult = WhitebrickCloud.RESULT_DEFAULT;
+    // Get the IDs
+    if (!organizationOwnerId && !userOwnerId) {
+      if (organizationOwnerName) {
+        let result = await this.organizationByName(organizationOwnerName);
+        if (!result.success) return result;
+        organizationOwnerId = result.payload.id;
+      } else if (userOwnerEmail) {
+        result = await this.userByEmail(userOwnerEmail);
+        if (!result.success) return result;
+        userOwnerId = result.payload.id;
+      } else {
+        return {
+          success: false,
+          message: "createSchema: Owner could not be found",
+        } as ServiceResult;
+      }
+    }
+    let userOrgRole: Organization | undefined = undefined;
+    if (!User.isAdmin(uid)) {
+      // User must be in the organization for organizationOwner
+      if (organizationOwnerId) {
+        const orgResult = await this.organizationAccess(
+          uid,
+          organizationOwnerId
+        );
+        if (!orgResult.success) return orgResult;
+        userOrgRole = orgResult.payload;
+        if (!userOrgRole) {
+          return {
+            success: false,
+            message: `createSchema: User ${uid} must be in Organization ${organizationOwnerId}`,
+          } as ServiceResult;
+        }
+        // Only the current user can be the userOwner
+      } else if (userOwnerId) {
+        if (uid != userOwnerId) {
+          return {
+            success: false,
+            message: `createSchema: The current user ${uid} does not match the userOwnerId ${userOwnerId}`,
+          } as ServiceResult;
+        }
+      }
+    }
+    const schemaResult = await this.dal.createSchema(
+      name,
+      label,
+      organizationOwnerId,
+      userOwnerId
+    );
+    if (!schemaResult.success) return schemaResult;
+    // If owner is organization and user is not an admin of the organization,
+    // add admin so they dont lose access
+    if (
+      !User.isAdmin(uid) &&
+      organizationOwnerId &&
+      userOrgRole &&
+      userOrgRole.userRole != "organiation_admin"
+    ) {
+      result = await this.setRole(
+        uid,
+        "schema_administrator",
+        "schema" as RoleLevel,
+        schemaResult.payload.id
+      );
+      if (!result.success) return result;
+    }
+    return schemaResult;
+  }
+
+  public async setRole(
+    userId: number,
+    roleName: string,
+    roleLevel: RoleLevel,
+    objectId: number
+  ): Promise<ServiceResult> {
+    return await this.dal.setRole(userId, roleName, roleLevel, objectId);
   }
 
   public async removeOrDeleteSchema(
@@ -236,6 +525,12 @@ class WhitebrickCloud {
     return this.dal.schemasByUserOwner(userEmail);
   }
 
+  public async schemasByOrgOwnerAdmin(
+    userEmail: string
+  ): Promise<ServiceResult> {
+    return this.dal.schemasByOrgOwnerAdmin(userEmail);
+  }
+
   /**
    * Schema-User-Roles
    */
@@ -245,7 +540,7 @@ class WhitebrickCloud {
     userEmail: string,
     schemaRole: string
   ): Promise<ServiceResult> {
-    const userResult = await this.dal.userByEmail(userEmail);
+    const userResult = await this.userByEmail(userEmail);
     if (!userResult.success) return userResult;
     const schemaResult = await this.dal.schemaByName(schemaName);
     if (!schemaResult.success) return schemaResult;
@@ -261,15 +556,26 @@ class WhitebrickCloud {
   }
 
   public async accessibleSchemas(userEmail: string): Promise<ServiceResult> {
+    // Order matters - owners, admins take presedence over users
+    // Schemas with user owners
     const schemaOwnerResult = await this.schemasByUserOwner(userEmail);
     if (!schemaOwnerResult.success) return schemaOwnerResult;
+    // Schemas with organization owners where user is organization_administrator
+    const schemaOrgAdminResult = await this.schemasByOrgOwnerAdmin(userEmail);
+    if (!schemaOrgAdminResult.success) return schemaOrgAdminResult;
+    // Schemas with scheama_users assigned
     const userRolesResult = await this.dal.schemasByUser(userEmail);
     if (!userRolesResult.success) return userRolesResult;
     const schemas: Schema[] = [];
+    const schemaIds: number[] = [];
     for (const schema of schemaOwnerResult.payload.concat(
+      schemaOrgAdminResult.payload,
       userRolesResult.payload
     )) {
-      schemas.push(this.addSchemaContext(schema));
+      if (!schemaIds.includes(schema.id)) {
+        schemas.push(schema);
+        schemaIds.push(schema.id);
+      }
     }
     return {
       success: true,
@@ -737,14 +1043,11 @@ class WhitebrickCloud {
       tableName
     );
     if (!tableResult.success) return tableResult;
-    const userResult = await this.dal.userByEmail(userEmail);
+    const userResult = await this.userByEmail(userEmail);
     if (!userResult.success) return userResult;
-    const roleResult = await this.dal.roleByName("table_inherit");
-    if (!roleResult.success) return roleResult;
     return this.dal.saveTableUserSettings(
       tableResult.payload.id,
       userResult.payload.id,
-      roleResult.payload.id,
       settings
     );
   }

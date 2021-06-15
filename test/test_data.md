@@ -1,21 +1,21 @@
 # whitebrick-cloud test data
 
-## tenants
+## organizations
 
-- A tenant is a group of users in the same organization/company
-- There is 1 test tenant: `name=test_donnas-media` `label="Donna's Media"`
+- A organization is a group of users in the same organization/company
+- There is 1 test organization: `name=test_donnas-media` `label="Donna's Media"`
 - `test_donnas-media` has the following users and roles
-  | user | tenant_users role |
+  | user | organization_users role |
   | ----- | ---- |
-  | test_donna@test.whitebrick.com | tenant_admin
-  | test_debbie@test.whitebrick.com | tenant_user
-  | test_daisy@test.whitebrick.com | tenant_user
+  | test_donna@test.whitebrick.com | organization_admin
+  | test_debbie@test.whitebrick.com | organization_user
+  | test_daisy@test.whitebrick.com | organization_user
 
 ## users
 
-- Users can be associated with zero, one or multiple tenants (eg Nick North below is not associated with any tenants)
+- Users can be associated with zero, one or multiple organizations (eg Nick North below is not associated with any organizations)
 - There are 4 test users
-  | email | firstName | lastName | tenants |
+  | email | firstName | lastName | organizations |
   | ----- | --------- | -------- | ------- |
   | test_donna@test.whitebrick.com | Donna | Donna | Donnas Media
   | test_debbie@test.whitebrick.com | Debbie | Debbie | Donnas Media
@@ -25,12 +25,12 @@
 ## schemas
 
 - A schema is presented to the user as a separate isolated database
-- A schema must be owned by either a tenant or a user
+- A schema must be owned by either a organization or a user
 - There are 3 test schemas
   | schema | name | owner |
   | ------ | ---- | ----- |
-  | `test_donnasdvd` | Donnas DVD DB | tenant: `test_donnas-media`
-  | `test_chinook` | Chinook Music DB | tenant: `test_donnas-media`
+  | `test_donnasdvd` | Donnas DVD DB | organization: `test_donnas-media`
+  | `test_chinook` | Chinook Music DB | organization: `test_donnas-media`
   | `test_northwind` | Northwind Supplies DB | user: `test_nick_north@test.whitebrick.com`
 
 ## roles
@@ -38,8 +38,8 @@
 - A role is a defined set of access controls - TBA
   | name | label |
   | ---- | ----- |
-  |tenant_user | Organization User
-  |tenant_admin | Organization Admin
+  |organization_user | Organization User
+  |organization_admin | Organization Admin
   |schema_owner | DB Owner
   |schema_administrator | DB Administrator
   |schema_editor | DB Editor

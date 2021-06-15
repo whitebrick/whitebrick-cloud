@@ -1,5 +1,8 @@
 import { typeDefs as Schema, resolvers as schemaResolvers } from "./schema";
-import { typeDefs as Tenant, resolvers as tenantResolvers } from "./tenant";
+import {
+  typeDefs as Organization,
+  resolvers as organizationResolvers,
+} from "./organization";
 import { typeDefs as User, resolvers as userResolvers } from "./user";
 import { typeDefs as Table, resolvers as tableResolvers } from "./table";
 import { merge } from "lodash";
@@ -29,23 +32,46 @@ export type ConstraintId = {
 
 const typeDefs = gql`
   type Query {
-    wbHealthCheck: String!
+    wbHealthCheck: JSON!
+    wbCloudContext: JSON!
   }
 
   type Mutation {
     wbResetTestData: Boolean!
+    wbAuth(
+      schemaName: String!
+      authUserId: String!
+      authUserName: String
+    ): JSON!
   }
 `;
 
 const resolvers: IResolvers = {
   Query: {
-    wbHealthCheck: () => "All good",
+    wbHealthCheck: async (_, __, context) => {
+      return {
+        headers: context.headers,
+        multiValueHeaders: context.headers,
+      };
+    },
+    wbCloudContext: async (_, __, context) => {
+      return context.wbCloud.cloudContext();
+    },
   },
   Mutation: {
     wbResetTestData: async (_, __, context) => {
       const result = await context.wbCloud.resetTestData();
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
+    },
+    wbAuth: async (_, { schemaName, authUserId, authUserName }, context) => {
+      const result = await context.wbCloud.auth(
+        schemaName,
+        authUserId,
+        authUserName
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
     },
   },
 };
@@ -54,14 +80,14 @@ export const schema = makeExecutableSchema({
   typeDefs: [
     constraintDirectiveTypeDefs,
     typeDefs,
-    Tenant,
+    Organization,
     User,
     Schema,
     Table,
   ],
   resolvers: merge(
     resolvers,
-    tenantResolvers,
+    organizationResolvers,
     userResolvers,
     schemaResolvers,
     tableResolvers

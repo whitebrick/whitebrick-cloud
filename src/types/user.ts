@@ -9,10 +9,12 @@ export const typeDefs = gql`
     lastName: String
     createdAt: String!
     updatedAt: String!
+    role: String
   }
 
   extend type Query {
-    wbUsersByTenantId(tenantId: ID!): [User]
+    wbOrganizationUsers(name: String!, roles: [String]): [User]
+    wbUsersByOrganizationId(organizationId: ID!): [User]
     wbUserById(id: ID!): User
     wbUserByEmail(email: String!): User
   }
@@ -26,13 +28,17 @@ export const typeDefs = gql`
       lastName: String
     ): User
     """
-    Tenant-User-Roles
+    Organization-User-Roles
     """
-    wbAddUserToTenant(
-      tenantName: String!
-      userEmail: String!
-      tenantRole: String!
-    ): User
+    wbSetOrganizationUsersRole(
+      organizationName: String!
+      userEmails: [String]!
+      role: String!
+    ): Boolean
+    wbRemoveUsersFromOrganization(
+      userEmails: [String]!
+      organizationName: String!
+    ): Boolean
     """
     Schema-User-Roles
     """
@@ -46,8 +52,15 @@ export const typeDefs = gql`
 
 export const resolvers: IResolvers = {
   Query: {
-    wbUsersByTenantId: async (_, { tenantId }, context) => {
-      const result = await context.wbCloud.usersByTenantId(tenantId);
+    wbOrganizationUsers: async (_, { name, roles }, context) => {
+      const result = await context.wbCloud.organizationUsers(name, roles);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbUsersByOrganizationId: async (_, { organizationId }, context) => {
+      const result = await context.wbCloud.usersByOrganizationId(
+        organizationId
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
@@ -83,21 +96,33 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    // Tenant-User-Roles
-    wbAddUserToTenant: async (
+    // Organization-User-Roles
+    wbSetOrganizationUsersRole: async (
       _,
-      { tenantName, userEmail, tenantRole },
+      { organizationName, userEmails, role },
       context
     ) => {
-      const result = await context.wbCloud.addUserToTenant(
-        tenantName,
-        userEmail,
-        tenantRole
+      const result = await context.wbCloud.setOrganizationUsersRole(
+        organizationName,
+        userEmails,
+        role
       );
       if (!result.success) throw context.wbCloud.err(result);
-      return result.payload;
+      return result.success;
     },
-    // Tenant-Schema-Roles
+    wbRemoveUsersFromOrganization: async (
+      _,
+      { userEmails, organizationName },
+      context
+    ) => {
+      const result = await context.wbCloud.removeUsersFromOrganization(
+        userEmails,
+        organizationName
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    // Organization-Schema-Roles
     wbAddUserToSchema: async (
       _,
       { schemaName, userEmail, schemaRole },

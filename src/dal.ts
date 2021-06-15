@@ -1,7 +1,16 @@
 import { environment } from "./environment";
 import { log } from "./whitebrick-cloud";
 import { Pool } from "pg";
-import { Tenant, User, Role, Schema, Table, Column, TableUser } from "./entity";
+import {
+  Organization,
+  User,
+  Role,
+  Schema,
+  Table,
+  Column,
+  TableUser,
+  RoleLevel,
+} from "./entity";
 import { ConstraintId, QueryParams, ServiceResult } from "./types";
 
 export class DAL {
@@ -67,203 +76,258 @@ export class DAL {
   }
 
   /**
-   * Tenants
+   * Organizations
    */
 
-  public async tenants(): Promise<ServiceResult> {
+  public async organizations(
+    userId?: number,
+    userEmail?: string,
+    organizationId?: number
+  ): Promise<ServiceResult> {
+    const params: (string | number)[] = [];
+    let query: string = `
+      SELECT wb.organizations.*
+      FROM wb.organizations
+      WHERE true
+    `;
+    if (userId || userEmail) {
+      query = `
+        SELECT wb.organizations.*, wb.roles.name as user_role
+        FROM wb.organizations
+        JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
+        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+      `;
+      if (userId) {
+        query += `
+          WHERE wb.organization_users.user_id=$1
+        `;
+        params.push(userId);
+      } else if (userEmail) {
+        query += `
+          JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+          WHERE users.email=$1
+        `;
+        params.push(userEmail);
+      }
+    }
+    if (organizationId) {
+      query += `
+        AND wb.organizations.id=$${params.length + 1}
+      `;
+      params.push(organizationId);
+    }
     const result = await this.executeQuery({
-      query: `
-        SELECT wb.tenants.*
-        FROM wb.tenants
-      `,
-    } as QueryParams);
-    if (result.success) result.payload = Tenant.parseResult(result.payload);
-    return result;
-  }
-
-  public async tenantById(id: number): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT wb.tenants.*
-        FROM wb.tenants
-        WHERE id=$1 LIMIT 1
-      `,
-      params: [id],
-    } as QueryParams);
-    if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
-    return result;
-  }
-
-  public async tenantByName(name: string): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT wb.tenants.*
-        FROM wb.tenants
-        WHERE name=$1 LIMIT 1
-      `,
-      params: [name],
+      query: query,
+      params: params,
     } as QueryParams);
     if (result.success) {
-      result.payload = Tenant.parseResult(result.payload);
-      if (result.payload.length == 0) {
-        return (<ServiceResult>{
-          success: false,
-          message: `dal.tenantByName: Could not find tenant where name=${name}`,
-        }) as ServiceResult;
-      } else {
-        result.payload = result.payload[0];
-      }
+      result.payload = Organization.parseResult(result.payload);
     }
     return result;
   }
 
-  public async createTenant(
+  public async organizationsByIdsOrNames(
+    ids?: number[],
+    names?: string[]
+  ): Promise<ServiceResult> {
+    let column = "id";
+    let params: any[] = [ids];
+    if (names) {
+      column = "name";
+      params = [names];
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT wb.organizations.*
+        FROM wb.organizations
+        WHERE ${column}=ANY($1)
+      `,
+      params: params,
+    } as QueryParams);
+    if (result.success) result.payload = User.parseResult(result.payload);
+    return result;
+  }
+
+  public async organizationUsers(
+    name: string,
+    roles?: string[]
+  ): Promise<ServiceResult> {
+    let query = `
+      SELECT wb.users.*, wb.roles.name as role
+      FROM wb.users
+      JOIN wb.organization_users ON wb.users.id=wb.organization_users.user_id
+      JOIN wb.organizations ON wb.organizations.id=wb.organization_users.organization_id
+      JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+      WHERE wb.organizations.name=$1
+    `;
+    if (roles) query += `AND wb.roles.name IN ('${roles.join("','")}')`;
+    const result = await this.executeQuery({
+      query: query,
+      params: [name],
+    } as QueryParams);
+    if (result.success) result.payload = User.parseResult(result.payload);
+    return result;
+  }
+
+  public async createOrganization(
     name: string,
     label: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
-        INSERT INTO wb.tenants(
-          name, label, created_at, updated_at
-        ) VALUES($1, $2, $3, $4)
+        INSERT INTO wb.organizations(
+          name, label
+        ) VALUES($1, $2)
         RETURNING *
       `,
-      params: [name, label, new Date(), new Date()],
+      params: [name, label],
     } as QueryParams);
-    if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
+    if (result.success)
+      result.payload = Organization.parseResult(result.payload)[0];
     return result;
   }
 
-  public async updateTenant(
-    id: number,
-    name?: string,
-    label?: string
+  public async updateOrganization(
+    name: string,
+    newName?: string,
+    newLabel?: string
   ): Promise<ServiceResult> {
-    if (!name && !label) {
-      return {
-        success: false,
-        message: "dal.updateTenant: all parameters are null",
-      } as ServiceResult;
+    const params: (Date | string)[] = [new Date()];
+    let query = "UPDATE wb.organizations SET updated_at=$1";
+    if (newName) {
+      params.push(newName);
+      query += `, name=$${params.length}`;
     }
-    let paramCount = 3;
-    const params: (number | Date | string)[] = [new Date(), id];
-    let query = "UPDATE wb.tenants SET ";
-    if (name) {
-      query += `name=$${paramCount}, `;
-      params.push(name);
-      paramCount++;
+    if (newLabel) {
+      params.push(newLabel);
+      query += `, label=$${params.length}`;
     }
-    if (label) {
-      query += `label=$${paramCount}, `;
-      params.push(label);
-      paramCount++;
-    }
-    query += "updated_at=$1 WHERE id=$2 RETURNING *";
+    params.push(name);
+    query += ` WHERE id=$${params.length} RETURNING *`;
     const result = await this.executeQuery({
       query: query,
       params: params,
     } as QueryParams);
-    if (result.success) result.payload = Tenant.parseResult(result.payload)[0];
+    if (result.success)
+      result.payload = Organization.parseResult(result.payload)[0];
     return result;
   }
 
-  public async deleteTestTenants(): Promise<ServiceResult> {
+  public async deleteOrganization(name: string): Promise<ServiceResult> {
+    // no patterns allowed here
+    return await this.deleteOrganizations(name.replace("%", ""));
+  }
+
+  public async deleteTestOrganizations(): Promise<ServiceResult> {
+    return await this.deleteOrganizations("test_%");
+  }
+
+  public async deleteOrganizations(
+    namePattern: string
+  ): Promise<ServiceResult> {
     const results = await this.executeQueries([
       {
         query: `
-          DELETE FROM wb.tenant_users
-          WHERE tenant_id IN (
-            SELECT id FROM wb.tenants WHERE name like 'test_%'
+          DELETE FROM wb.organization_users
+          WHERE organization_id IN (
+            SELECT id FROM wb.organizations WHERE name like $1
           )
         `,
+        params: [namePattern],
       } as QueryParams,
       {
         query: `
-          DELETE FROM wb.tenants WHERE name like 'test_%'
+          DELETE FROM wb.organizations WHERE name like $1
         `,
+        params: [namePattern],
       } as QueryParams,
     ]);
     return results[results.length - 1];
   }
 
   /**
-   * Tenant-User-Roles
+   * Organization-User-Roles
    */
 
-  public async addUserToTenant(
-    tenantId: number,
-    userId: number,
-    tenantRoleId: number
+  public async setOrganizationUsersRole(
+    organizationId: number,
+    users: User[],
+    roleId: number
   ): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        INSERT INTO wb.tenant_users(
-          tenant_id, user_id, role_id, created_at, updated_at
-        ) VALUES($1, $2, $3, $4, $5)
+    log.warn(`++++++++++++++++++++++${organizationId} ${users} ${roleId}`);
+    const queryParams: QueryParams[] = [];
+    for (const user of users) {
+      queryParams.push({
+        query: `
+        INSERT INTO wb.organization_users(
+          organization_id, user_id, role_id, updated_at
+        ) VALUES($1, $2, $3, $4)
+        ON CONFLICT (organization_id, user_id)
+        DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
       `,
-      params: [tenantId, userId, tenantRoleId, new Date(), new Date()],
-    } as QueryParams);
-    return result;
+        params: [organizationId, user.id, roleId, new Date()],
+      } as QueryParams);
+    }
+    const results = await this.executeQueries(queryParams);
+    return results[results.length - 1];
   }
 
-  public async removeUserFromTenant(
-    tenantId: number,
-    userId: number,
-    tenantRoleId?: number
+  public async removeUsersFromOrganization(
+    users: User[],
+    organizationId: number
   ): Promise<ServiceResult> {
-    let query = `
-      DELETE FROM wb.tenant_users
-      WHERE tenant_id=$1 AND user_id=$2
-    `;
-    const params: (number | undefined)[] = [tenantId, userId];
-    if (tenantRoleId) query += " AND role_id=$3";
-    params.push(tenantRoleId);
-    const result = await this.executeQuery({
-      query: query,
-      params: params,
-    } as QueryParams);
-    return result;
+    const queryParams: QueryParams[] = [];
+    for (const user of users) {
+      queryParams.push({
+        query: `
+          DELETE FROM wb.organization_users
+          WHERE user_id=$1 AND organization_id=$2
+      `,
+        params: [user.id, organizationId],
+      } as QueryParams);
+    }
+    const results = await this.executeQueries(queryParams);
+    return results[results.length - 1];
   }
 
   /**
    * Users
    */
 
-  public async usersByTenantId(tenantId: number): Promise<ServiceResult> {
+  public async usersByOrganizationId(
+    organizationId: number
+  ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
         SELECT wb.users.*
         FROM wb.users
-        WHERE tenant_id=$1
+        WHERE organization_id=$1
       `,
-      params: [tenantId],
+      params: [organizationId],
     } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload);
     return result;
   }
 
-  public async userById(id: number): Promise<ServiceResult> {
+  public async usersByIdsOrEmails(
+    ids?: number[],
+    emails?: string[]
+  ): Promise<ServiceResult> {
+    let column = "id";
+    let params: any[] = [ids];
+    if (emails) {
+      column = "email";
+      params = [emails];
+    }
     const result = await this.executeQuery({
       query: `
         SELECT wb.users.*
         FROM wb.users
-        WHERE id=$1 LIMIT 1
+        WHERE ${column}=ANY($1)
       `,
-      params: [id],
+      params: params,
     } as QueryParams);
-    if (result.success) result.payload = User.parseResult(result.payload)[0];
-    return result;
-  }
-
-  public async userByEmail(email: string): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT * FROM wb.users
-        WHERE email=$1 LIMIT 1
-      `,
-      params: [email],
-    } as QueryParams);
-    if (result.success) result.payload = User.parseResult(result.payload)[0];
+    if (result.success) result.payload = User.parseResult(result.payload);
     return result;
   }
 
@@ -275,10 +339,10 @@ export class DAL {
     const result = await this.executeQuery({
       query: `
         INSERT INTO wb.users(
-          email, first_name, last_name, created_at, updated_at
-        ) VALUES($1, $2, $3, $4, $5) RETURNING *
+          email, first_name, last_name
+        ) VALUES($1, $2, $3) RETURNING *
       `,
-      params: [email, firstName, lastName, new Date(), new Date()],
+      params: [email, firstName, lastName],
     } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
@@ -297,7 +361,8 @@ export class DAL {
       } as ServiceResult;
     }
     let paramCount = 3;
-    const params: (Date | number | string)[] = [new Date(), id];
+    const date = new Date();
+    const params: (Date | number | string)[] = [date, id];
     let query = "UPDATE wb.users SET ";
     if (email) {
       query += `email=$${paramCount}, `;
@@ -351,6 +416,77 @@ export class DAL {
     return result;
   }
 
+  public async setRole(
+    userId: number,
+    roleName: string,
+    roleLevel: RoleLevel,
+    objectId: number
+  ): Promise<ServiceResult> {
+    if (!Role.isRole(roleName)) {
+      return {
+        success: false,
+        message: `${roleName} is not a valid Role`,
+      };
+    }
+    const roleResult = await this.roleByName(roleName);
+    if (!roleResult.success) return roleResult;
+    let wbTable: string = "";
+    let wbColumn: string = "";
+    switch (roleLevel) {
+      case "organization" as RoleLevel:
+        wbTable = "wb.organization_users";
+        wbColumn = "organization_id";
+        break;
+      case "schema" as RoleLevel:
+        wbTable = "wb.schema_users";
+        wbColumn = "schema_id";
+        break;
+      case "table" as RoleLevel:
+        wbTable = "wb.table_users";
+        wbColumn = "table_id";
+        break;
+    }
+    const query: string = `
+      INSERT INTO ${wbTable} (role_id,  user_id, ${wbColumn}, updated_at)
+      VALUES (${roleResult.payload.id}, ${userId}, ${objectId}, $1)
+      ON CONFLICT (user_id, ${wbColumn})
+      DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
+    `;
+    return await this.executeQuery({
+      query: query,
+      params: [new Date()],
+    } as QueryParams);
+  }
+
+  public async userRolesForSchema(
+    schemaId: number,
+    userId: number
+  ): Promise<ServiceResult> {
+    let result = await this.executeQuery({
+      query: `
+        SELECT wb.roles.*
+        FROM wb.roles
+        JOIN wb.schema_users ON wb.roles.id=wb.schema_users.role_id
+        WHERE wb.schema_users.schema_id=$1 AND wb.schema_users.user_id=$2
+      `,
+      params: [schemaId, userId],
+    } as QueryParams);
+    if (!result.success) return result;
+    const tableUserRoles = Role.parseResult(result.payload);
+    result = await this.executeQuery({
+      query: `
+        SELECT wb.roles.*
+        FROM wb.roles
+        JOIN wb.schema_users ON wb.roles.id=wb.schema_users.role_id
+        WHERE wb.schema_users.schema_id=$1 AND wb.schema_users.user_id=$2
+      `,
+      params: [schemaId, userId],
+    } as QueryParams);
+    if (!result.success) return result;
+    const schemaUserRoles = Role.parseResult(result.payload);
+    return result;
+  }
+
   /**
    * Schemas
    */
@@ -358,7 +494,7 @@ export class DAL {
   public async createSchema(
     name: string,
     label: string,
-    tenantOwnerId?: number,
+    organizationOwnerId?: number,
     userOwnerId?: number
   ): Promise<ServiceResult> {
     const results = await this.executeQueries([
@@ -368,17 +504,10 @@ export class DAL {
       {
         query: `
           INSERT INTO wb.schemas(
-            name, label, tenant_owner_id, user_owner_id, created_at, updated_at
-          ) VALUES($1, $2, $3, $4, $5, $6) RETURNING *
+            name, label, organization_owner_id, user_owner_id
+          ) VALUES($1, $2, $3, $4) RETURNING *
         `,
-        params: [
-          name,
-          label,
-          tenantOwnerId,
-          userOwnerId,
-          new Date(),
-          new Date(),
-        ],
+        params: [name, label, organizationOwnerId, userOwnerId],
       } as QueryParams,
     ]);
     const insertResult: ServiceResult = results[results.length - 1];
@@ -469,6 +598,25 @@ export class DAL {
     return result;
   }
 
+  public async schemasByOrgOwnerAdmin(
+    userEmail: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT wb.schemas.*, wb.roles.name as user_role
+        FROM wb.schemas
+        JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
+        JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
+        JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+        WHERE wb.roles.name='organization_administrator' AND wb.users.email=$1
+      `,
+      params: [userEmail],
+    } as QueryParams);
+    if (result.success) result.payload = Schema.parseResult(result.payload);
+    return result;
+  }
+
   public async removeOrDeleteSchema(
     schemaName: string,
     del: boolean
@@ -505,10 +653,10 @@ export class DAL {
     const result = await this.executeQuery({
       query: `
         INSERT INTO wb.schema_users(
-          schema_id, user_id, role_id, created_at, updated_at
-        ) VALUES($1, $2, $3, $4, $5)
+          schema_id, user_id, role_id
+        ) VALUES($1, $2, $3)
       `,
-      params: [schemaId, userId, schemaRoleId, new Date(), new Date()],
+      params: [schemaId, userId, schemaRoleId],
     } as QueryParams);
     return result;
   }
@@ -681,16 +829,19 @@ export class DAL {
           AND fk.table_name LIKE '${tableNamePattern}'
           AND fk.column_name LIKE '${columnNamePattern}'
         `;
+        break;
       case "REFERENCES":
         whereSql = `
           AND ref.table_name LIKE '${tableNamePattern}'
           AND ref.column_name LIKE '${columnNamePattern}'
         `;
+        break;
       case "ALL":
         whereSql = `
           AND fk.table_name LIKE '${tableNamePattern}'
           AND fk.column_name LIKE '${columnNamePattern}'
         `;
+        break;
     }
     const result = await this.executeQuery({
       query: `
@@ -879,16 +1030,10 @@ export class DAL {
     const queriesAndParams: Array<QueryParams> = [
       {
         query: `
-        INSERT INTO wb.tables(schema_id, name, label, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO wb.tables(schema_id, name, label)
+        VALUES ($1, $2, $3)
       `,
-        params: [
-          result.payload.id,
-          tableName,
-          tableLabel,
-          new Date(),
-          new Date(),
-        ],
+        params: [result.payload.id, tableName, tableLabel],
       } as QueryParams,
     ];
     if (create) {
@@ -995,16 +1140,10 @@ export class DAL {
     const queriesAndParams: Array<QueryParams> = [
       {
         query: `
-          INSERT INTO wb.columns(table_id, name, label, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5)
+          INSERT INTO wb.columns(table_id, name, label)
+          VALUES ($1, $2, $3)
         `,
-        params: [
-          result.payload.id,
-          columnName,
-          columnLabel,
-          new Date(),
-          new Date(),
-        ],
+        params: [result.payload.id, columnName, columnLabel],
       } as QueryParams,
     ];
     if (create) {
@@ -1177,19 +1316,18 @@ export class DAL {
   public async saveTableUserSettings(
     tableId: number,
     userId: number,
-    roleId: number,
     settings: object
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
         INSERT INTO wb.table_users (
-          table_id, user_id, role_id, settings
+          table_id, user_id, settings
         )
-        VALUES($1, $2, $3, $4)
-        ON CONFLICT (table_id, user_id, role_id) 
+        VALUES($1, $2, $3)
+        ON CONFLICT (table_id, user_id) 
         DO UPDATE SET settings = EXCLUDED.settings
       `,
-      params: [tableId, userId, roleId, settings],
+      params: [tableId, userId, settings],
     } as QueryParams);
     return result;
   }

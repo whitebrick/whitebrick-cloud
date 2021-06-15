@@ -1,5 +1,4 @@
 import { QueryResult } from "pg";
-import { RoleName } from "./Role";
 
 export class Schema {
   static SYS_SCHEMA_NAMES: string[] = [
@@ -12,13 +11,12 @@ export class Schema {
   id!: number;
   name!: string;
   label!: string;
-  tenantOwnerId?: number;
+  organizationOwnerId?: number;
   userOwnerId?: number;
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
-  userRole?: RoleName;
-  context!: object;
+  userRole?: string;
 
   public static parseResult(data: QueryResult | null): Array<Schema> {
     if (!data) throw new Error("Schema.parseResult: input is null");
@@ -35,10 +33,11 @@ export class Schema {
     schema.id = data.id;
     schema.name = data.name;
     schema.label = data.label;
-    schema.tenantOwnerId = data.tenantOwnerId;
+    schema.organizationOwnerId = data.organizationOwnerId;
     schema.userOwnerId = data.userOwnerId;
     schema.createdAt = data.created_at;
     schema.updatedAt = data.updated_at;
+    if (data.user_role) schema.userRole = data.user_role;
     return schema;
   }
 }

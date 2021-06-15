@@ -1,1 +1,2 @@
+
 DROP SCHEMA wb;

@@ -1,6 +1,7 @@
+
 CREATE SCHEMA wb;
 
-CREATE TABLE IF NOT EXISTS wb.tenants(
+CREATE TABLE IF NOT EXISTS wb.organizations(
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   label TEXT NOT NULL,
@@ -8,8 +9,8 @@ CREATE TABLE IF NOT EXISTS wb.tenants(
   updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc')
 );
 
-CREATE INDEX idx_wb_tenants_name ON wb.tenants(name);
-ALTER SEQUENCE wb.tenants_id_seq RESTART WITH 101;
+CREATE INDEX idx_wb_organizations_name ON wb.organizations(name);
+ALTER SEQUENCE wb.organizations_id_seq RESTART WITH 101;
 
 CREATE TABLE IF NOT EXISTS wb.users(
   id BIGSERIAL PRIMARY KEY,
@@ -24,30 +25,32 @@ CREATE INDEX idx_wb_users_email ON wb.users(email);
 ALTER SEQUENCE wb.users_id_seq RESTART WITH 20001;
 
 CREATE TABLE IF NOT EXISTS wb.roles (
-  id SERIAL PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
+  syscode VARCHAR(2) UNIQUE,
   label TEXT,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
 );
 
 CREATE INDEX idx_wb_roles_name ON wb.roles(name);
+CREATE INDEX idx_wb_roles_syscode ON wb.roles(syscode);
 
-CREATE TABLE IF NOT EXISTS wb.tenant_users (
-  tenant_id integer REFERENCES wb.tenants(id) NOT NULL,
-  user_id bigint REFERENCES wb.users(id) NOT NULL,
-  role_id integer REFERENCES wb.roles(id) NOT NULL,
+CREATE TABLE IF NOT EXISTS wb.organization_users (
+  organization_id INTEGER REFERENCES wb.organizations(id) NOT NULL,
+  user_id BIGINT REFERENCES wb.users(id) NOT NULL,
+  role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-  PRIMARY KEY (tenant_id, user_id, role_id)
+  PRIMARY KEY (organization_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS wb.schemas(
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
   label TEXT NOT NULL,
-  tenant_owner_id integer REFERENCES wb.tenants(id),
-  user_owner_id bigint REFERENCES wb.users(id),
+  organization_owner_id INTEGER REFERENCES wb.organizations(id),
+  user_owner_id BIGINT REFERENCES wb.users(id),
   created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc'),
   updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc')
 );
@@ -56,12 +59,12 @@ ALTER SEQUENCE wb.schemas_id_seq RESTART WITH 30001;
 CREATE INDEX idx_wb_schemas_name ON wb.schemas(name);
 
 CREATE TABLE IF NOT EXISTS wb.schema_users (
-  schema_id integer REFERENCES wb.schemas(id) NOT NULL,
-  user_id bigint REFERENCES wb.users(id) NOT NULL,
-  role_id integer REFERENCES wb.roles(id) NOT NULL,
+  schema_id INTEGER REFERENCES wb.schemas(id) NOT NULL,
+  user_id BIGINT REFERENCES wb.users(id) NOT NULL,
+  role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-  PRIMARY KEY (schema_id, user_id, role_id)
+  PRIMARY KEY (schema_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS wb.tables(
@@ -78,13 +81,13 @@ ALTER SEQUENCE wb.tables_id_seq RESTART WITH 40001;
 CREATE INDEX idx_wb_tables_name ON wb.tables(name);
 
 CREATE TABLE IF NOT EXISTS wb.table_users(
-  table_id bigint REFERENCES wb.tables(id) NOT NULL,
-  user_id bigint REFERENCES wb.users(id) NOT NULL,
-  role_id integer REFERENCES wb.roles(id) NOT NULL,
+  table_id BIGINT REFERENCES wb.tables(id) NOT NULL,
+  user_id BIGINT REFERENCES wb.users(id) NOT NULL,
+  role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
   settings jsonb,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
-  PRIMARY KEY (table_id, user_id, role_id)
+  PRIMARY KEY (table_id, user_id)
 );
 
 CREATE TABLE IF NOT EXISTS wb.columns(
@@ -99,3 +102,15 @@ CREATE TABLE IF NOT EXISTS wb.columns(
 
 ALTER SEQUENCE wb.columns_id_seq RESTART WITH 50001;
 CREATE INDEX idx_wb_columns_name ON wb.columns(name);
+
+CREATE TABLE IF NOT EXISTS wb.custom_role_column_permissions(
+  role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
+  column_id BIGINT REFERENCES wb.columns(id) NOT NULL,
+  allow_insert BOOLEAN DEFAULT false,
+  allow_select BOOLEAN DEFAULT false,
+  allow_update BOOLEAN DEFAULT false,
+  allow_delete BOOLEAN DEFAULT false,
+  created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+  PRIMARY KEY (role_id, column_id)
+);
