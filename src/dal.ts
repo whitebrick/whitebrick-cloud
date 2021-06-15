@@ -254,7 +254,9 @@ export class DAL {
     users: User[],
     roleId: number
   ): Promise<ServiceResult> {
-    log.warn(`++++++++++++++++++++++${organizationId} ${users} ${roleId}`);
+    log.debug(
+      `dal.setOrganizationUsersRole(${organizationId}, ${users}, ${roleId}`
+    );
     const queryParams: QueryParams[] = [];
     for (const user of users) {
       queryParams.push({

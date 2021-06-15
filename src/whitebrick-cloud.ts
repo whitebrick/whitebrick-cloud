@@ -295,12 +295,12 @@ class WhitebrickCloud {
   ): Promise<ServiceResult> {
     const usersResult = await this.usersByEmails(userEmails);
     if (!usersResult.success) return usersResult;
-    if (usersResult.payload.length != userEmails) {
+    if (usersResult.payload.length != userEmails.length) {
       return {
         success: false,
-        message: `setOrganizationUsersRole: ${
-          userEmails.length - usersResult.payload.length
-        } missing user(s)`,
+        message: `setOrganizationUsersRole: missing user(s): ${userEmails.filter(
+          (x: string) => !usersResult.payload.includes(x)
+        )}`,
       } as ServiceResult;
     }
     const organizationResult = await this.organizationByName(organizationName);

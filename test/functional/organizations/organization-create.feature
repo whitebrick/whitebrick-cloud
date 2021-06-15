@@ -7,7 +7,9 @@ Feature:
     Given text query = 
     """
       mutation ($name: String!, $label: String!, $currentUserEmail: String!){
-        wbCreateOrganization(name: $name, label: $label, currentUserEmail: $currentUserEmail)
+        wbCreateOrganization(name: $name, label: $label, currentUserEmail: $currentUserEmail){
+          id
+        }
       }
     """
     And def variables = { name: '#(name)', label: '#(label)', currentUserEmail: '#(currentUserEmail)' }
