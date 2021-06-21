@@ -25,4 +25,5 @@ plugins:
 custom:
   webpack:
     includeModules: true
-
+  serverless-offline:
+    noTimeout: true

@@ -4,7 +4,15 @@ import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { ConstraintId, schema, ServiceResult } from "./types";
 import v = require("voca");
-import { Column, Organization, Role, RoleLevel, Schema, User } from "./entity";
+import {
+  Column,
+  Organization,
+  Role,
+  RoleLevel,
+  Schema,
+  Table,
+  User,
+} from "./entity";
 import { isThisTypeNode } from "typescript";
 
 export const graphqlHandler = new ApolloServer({
@@ -26,35 +34,67 @@ export const log: Logger = new Logger({
 class WhitebrickCloud {
   dal = new DAL();
 
-  static RESULT_DEFAULT: ServiceResult = {
-    success: false,
-    message: "RESULT_DEFAULT: result has not been assigned",
+  // wbErrorCode : [ message, apolloErrorCode? ]
+  static WB_ERROR_CODES: Record<string, string[]> = {
+    // Users
+    WB_USER_NOT_FOUND: ["User not found.", "BAD_USER_INPUT"],
+    WB_USERS_NOT_FOUND: ["One or more users were not found."],
+    // Organizations
+    WB_ORGANIZATION_NOT_FOUND: ["Organization not found.", "BAD_USER_INPUT"],
+    WB_ORGANIZATION_NAME_TAKEN: [
+      "This Organization name has already been taken.",
+      "BAD_USER_INPUT",
+    ],
+    WB_ORGANIZATION_NOT_USER_EMPTY: [
+      "This organization still has non-administrative users.",
+      "BAD_USER_INPUT",
+    ],
+    WB_ORGANIZATION_NO_ADMINS: [
+      "You can not remove all Administrators from an Organization - you must leave at least one.",
+      "BAD_USER_INPUT",
+    ],
+    WB_USER_NOT_IN_ORG: ["User must be in Organization"],
+    WB_USER_NOT_SCHEMA_OWNER: ["The current user is not the owner."],
+    // Schemas
+    WB_SCHEMA_NOT_FOUND: ["Database could not be found."],
+    WB_BAD_SCHEMA_NAME: [
+      "Database name can not begin with 'pg_' or be in the reserved list.",
+      "BAD_USER_INPUT",
+    ],
+    // Tables
+    WB_TABLE_NOT_FOUND: ["Table could not be found."],
+    WB_TABLE_NAME_EXISTS: ["This Table name already exists", "BAD_USER_INPUT"],
+    COLUMN_NOT_FOUND: ["Column could not be found"],
+    WB_COLUMN_NAME_EXISTS: [
+      "This Column name already exists.",
+      "BAD_USER_INPUT",
+    ],
+    WB_PK_EXISTS: ["Remove existing primary key first.", "BAD_USER_INPUT"],
+    WB_FK_EXISTS: [
+      "Remove existing foreign key on the column first.",
+      "BAD_USER_INPUT",
+    ],
+    // Table Users,
+    WB_TABLE_USER_NOT_FOUND: ["Table User not found."],
+    // Roles
+    ROLE_NOT_FOUND: ["This role could not be found."],
   };
 
   public err(result: ServiceResult): Error {
-    if (result.success) {
-      return new Error(
-        "WhitebrickCloud.err: result is not an error (success==true)"
-      );
-    }
-    let apolloError = "INTERNAL_SERVER_ERROR";
-    if (result.apolloError) apolloError = result.apolloError;
-    return new ApolloError(result.message, apolloError, {
-      ref: result.code,
-    });
+    return apolloErr(result);
   }
 
   public async uidFromHeaders(
     headers: Record<string, string>
   ): Promise<ServiceResult> {
-    log.warn("========== HEADERS: " + JSON.stringify(headers));
+    log.info("========== HEADERS: " + JSON.stringify(headers));
     const headersLowerCase = Object.entries(headers).reduce(
       (acc: Record<string, string>, [key, val]) => (
         (acc[key.toLowerCase()] = val), acc
       ),
       {}
     );
-    let result: ServiceResult = WhitebrickCloud.RESULT_DEFAULT;
+    let result: ServiceResult = errResult();
     if (
       headersLowerCase["x-hasura-role"] &&
       headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
@@ -67,7 +107,7 @@ class WhitebrickCloud {
       process.env.NODE_ENV == "development" &&
       headersLowerCase["x-test-user-id"]
     ) {
-      // log.warn("uid: " + headersLowerCase["x-test-user-id"]);
+      // log.info("uid: " + headersLowerCase["x-test-user-id"]);
       result = await this.userByEmail(headersLowerCase["x-test-user-id"]);
       if (result.success) result.payload = result.payload.id;
     } else if (headersLowerCase["x-hasura-user-id"]) {
@@ -76,12 +116,11 @@ class WhitebrickCloud {
         payload: parseInt(headersLowerCase["x-hasura-user-id"]),
       } as ServiceResult;
     } else {
-      result = {
-        success: false,
+      result = errResult({
         message: `uidFromHeaders: Could not find headers for Admin, Test or User in: ${JSON.stringify(
           headers
         )}`,
-      } as ServiceResult;
+      } as ServiceResult);
     }
     return result;
   }
@@ -102,6 +141,7 @@ class WhitebrickCloud {
    */
 
   public async resetTestData(): Promise<ServiceResult> {
+    log.debug(`resetTestData()`);
     let result = await this.dal.schemas("test_%");
     if (!result.success) return result;
     for (const schema of result.payload) {
@@ -110,7 +150,7 @@ class WhitebrickCloud {
     }
     result = await this.dal.deleteTestOrganizations();
     if (!result.success) return result;
-    result = await this.dal.deleteTestUsers();
+    result = await this.deleteTestUsers();
     return result;
   }
 
@@ -120,20 +160,24 @@ class WhitebrickCloud {
 
   public async auth(
     schemaName: string,
-    authUserId: string,
-    authUserName?: string
+    userAuthId: string
   ): Promise<ServiceResult> {
+    let hasuraUserId: number;
+    let result = await this.dal.userIdFromAuthId(userAuthId);
+    if (!result.success) return result;
+    hasuraUserId = result.payload;
     const randomNumber = Math.floor(Math.random() * 10000);
+    result = await this.dal.rolesForSchemaUser(schemaName, hasuraUserId);
+    if (!result.success) return result;
     return {
       success: true,
       payload: {
-        "x-hasura-allowed-roles": [
+        "X-Hasura-Allowed-Roles": [
+          "wbuser",
           `RANDOM_ROLE_${randomNumber}`,
-          "tr40320",
-          "tr40321",
-        ],
-        "x-hasura-default-role": "tr40321",
-        "x-hasura-user-id": authUserId,
+        ].concat(result.payload),
+        "x-Hasura-Default-Role": "wbuser",
+        "X-Hasura-User-ID": hasuraUserId,
       },
     } as ServiceResult;
   }
@@ -148,6 +192,22 @@ class WhitebrickCloud {
     organizationId?: number
   ): Promise<ServiceResult> {
     return this.dal.organizations(userId, userEmail, organizationId);
+  }
+
+  public async organization(
+    userId?: number,
+    userEmail?: string,
+    organizationId?: number,
+    organizationName?: string
+  ): Promise<ServiceResult> {
+    const result = await this.dal.organizations(
+      userId,
+      userEmail,
+      organizationId,
+      organizationName
+    );
+    if (result.success) result.payload = result.payload[0];
+    return result;
   }
 
   public async organizationsByUserId(userId: number): Promise<ServiceResult> {
@@ -179,7 +239,15 @@ class WhitebrickCloud {
 
   public async organizationById(id: number): Promise<ServiceResult> {
     const result = await this.organizationsByIds([id]);
-    if (result.success) result.payload = result.payload[0];
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_ORGANIZATION_NOT_FOUND",
+          values: [id.toString()],
+        });
+      }
+    }
     return result;
   }
 
@@ -189,7 +257,15 @@ class WhitebrickCloud {
 
   public async organizationByName(name: string): Promise<ServiceResult> {
     const result = await this.organizationsByNames([name]);
-    if (result.success) result.payload = result.payload[0];
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_ORGANIZATION_NOT_FOUND",
+          values: [name],
+        });
+      }
+    }
     return result;
   }
 
@@ -200,19 +276,15 @@ class WhitebrickCloud {
     const result = await this.organizationByName(name);
     if (!result.success) return result;
     if (!result.payload) {
-      return {
-        success: false,
-        message: `Organization with name '${name}' could not be found`,
-        code: "WB_ORGANIZATION_NOT_FOUND",
-        apolloError: "BAD_USER_INPUT",
-      } as ServiceResult;
+      return errResult({
+        wbCode: "WB_ORGANIZATION_NOT_FOUND",
+      } as ServiceResult);
     }
     if (roles && !Role.areRoles(roles)) {
-      return {
-        success: false,
+      return errResult({
         message:
           "organizationUsers: roles contains one or more unrecognized strings",
-      } as ServiceResult;
+      } as ServiceResult);
     }
     return this.dal.organizationUsers(name, roles);
   }
@@ -223,14 +295,13 @@ class WhitebrickCloud {
     label: string
   ): Promise<ServiceResult> {
     const checkNameResult = await this.organizationByName(name);
-    if (!checkNameResult.success) return checkNameResult;
-    if (checkNameResult.payload) {
-      return {
-        success: false,
-        message: `This organization name has already been taken.`,
-        code: "WB_ORGANIZATION_NAME_TAKEN",
-        apolloError: "BAD_USER_INPUT",
-      } as ServiceResult;
+    if (checkNameResult.success) {
+      return errResult({
+        wbCode: "WB_ORGANIZATION_NAME_TAKEN",
+      } as ServiceResult);
+      // WB_ORGANIZATION_NOT_FOUND is the desired result
+    } else if (checkNameResult.wbCode != "WB_ORGANIZATION_NOT_FOUND") {
+      return checkNameResult;
     }
     const createOrgResult = await this.dal.createOrganization(name, label);
     if (!createOrgResult.success) return createOrgResult;
@@ -258,17 +329,15 @@ class WhitebrickCloud {
     ]);
     if (!result.success) return result;
     if (result.payload.length > 0) {
-      return {
-        success: false,
-        message: `Remove all non-administrative users from Organization before deleting.`,
-        code: "WB_ORGANIZATION_NOT_EMPTY",
-        apolloError: "BAD_USER_INPUT",
-      } as ServiceResult;
+      return errResult({
+        wbCode: "WB_ORGANIZATION_NOT_USER_EMPTY",
+      } as ServiceResult);
     }
     return this.dal.deleteOrganization(name);
   }
 
   public async deleteTestOrganizations(): Promise<ServiceResult> {
+    log.debug(`deleteTestOrganizations()`);
     return this.dal.deleteTestOrganizations();
   }
 
@@ -296,12 +365,12 @@ class WhitebrickCloud {
     const usersResult = await this.usersByEmails(userEmails);
     if (!usersResult.success) return usersResult;
     if (usersResult.payload.length != userEmails.length) {
-      return {
-        success: false,
-        message: `setOrganizationUsersRole: missing user(s): ${userEmails.filter(
+      return errResult({
+        wbCode: "WB_USERS_NOT_FOUND",
+        values: userEmails.filter(
           (x: string) => !usersResult.payload.includes(x)
-        )}`,
-      } as ServiceResult;
+        ),
+      } as ServiceResult);
     }
     const organizationResult = await this.organizationByName(organizationName);
     if (!organizationResult.success) return organizationResult;
@@ -331,12 +400,9 @@ class WhitebrickCloud {
       (user: { id: number }) => user.id
     );
     if (allAdminIds.every((elem: number) => userIds.includes(elem))) {
-      return {
-        success: false,
-        message: `You can not remove all Administrators from an Organization - you must leave at least one.`,
-        code: "WB_ORGANIZATION_NO_ADMINS",
-        apolloError: "BAD_USER_INPUT",
-      } as ServiceResult;
+      return errResult({
+        wbCode: "WB_ORGANIZATION_NO_ADMINS",
+      } as ServiceResult);
     }
     const organizationResult = await this.organizationByName(organizationName);
     if (!organizationResult.success) return organizationResult;
@@ -351,6 +417,11 @@ class WhitebrickCloud {
    * Users
    */
 
+  public async deleteTestUsers(): Promise<ServiceResult> {
+    log.debug(`deleteTestUsers()`);
+    return this.dal.deleteTestUsers();
+  }
+
   public async usersByOrganizationId(
     organizationId: number
   ): Promise<ServiceResult> {
@@ -363,7 +434,15 @@ class WhitebrickCloud {
 
   public async userById(id: number): Promise<ServiceResult> {
     const result = await this.usersByIds([id]);
-    if (result.success) result.payload = result.payload[0];
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_USER_NOT_FOUND",
+          values: [id.toString()],
+        });
+      }
+    }
     return result;
   }
 
@@ -373,7 +452,15 @@ class WhitebrickCloud {
 
   public async userByEmail(email: string): Promise<ServiceResult> {
     const result = await this.usersByEmails([email]);
-    if (result.success) result.payload = result.payload[0];
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_USER_NOT_FOUND",
+          values: [email],
+        });
+      }
+    }
     return result;
   }
 
@@ -418,16 +505,9 @@ class WhitebrickCloud {
     userOwnerEmail?: string
   ): Promise<ServiceResult> {
     if (name.startsWith("pg_") || Schema.SYS_SCHEMA_NAMES.includes(name)) {
-      return {
-        success: false,
-        message: `Database name can not begin with 'pg_' or be in the reserved list: ${Schema.SYS_SCHEMA_NAMES.join(
-          ", "
-        )}`,
-        code: "WB_SCHEMA_NAME",
-        apolloError: "BAD_USER_INPUT",
-      } as ServiceResult;
+      return errResult({ wbCode: "WB_BAD_SCHEMA_NAME" } as ServiceResult);
     }
-    let result: ServiceResult = WhitebrickCloud.RESULT_DEFAULT;
+    let result: ServiceResult = errResult();
     // Get the IDs
     if (!organizationOwnerId && !userOwnerId) {
       if (organizationOwnerName) {
@@ -439,14 +519,14 @@ class WhitebrickCloud {
         if (!result.success) return result;
         userOwnerId = result.payload.id;
       } else {
-        return {
-          success: false,
-          message: "createSchema: Owner could not be found",
-        } as ServiceResult;
+        return errResult({
+          message:
+            "createSchema: Either organizationOwnerName or userOwnerEmail required.",
+        } as ServiceResult);
       }
     }
     let userOrgRole: Organization | undefined = undefined;
-    if (!User.isAdmin(uid)) {
+    if (!User.isSysAdmin(uid)) {
       // User must be in the organization for organizationOwner
       if (organizationOwnerId) {
         const orgResult = await this.organizationAccess(
@@ -456,18 +536,18 @@ class WhitebrickCloud {
         if (!orgResult.success) return orgResult;
         userOrgRole = orgResult.payload;
         if (!userOrgRole) {
-          return {
-            success: false,
-            message: `createSchema: User ${uid} must be in Organization ${organizationOwnerId}`,
-          } as ServiceResult;
+          return errResult({
+            wbCode: "WB_USER_NOT_IN_ORG",
+            values: [uid.toString(), organizationOwnerId.toString()],
+          }) as ServiceResult;
         }
         // Only the current user can be the userOwner
       } else if (userOwnerId) {
         if (uid != userOwnerId) {
-          return {
-            success: false,
-            message: `createSchema: The current user ${uid} does not match the userOwnerId ${userOwnerId}`,
-          } as ServiceResult;
+          return errResult({
+            wbCode: "WB_USER_NOT_SCHEMA_OWNER",
+            values: [uid.toString()],
+          }) as ServiceResult;
         }
       }
     }
@@ -481,7 +561,7 @@ class WhitebrickCloud {
     // If owner is organization and user is not an admin of the organization,
     // add admin so they dont lose access
     if (
-      !User.isAdmin(uid) &&
+      !User.isSysAdmin(uid) &&
       organizationOwnerId &&
       userOrgRole &&
       userOrgRole.userRole != "organiation_admin"
@@ -510,10 +590,16 @@ class WhitebrickCloud {
     schemaName: string,
     del: boolean
   ): Promise<ServiceResult> {
-    let result = await this.dal.discoverTables(schemaName);
+    log.debug(`removeOrDeleteSchema(${schemaName},${del})`);
+    let result = await this.addOrRemoveAllExistingRelationships(
+      schemaName,
+      true
+    );
     if (!result.success) return result;
-    for (const tableName of result.payload) {
-      result = await this.removeOrDeleteTable(schemaName, tableName, del);
+    result = await this.dal.tables(schemaName);
+    if (!result.success) return result;
+    for (const table of result.payload) {
+      result = await this.removeOrDeleteTable(schemaName, table.name, del);
       if (!result.success) return result;
     }
     result = await this.dal.removeAllUsersFromSchema(schemaName);
@@ -588,13 +674,18 @@ class WhitebrickCloud {
    * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
    */
 
-  public async tables(schemaName: string): Promise<ServiceResult> {
+  public async tables(
+    schemaName: string,
+    withColumns?: boolean
+  ): Promise<ServiceResult> {
     const result = await this.dal.tables(schemaName);
-    if (!result.success) return result;
-    for (const table of result.payload) {
-      const columnsResult = await this.columns(schemaName, table.name);
-      if (!columnsResult.success) return columnsResult;
-      table.columns = columnsResult.payload;
+    if (withColumns) {
+      if (!result.success) return result;
+      for (const table of result.payload) {
+        const columnsResult = await this.columns(schemaName, table.name);
+        if (!columnsResult.success) return columnsResult;
+        table.columns = columnsResult.payload;
+      }
     }
     return result;
   }
@@ -637,6 +728,9 @@ class WhitebrickCloud {
     tableLabel: string,
     create?: boolean
   ): Promise<ServiceResult> {
+    log.info(
+      `addOrCreateTable(${schemaName},${tableName},${tableLabel},${create})`
+    );
     if (!create) create = false;
     let result = await this.dal.addOrCreateTable(
       schemaName,
@@ -645,7 +739,7 @@ class WhitebrickCloud {
       create
     );
     if (!result.success) return result;
-    return await hasuraApi.trackTable(schemaName, tableName);
+    return await this.trackTableWithPermissions(schemaName, tableName);
   }
 
   public async removeOrDeleteTable(
@@ -654,11 +748,8 @@ class WhitebrickCloud {
     del?: boolean
   ): Promise<ServiceResult> {
     if (!del) del = false;
-    // 1. untrack
-    let result = await hasuraApi.untrackTable(schemaName, tableName);
-    if (!result.success) return result;
-    // 2. remove/delete columns
-    result = await this.dal.columns(schemaName, tableName);
+    // 1. remove/delete columns
+    let result = await this.dal.columns(schemaName, tableName);
     if (!result.success) return result;
     const columns = result.payload;
     for (const column of columns) {
@@ -666,10 +757,13 @@ class WhitebrickCloud {
         schemaName,
         tableName,
         column.name,
-        del
+        del,
+        true
       );
       if (!result.success) return result;
     }
+    result = await this.untrackTableWithPermissions(schemaName, tableName);
+    if (!result.success) return result;
     // 3. remove user settings
     result = await this.dal.removeTableUsers(schemaName, tableName);
     if (!result.success) return result;
@@ -677,19 +771,33 @@ class WhitebrickCloud {
     return await this.dal.removeOrDeleteTable(schemaName, tableName, del);
   }
 
+  // Must enter and exit with tracked table, regardless of if there are columns
   public async removeOrDeleteColumn(
     schemaName: string,
     tableName: string,
     columnName: string,
-    del?: boolean
+    del?: boolean,
+    skipTracking?: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `removeOrDeleteColumn(${schemaName},${tableName},${columnName},${del})`
+    );
     if (!del) del = false;
-    return await this.dal.removeOrDeleteColumn(
+    let result: ServiceResult = errResult();
+    if (!skipTracking) {
+      result = await this.untrackTableWithPermissions(schemaName, tableName);
+      if (!result.success) return result;
+    }
+    result = await this.dal.removeOrDeleteColumn(
       schemaName,
       tableName,
       columnName,
       del
     );
+    if (result.success && !skipTracking) {
+      result = await this.trackTableWithPermissions(schemaName, tableName);
+    }
+    return result;
   }
 
   public async updateTable(
@@ -700,20 +808,15 @@ class WhitebrickCloud {
   ): Promise<ServiceResult> {
     let result: ServiceResult;
     if (newTableName) {
-      result = await this.tables(schemaName);
+      result = await this.tables(schemaName, false);
       if (!result.success) return result;
       const existingTableNames = result.payload.map(
         (table: { name: string }) => table.name
       );
       if (existingTableNames.includes(newTableName)) {
-        return {
-          success: false,
-          message: "The new table name must be unique",
-          code: "WB_TABLE_NAME_EXISTS",
-          apolloError: "BAD_USER_INPUT",
-        } as ServiceResult;
+        return errResult({ wbCode: "WB_TABLE_NAME_EXISTS" } as ServiceResult);
       }
-      result = await hasuraApi.untrackTable(schemaName, tableName);
+      result = await this.untrackTableWithPermissions(schemaName, tableName);
       if (!result.success) return result;
     }
     result = await this.dal.updateTable(
@@ -724,7 +827,7 @@ class WhitebrickCloud {
     );
     if (!result.success) return result;
     if (newTableName) {
-      result = await hasuraApi.trackTable(schemaName, newTableName);
+      result = await this.trackTableWithPermissions(schemaName, newTableName);
       if (!result.success) return result;
     }
     return result;
@@ -744,6 +847,8 @@ class WhitebrickCloud {
         false
       );
       if (!result.success) return result;
+      result = await this.untrackTableWithPermissions(schemaName, tableName);
+      if (!result.success) return result;
       result = await this.dal.discoverColumns(schemaName, tableName);
       if (!result.success) return result;
       const columns = result.payload;
@@ -753,16 +858,21 @@ class WhitebrickCloud {
           tableName,
           column.name,
           v.titleCase(column.name.replaceAll("_", " ")),
-          false
+          false,
+          undefined,
+          true
         );
         if (!result.success) return result;
       }
+      result = await this.trackTableWithPermissions(schemaName, tableName);
+      if (!result.success) return result;
     }
     return result;
   }
 
-  public async addAllExistingRelationships(
-    schemaName: string
+  public async addOrRemoveAllExistingRelationships(
+    schemaName: string,
+    remove?: boolean
   ): Promise<ServiceResult> {
     let result = await this.dal.foreignKeysOrReferences(
       schemaName,
@@ -775,19 +885,29 @@ class WhitebrickCloud {
     if (relationships.length > 0) {
       for (const relationship of relationships) {
         if (relationship.relTableName && relationship.relColumnName) {
-          this.addOrCreateForeignKey(
-            schemaName,
-            relationship.tableName,
-            [relationship.columnName],
-            relationship.relTableName,
-            [relationship.relColumnName]
-          );
+          let result: ServiceResult;
+          if (remove) {
+            result = await this.removeOrDeleteForeignKey(
+              schemaName,
+              relationship.tableName,
+              [relationship.columnName],
+              relationship.relTableName
+            );
+          } else {
+            result = await this.addOrCreateForeignKey(
+              schemaName,
+              relationship.tableName,
+              [relationship.columnName],
+              relationship.relTableName,
+              [relationship.relColumnName]
+            );
+          }
+          if (!result.success) return result;
         } else {
-          return {
-            success: false,
+          return errResult({
             message:
-              "addAllExistingRelationships: ConstraintId must have relTableName and relColumnName",
-          } as ServiceResult;
+              "addOrRemoveAllExistingRelationships: ConstraintId must have relTableName and relColumnName",
+          } as ServiceResult);
         }
       }
     }
@@ -800,10 +920,19 @@ class WhitebrickCloud {
     columnName: string,
     columnLabel: string,
     create?: boolean,
-    columnType?: string
+    columnType?: string,
+    skipTracking?: boolean
   ): Promise<ServiceResult> {
+    log.info(
+      `addOrCreateColumn(${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${skipTracking})`
+    );
     if (!create) create = false;
-    let result = await this.dal.addOrCreateColumn(
+    let result: ServiceResult = errResult();
+    if (!skipTracking) {
+      result = await this.untrackTableWithPermissions(schemaName, tableName);
+      if (!result.success) return result;
+    }
+    result = await this.dal.addOrCreateColumn(
       schemaName,
       tableName,
       columnName,
@@ -811,11 +940,62 @@ class WhitebrickCloud {
       create,
       columnType
     );
+    if (result.success && !skipTracking) {
+      result = await this.trackTableWithPermissions(schemaName, tableName);
+    }
+    return result;
+  }
+
+  public async addDefaultTablePermissions(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    let result = await this.columns(schemaName, tableName);
     if (!result.success) return result;
-    if (create) {
-      result = await hasuraApi.untrackTable(schemaName, tableName);
+    // dont add permissions for tables with no columns
+    if (result.payload.length == 0) return { success: true } as ServiceResult;
+    const columnNames: string[] = result.payload.map(
+      (table: { name: string }) => table.name
+    );
+    let tableResult = await this.dal.tableBySchemaTable(schemaName, tableName);
+    if (!tableResult.success) return result;
+    for (const roleAndType of Role.defaultTablePermissionRoles(
+      tableResult.payload.id
+    )) {
+      result = await hasuraApi.createPermission(
+        schemaName,
+        tableName,
+        roleAndType.role,
+        roleAndType.type,
+        columnNames
+      );
       if (!result.success) return result;
-      result = await hasuraApi.trackTable(schemaName, tableName);
+    }
+    return result;
+  }
+
+  public async removeDefaultTablePermissions(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    // If this table no longer has any columns, there will be no permissions
+    let result = await this.columns(schemaName, tableName);
+    if (!result.success) return result;
+    if (result.payload.length == 0) {
+      return { success: true, payload: true } as ServiceResult;
+    }
+    let tableResult = await this.dal.tableBySchemaTable(schemaName, tableName);
+    if (!tableResult.success) return result;
+    for (const roleAndType of Role.defaultTablePermissionRoles(
+      tableResult.payload.id
+    )) {
+      result = await hasuraApi.dropPermission(
+        schemaName,
+        tableName,
+        roleAndType.role,
+        roleAndType.type
+      );
+      if (!result.success) return result;
     }
     return result;
   }
@@ -828,6 +1008,7 @@ class WhitebrickCloud {
     newColumnLabel?: string,
     newType?: string
   ): Promise<ServiceResult> {
+    // TBD: if this is a fk
     let result: ServiceResult;
     if (newColumnName) {
       result = await this.columns(schemaName, tableName);
@@ -836,16 +1017,11 @@ class WhitebrickCloud {
         (table: { name: string }) => table.name
       );
       if (existingColumnNames.includes(newColumnName)) {
-        return {
-          success: false,
-          message: "The new column name must be unique",
-          code: "WB_COLUMN_NAME_EXISTS",
-          apolloError: "BAD_USER_INPUT",
-        } as ServiceResult;
+        return errResult({ wbCode: "WB_COLUMN_NAME_EXISTS" } as ServiceResult);
       }
     }
     if (newColumnName || newType) {
-      result = await hasuraApi.untrackTable(schemaName, tableName);
+      result = await this.untrackTableWithPermissions(schemaName, tableName);
       if (!result.success) return result;
     }
     result = await this.dal.updateColumn(
@@ -858,7 +1034,7 @@ class WhitebrickCloud {
     );
     if (!result.success) return result;
     if (newColumnName || newType) {
-      result = await hasuraApi.trackTable(schemaName, tableName);
+      result = await this.trackTableWithPermissions(schemaName, tableName);
       if (!result.success) return result;
     }
     return result;
@@ -886,22 +1062,13 @@ class WhitebrickCloud {
       }
     } else {
       if (existingConstraintNames.length > 0) {
-        return {
-          success: false,
-          message: "Remove existing primary key first",
-          code: "WB_PK_EXISTS",
-          apolloError: "BAD_USER_INPUT",
-        } as ServiceResult;
+        return errResult({ wbCode: "WB_PK_EXISTS" } as ServiceResult);
       }
-      result = await hasuraApi.untrackTable(schemaName, tableName);
-      if (!result.success) return result;
       result = await this.dal.createPrimaryKey(
         schemaName,
         tableName,
         columnNames
       );
-      if (!result.success) return result;
-      result = await hasuraApi.trackTable(schemaName, tableName);
     }
     return result;
   }
@@ -966,7 +1133,7 @@ class WhitebrickCloud {
       existingForeignKeys[constraintId.columnName] =
         constraintId.constraintName;
     }
-    // Check for existing foreign keys
+    if (!result.success) return result;
     for (const columnName of columnNames) {
       if (Object.keys(existingForeignKeys).includes(columnName)) {
         if (operation == "REMOVE" || operation == "DELETE") {
@@ -983,19 +1150,15 @@ class WhitebrickCloud {
             );
           }
           return result;
-        } else {
-          return {
-            success: false,
-            message: `Remove existing foreign key on ${columnName} first`,
-            code: "WB_FK_EXISTS",
-            apolloError: "BAD_USER_INPUT",
-          } as ServiceResult;
+        } else if (operation == "CREATE") {
+          return errResult({
+            wbCode: "WB_FK_EXISTS",
+            values: [columnName],
+          } as ServiceResult);
         }
       }
     }
     if (operation == "ADD" || operation == "CREATE") {
-      // result = await hasuraApi.untrackTable(schemaName, tableName);
-      // if (!result.success) return result;
       if (operation == "CREATE") {
         result = await this.dal.createForeignKey(
           schemaName,
@@ -1051,4 +1214,92 @@ class WhitebrickCloud {
       settings
     );
   }
+
+  public async trackTableWithPermissions(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    log.info(`trackTableWithPermissions(${schemaName},${tableName})`);
+    let result = await hasuraApi.trackTable(schemaName, tableName);
+    if (!result.success) return result;
+    return await this.addDefaultTablePermissions(schemaName, tableName);
+  }
+
+  public async untrackTableWithPermissions(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    let result = await this.removeDefaultTablePermissions(
+      schemaName,
+      tableName
+    );
+    if (!result.success) return result;
+    result = await hasuraApi.untrackTable(schemaName, tableName);
+    return result;
+  }
+}
+
+export function errResult(result?: ServiceResult): ServiceResult {
+  if (!result) {
+    return {
+      success: false,
+      message: "Result has not been assigned",
+    } as ServiceResult;
+  }
+  if (result.success == true) {
+    result = {
+      success: false,
+      message:
+        "WhitebrickCloud errResult: result is not an error (success==true)",
+    };
+  } else if (!("success" in result)) {
+    result.success = false;
+  }
+  if (!result.message && result.wbCode) {
+    result.message = WhitebrickCloud.WB_ERROR_CODES[result.wbCode][0];
+    if (!result.message) {
+      result = {
+        success: false,
+        message: `WhitebrickCloud errResult: Could not find message for wbCode=${result.wbCode}`,
+      };
+    }
+  }
+  if (result.values) {
+    result.message = `${result.message} Values: ${result.values.join(", ")}`;
+    delete result.values;
+  }
+  if (
+    !result.apolloErrorCode &&
+    result.wbCode &&
+    Object.keys(WhitebrickCloud.WB_ERROR_CODES).includes(result.wbCode) &&
+    WhitebrickCloud.WB_ERROR_CODES[result.wbCode].length == 2
+  ) {
+    result.apolloErrorCode = WhitebrickCloud.WB_ERROR_CODES[result.wbCode][1];
+  } else if (
+    !result.apolloErrorCode &&
+    result.wbCode &&
+    !Object.keys(WhitebrickCloud.WB_ERROR_CODES).includes(result.wbCode)
+  ) {
+    result = {
+      success: false,
+      message: `WhitebrickCloud err: Could not find apolloErrorCode for wbCode=${result.wbCode}`,
+    };
+  } else {
+    result.apolloErrorCode = "INTERNAL_SERVER_ERROR";
+  }
+  return result;
+}
+
+export function apolloErr(result: ServiceResult): Error {
+  result = errResult(result);
+  if (result.success) {
+    return new Error(
+      "WhitebrickCloud.err: result is not an error (success==true)"
+    );
+  }
+  const details: Record<string, string> = {};
+  if (!result.message) result.message = "Unknown error.";
+  if (result.refCode) details.refCode = result.refCode;
+  if (result.wbCode) details.wbCode = result.wbCode;
+  return new ApolloError(result.message, result.apolloErrorCode, details);
 }

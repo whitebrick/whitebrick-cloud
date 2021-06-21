@@ -13,6 +13,7 @@ export const typeDefs = gql`
     createdAt: String!
     updatedAt: String!
     columns: [Column]!
+    schemaName: String
   }
 
   type Column {
@@ -46,7 +47,7 @@ export const typeDefs = gql`
   }
 
   extend type Query {
-    wbTables(schemaName: String!): [Table]
+    wbTables(schemaName: String!, withColumns: Boolean): [Table]
     wbColumns(schemaName: String!, tableName: String!): [Column]
     wbTableUser(
       userEmail: String!
@@ -130,8 +131,8 @@ export const typeDefs = gql`
 export const resolvers: IResolvers = {
   JSON: GraphQLJSON,
   Query: {
-    wbTables: async (_, { schemaName }, context) => {
-      const result = await context.wbCloud.tables(schemaName);
+    wbTables: async (_, { schemaName, withColumns }, context) => {
+      const result = await context.wbCloud.tables(schemaName, withColumns);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
@@ -198,7 +199,7 @@ export const resolvers: IResolvers = {
       return result.success;
     },
     wbAddAllExistingRelationships: async (_, { schemaName }, context) => {
-      const result = await context.wbCloud.addAllExistingRelationships(
+      const result = await context.wbCloud.addOrRemoveAllExistingRelationships(
         schemaName
       );
       if (!result.success) throw context.wbCloud.err(result);

@@ -21,10 +21,8 @@ function fn() {
 
   config = {
     baseUrl: "http://localhost:3000",
-    endpointPath: "/graphql"
+    endpointPath: "/graphql",
   }
-
-  karate.configure('readTimeout', 60000);
 
   return config;
 }

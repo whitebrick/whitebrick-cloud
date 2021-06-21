@@ -5,11 +5,11 @@ Feature:
     * path endpointPath
     * configure readTimeout = 600000
 
-  Scenario: Add all existing tables
+  Scenario: Add all existing relationships
     Given text query = 
     """
       mutation ($schemaName: String!){
-        wbAddAllExistingTables(schemaName: $schemaName)
+        wbAddAllExistingRelationships(schemaName: $schemaName)
       }
     """
     And def variables = { schemaName: '#(schemaName)'}

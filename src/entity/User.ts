@@ -13,7 +13,7 @@ export class User {
   // not persisted
   role?: string;
 
-  public static isAdmin(uid: number) {
+  public static isSysAdmin(uid: number) {
     return uid == User.HASURA_ADMIN_ID;
   }
 

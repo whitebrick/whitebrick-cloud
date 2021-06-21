@@ -20,6 +20,7 @@ export const typeDefs = gql`
 
   extend type Mutation {
     wbCreateSchema(
+      currentUserEmail: String!
       name: String!
       label: String!
       organizationOwnerId: Int
@@ -45,6 +46,7 @@ export const resolvers: IResolvers = {
     wbCreateSchema: async (
       _,
       {
+        currentUserEmail,
         name,
         label,
         organizationOwnerId,
@@ -54,10 +56,12 @@ export const resolvers: IResolvers = {
       },
       context
     ) => {
-      const uidResult = await context.wbCloud.uidFromHeaders(context.headers);
+      // const uidResult = await context.wbCloud.uidFromHeaders(context.headers);
+      // if (!uidResult.success) return context.wbCloud.err(uidResult);
+      const uidResult = await context.wbCloud.userByEmail(currentUserEmail);
       if (!uidResult.success) return context.wbCloud.err(uidResult);
       const result = await context.wbCloud.createSchema(
-        uidResult.payload,
+        uidResult.payload.id,
         name,
         label,
         organizationOwnerId,

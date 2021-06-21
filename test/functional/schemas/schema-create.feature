@@ -9,14 +9,14 @@ Feature:
   Scenario: Create a schema
     Given text query = 
     """
-      mutation ($name: String!, $label: String!, $organizationOwnerName: String, $userOwnerEmail: String){
-        wbCreateSchema(name: $name, label: $label, organizationOwnerName: $organizationOwnerName, userOwnerEmail: $userOwnerEmail) {
+      mutation ($currentUserEmail: String!, $name: String!, $label: String!, $organizationOwnerName: String, $userOwnerEmail: String){
+        wbCreateSchema(currentUserEmail: $currentUserEmail, name: $name, label: $label, organizationOwnerName: $organizationOwnerName, userOwnerEmail: $userOwnerEmail) {
           name,
           label
         }
       }
     """
-    And def variables = { name: '#(name)', label: '#(label)', organizationOwnerName: '##(organizationOwnerNameChk)', userOwnerEmail: '##(userOwnerEmailChk)'}
+    And def variables = { currentUserEmail: '#(currentUserEmail)', name: '#(name)', label: '#(label)', organizationOwnerName: '##(organizationOwnerNameChk)', userOwnerEmail: '##(userOwnerEmailChk)'}
     # And header X-Test-User-ID = uid
     And header X-Hasura-Role = 'admin'
     And request { query: '#(query)', variables: '#(variables)'} }

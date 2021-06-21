@@ -15,35 +15,32 @@ export type RoleLevel = "organization" | "schema" | "table";
 export class Role {
   static SYSROLES_ORGANIZATIONS: Record<string, Record<string, string>> = {
     organization_administrator: {
-      syscode: "oa",
       label: "Organization Administrator",
     },
-    organization_user: { syscode: "ou", label: "Organization User" },
+    organization_user: { label: "Organization User" },
     organization_external_user: {
-      syscode: "oe",
       label: "Organization External User",
     },
   };
 
   static SYSROLES_SCHEMAS: Record<string, Record<string, string>> = {
-    schema_owner: { syscode: "so", label: "DB Owner" },
-    schema_administrator: { syscode: "sa", label: "DB Administrator" },
-    schema_manager: { syscode: "sm", label: "DB Manager" },
-    schema_editor: { syscode: "se", label: "DB Editor" },
-    schema_reader: { syscode: "sr", label: "DB Reader" },
+    schema_owner: { label: "DB Owner" },
+    schema_administrator: { label: "DB Administrator" },
+    schema_manager: { label: "DB Manager" },
+    schema_editor: { label: "DB Editor" },
+    schema_reader: { label: "DB Reader" },
   };
 
   static SYSROLES_TABLES: Record<string, Record<string, string>> = {
-    table_inherit: { syscode: "ti", label: "Inherit Table Role From DB" },
-    table_administrator: { syscode: "ta", label: "Table Administrator" },
-    table_manager: { syscode: "tm", label: "Table Manager" },
-    table_editor: { syscode: "te", label: "Table Editor" },
-    table_reader: { syscode: "tr", label: "Table Reader" },
+    table_inherit: { label: "Inherit Table Role From DB" },
+    table_administrator: { label: "Table Administrator" },
+    table_manager: { label: "Table Manager" },
+    table_editor: { label: "Table Editor" },
+    table_reader: { label: "Table Reader" },
   };
 
   id!: number;
   name!: string;
-  syscode: string | undefined;
   label!: string;
   createdAt!: Date;
   updatedAt!: Date;
@@ -68,6 +65,20 @@ export class Role {
     return true;
   }
 
+  public static defaultTablePermissionRoles(
+    tableId: number
+  ): Record<string, string>[] {
+    const readOnlyRole: string = `ro${tableId}`;
+    const readWriteRole: string = `rw${tableId}`;
+    return [
+      { role: readOnlyRole, type: "select" } as Record<string, string>,
+      { role: readWriteRole, type: "select" } as Record<string, string>,
+      { role: readWriteRole, type: "insert" } as Record<string, string>,
+      { role: readWriteRole, type: "update" } as Record<string, string>,
+      { role: readWriteRole, type: "delete" } as Record<string, string>,
+    ];
+  }
+
   public static parseResult(data: QueryResult | null): Array<Role> {
     if (!data) throw new Error("Role.parseResult: input is null");
     const roles = Array<Role>();
@@ -82,7 +93,6 @@ export class Role {
     const role = new Role();
     role.id = data.id;
     role.name = data.name;
-    if (data.syscode) role.syscode = data.syscode;
     role.label = data.label;
     role.createdAt = data.created_at;
     role.updatedAt = data.updated_at;

@@ -15,7 +15,14 @@ import { makeExecutableSchema } from "graphql-tools";
 
 export type ServiceResult =
   | { success: true; payload: any; message?: string }
-  | { success: false; message: string; code?: string; apolloError?: string };
+  | {
+      success?: false;
+      message?: string;
+      refCode?: string;
+      wbCode?: string;
+      apolloErrorCode?: string;
+      values?: string[];
+    };
 
 export type QueryParams = {
   query: string;
@@ -38,11 +45,7 @@ const typeDefs = gql`
 
   type Mutation {
     wbResetTestData: Boolean!
-    wbAuth(
-      schemaName: String!
-      authUserId: String!
-      authUserName: String
-    ): JSON!
+    wbAuth(schemaName: String!, userAuthId: String!): JSON!
   }
 `;
 
@@ -64,12 +67,8 @@ const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbAuth: async (_, { schemaName, authUserId, authUserName }, context) => {
-      const result = await context.wbCloud.auth(
-        schemaName,
-        authUserId,
-        authUserName
-      );
+    wbAuth: async (_, { schemaName, userAuthId }, context) => {
+      const result = await context.wbCloud.auth(schemaName, userAuthId);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

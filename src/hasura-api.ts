@@ -1,9 +1,10 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
 import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { Column } from "./entity";
 import { environment } from "./environment";
 import { ServiceResult } from "./types";
-import { log } from "./whitebrick-cloud";
+import { errResult, log } from "./whitebrick-cloud";
 
 const headers: Readonly<Record<string, string | boolean>> = {
   Accept: "application/json",
@@ -12,10 +13,14 @@ const headers: Readonly<Record<string, string | boolean>> = {
 };
 
 class HasuraApi {
+  // uncomment for debugging
   static HASURA_IGNORE_CODES: string[] = [
-    "already-untracked",
-    "already-tracked",
-    "not-exists", // dropping a relationship
+    // "already-untracked",
+    // "already-tracked",
+    // "not-exists", // dropping a relationship
+    // "already-exists",
+    // "unexpected",
+    // "permission-denied",
   ];
   private instance: AxiosInstance | null = null;
 
@@ -35,7 +40,7 @@ class HasuraApi {
   }
 
   private async post(type: string, args: Record<string, any>) {
-    let result: ServiceResult = { success: false } as ServiceResult;
+    let result: ServiceResult = errResult();
     try {
       log.debug(`hasuraApi.post: type: ${type}`, args);
       const response = await this.http.post<any, AxiosResponse>(
@@ -52,26 +57,30 @@ class HasuraApi {
     } catch (error) {
       if (error.response && error.response.data) {
         if (!HasuraApi.HASURA_IGNORE_CODES.includes(error.response.data.code)) {
-          log.error(error.response.data);
-          result = {
-            success: false,
+          log.error(
+            "error.response.data: " + JSON.stringify(error.response.data)
+          );
+          result = errResult({
             message: error.response.data.error,
-            code: error.response.data.code,
-          } as ServiceResult;
+            refCode: error.response.data.code,
+          } as ServiceResult);
         } else {
           result = {
             success: true,
           } as ServiceResult;
         }
       } else {
-        result = {
-          success: false,
+        result = errResult({
           message: error.message,
-        } as ServiceResult;
+        }) as ServiceResult;
       }
     }
     return result;
   }
+
+  /**
+   * Tables
+   */
 
   public async trackTable(schemaName: string, tableName: string) {
     const result = await this.post("pg_track_table", {
@@ -82,13 +91,13 @@ class HasuraApi {
     });
     if (
       !result.success &&
-      result.code &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+      result.refCode &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
     ) {
       return {
         success: true,
         payload: true,
-        message: result.code,
+        message: result.refCode,
       } as ServiceResult;
     }
     return result;
@@ -104,17 +113,21 @@ class HasuraApi {
     });
     if (
       !result.success &&
-      result.code &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+      result.refCode &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
     ) {
       return {
         success: true,
         payload: true,
-        message: result.code,
+        message: result.refCode,
       } as ServiceResult;
     }
     return result;
   }
+
+  /**
+   * Relationships
+   */
 
   // a post has one author (constraint posts.author_id -> authors.id)
   public async createObjectRelationship(
@@ -138,13 +151,13 @@ class HasuraApi {
     });
     if (
       !result.success &&
-      result.code &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+      result.refCode &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
     ) {
       return {
         success: true,
         payload: true,
-        message: result.code,
+        message: result.refCode,
       } as ServiceResult;
     }
     return result;
@@ -178,13 +191,13 @@ class HasuraApi {
     });
     if (
       !result.success &&
-      result.code &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+      result.refCode &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
     ) {
       return {
         success: true,
         payload: true,
-        message: result.code,
+        message: result.refCode,
       } as ServiceResult;
     }
     return result;
@@ -204,8 +217,9 @@ class HasuraApi {
     });
     if (
       !result.success &&
-      (!result.code ||
-        (result.code && !HasuraApi.HASURA_IGNORE_CODES.includes(result.code)))
+      (!result.refCode ||
+        (result.refCode &&
+          !HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)))
     ) {
       return result;
     }
@@ -218,15 +232,57 @@ class HasuraApi {
     });
     if (
       !result.success &&
-      result.code &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.code)
+      result.refCode &&
+      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
     ) {
       return {
         success: true,
         payload: true,
-        message: result.code,
+        message: result.refCode,
       } as ServiceResult;
     }
+    return result;
+  }
+
+  /**
+   * Permissions
+   */
+
+  public async createPermission(
+    schemaName: string,
+    tableName: string,
+    role: string,
+    type: string,
+    columns: string[]
+  ) {
+    const result = await this.post(`pg_create_${type}_permission`, {
+      table: {
+        schema: schemaName,
+        name: tableName,
+      },
+      role: role,
+      permission: {
+        columns: columns,
+        filter: {},
+        check: {},
+      },
+    });
+    return result;
+  }
+
+  public async dropPermission(
+    schemaName: string,
+    tableName: string,
+    role: string,
+    type: string
+  ) {
+    const result = await this.post(`pg_drop_${type}_permission`, {
+      table: {
+        schema: schemaName,
+        name: tableName,
+      },
+      role: role,
+    });
     return result;
   }
 }

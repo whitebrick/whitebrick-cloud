@@ -3,6 +3,8 @@ Feature:
   Background:
     * url baseUrl
     * path endpointPath
+    * configure readTimeout = 600000
+    
   Scenario: Reset test data
     Given text query = 
     """

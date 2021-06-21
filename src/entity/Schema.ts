@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { User, Organization } from ".";
 
 export class Schema {
   static SYS_SCHEMA_NAMES: string[] = [
@@ -33,8 +34,8 @@ export class Schema {
     schema.id = data.id;
     schema.name = data.name;
     schema.label = data.label;
-    schema.organizationOwnerId = data.organizationOwnerId;
-    schema.userOwnerId = data.userOwnerId;
+    schema.organizationOwnerId = data.organization_owner_id;
+    schema.userOwnerId = data.user_owner_id;
     schema.createdAt = data.created_at;
     schema.updatedAt = data.updated_at;
     if (data.user_role) schema.userRole = data.user_role;

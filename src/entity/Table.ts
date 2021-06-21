@@ -10,6 +10,7 @@ export class Table {
   updatedAt!: Date;
   // not persisted
   columns!: [Column];
+  schemaName?: string;
 
   public static parseResult(data: QueryResult | null): Array<Table> {
     if (!data) throw new Error("Table.parseResult: input is null");
@@ -29,6 +30,7 @@ export class Table {
     table.label = data.label;
     table.createdAt = data.created_at;
     table.updatedAt = data.updated_at;
+    if (data.schema_name) table.schemaName = data.schema_name;
     return table;
   }
 }

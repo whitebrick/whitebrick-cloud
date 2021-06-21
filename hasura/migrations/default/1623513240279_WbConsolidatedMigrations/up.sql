@@ -14,6 +14,7 @@ ALTER SEQUENCE wb.organizations_id_seq RESTART WITH 101;
 
 CREATE TABLE IF NOT EXISTS wb.users(
   id BIGSERIAL PRIMARY KEY,
+  auth_id TEXT UNIQUE,
   email TEXT NOT NULL UNIQUE,
   first_name TEXT NOT NULL,
   last_name TEXT NOT NULL,
@@ -21,20 +22,22 @@ CREATE TABLE IF NOT EXISTS wb.users(
   updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc')
 );
 
+CREATE INDEX idx_wb_users_auth_id ON wb.users(auth_id);
 CREATE INDEX idx_wb_users_email ON wb.users(email);
 ALTER SEQUENCE wb.users_id_seq RESTART WITH 20001;
 
 CREATE TABLE IF NOT EXISTS wb.roles (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  syscode VARCHAR(2) UNIQUE,
+  custom BOOLEAN DEFAULT true,
   label TEXT,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
 );
 
 CREATE INDEX idx_wb_roles_name ON wb.roles(name);
-CREATE INDEX idx_wb_roles_syscode ON wb.roles(syscode);
+-- Create a partial index because only a small fraction of the table has the value false
+CREATE INDEX idx_wb_roles_custom ON wb.roles((1)) WHERE wb.roles.custom;
 
 CREATE TABLE IF NOT EXISTS wb.organization_users (
   organization_id INTEGER REFERENCES wb.organizations(id) NOT NULL,

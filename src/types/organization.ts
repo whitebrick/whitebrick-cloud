@@ -14,7 +14,7 @@ export const typeDefs = gql`
   extend type Query {
     wbOrganizations(userEmail: String): [Organization]
     wbOrganizationById(id: ID!): Organization
-    wbOrganizationByName(name: String!): Organization
+    wbOrganizationByName(currentUserEmail: String!, name: String!): Organization
   }
 
   extend type Mutation {
@@ -43,13 +43,18 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbOrganizationById: async (_, { id }, context) => {
-      const result = await context.wbCloud.organizationById(id);
+    wbOrganizationByName: async (_, { currentUserEmail, name }, context) => {
+      const result = await context.wbCloud.organization(
+        undefined,
+        currentUserEmail,
+        undefined,
+        name
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbOrganizationByName: async (_, { name }, context) => {
-      const result = await context.wbCloud.organizationByName(name);
+    wbOrganizationById: async (_, { id }, context) => {
+      const result = await context.wbCloud.organizationById(id);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

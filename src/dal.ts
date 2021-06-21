@@ -1,5 +1,5 @@
 import { environment } from "./environment";
-import { log } from "./whitebrick-cloud";
+import { log, errResult } from "./whitebrick-cloud";
 import { Pool } from "pg";
 import {
   Organization,
@@ -49,7 +49,7 @@ export class DAL {
       for (const queryParams of queriesAndParams) {
         log.debug(
           `dal.executeQuery QueryParams: ${queryParams.query}`,
-          queryParams.params
+          `    [ ${queryParams.params ? queryParams.params.join(", ") : ""} ]`
         );
         const response = await client.query(
           queryParams.query,
@@ -64,11 +64,12 @@ export class DAL {
     } catch (error) {
       await client.query("ROLLBACK");
       log.error(JSON.stringify(error));
-      results.push(<ServiceResult>{
-        success: false,
-        message: error.message,
-        code: "PG_" + error.code,
-      });
+      results.push(
+        errResult({
+          message: error.message,
+          refCode: "PG_" + error.code,
+        } as ServiceResult)
+      );
     } finally {
       client.release();
     }
@@ -82,7 +83,8 @@ export class DAL {
   public async organizations(
     userId?: number,
     userEmail?: string,
-    organizationId?: number
+    organizationId?: number,
+    organizationName?: string
   ): Promise<ServiceResult> {
     const params: (string | number)[] = [];
     let query: string = `
@@ -115,6 +117,11 @@ export class DAL {
         AND wb.organizations.id=$${params.length + 1}
       `;
       params.push(organizationId);
+    } else if (organizationName) {
+      query += `
+        AND wb.organizations.name=$${params.length + 1}
+      `;
+      params.push(organizationName);
     }
     const result = await this.executeQuery({
       query: query,
@@ -144,7 +151,8 @@ export class DAL {
       `,
       params: params,
     } as QueryParams);
-    if (result.success) result.payload = User.parseResult(result.payload);
+    if (result.success)
+      result.payload = Organization.parseResult(result.payload);
     return result;
   }
 
@@ -203,7 +211,7 @@ export class DAL {
       query += `, label=$${params.length}`;
     }
     params.push(name);
-    query += ` WHERE id=$${params.length} RETURNING *`;
+    query += ` WHERE name=$${params.length} RETURNING *`;
     const result = await this.executeQuery({
       query: query,
       params: params,
@@ -296,6 +304,28 @@ export class DAL {
    * Users
    */
 
+  public async userIdFromAuthId(authId: string): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT wb.users.id
+        FROM wb.users
+        WHERE auth_id=$1
+        LIMIT 1
+      `,
+      params: [authId],
+    } as QueryParams);
+    if (result.success) {
+      if (result.payload.rows.length == 0) {
+        return errResult({
+          wbCode: "WB_USER_NOT_FOUND",
+          values: [authId],
+        });
+      }
+      result.payload = result.payload.rows[0].id;
+    }
+    return result;
+  }
+
   public async usersByOrganizationId(
     organizationId: number
   ): Promise<ServiceResult> {
@@ -357,10 +387,9 @@ export class DAL {
     lastName?: string
   ): Promise<ServiceResult> {
     if (!email && !firstName && !lastName) {
-      return {
-        success: false,
+      return errResult({
         message: "dal.updateUser: all parameters are null",
-      } as ServiceResult;
+      } as ServiceResult);
     }
     let paramCount = 3;
     const date = new Date();
@@ -414,7 +443,15 @@ export class DAL {
       `,
       params: [name],
     } as QueryParams);
-    if (result.success) result.payload = Role.parseResult(result.payload)[0];
+    if (result.success) {
+      result.payload = Role.parseResult(result.payload)[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "ROLE_NOT_FOUND",
+          values: [name],
+        });
+      }
+    }
     return result;
   }
 
@@ -425,10 +462,9 @@ export class DAL {
     objectId: number
   ): Promise<ServiceResult> {
     if (!Role.isRole(roleName)) {
-      return {
-        success: false,
+      return errResult({
         message: `${roleName} is not a valid Role`,
-      };
+      });
     }
     const roleResult = await this.roleByName(roleName);
     if (!roleResult.success) return roleResult;
@@ -458,6 +494,27 @@ export class DAL {
       query: query,
       params: [new Date()],
     } as QueryParams);
+  }
+
+  public async rolesForSchemaUser(
+    schemaName: string,
+    userId: number
+  ): Promise<ServiceResult> {
+    let result = await this.executeQuery({
+      query: `
+        SELECT 'rw' || wb.tables.id as permission
+        FROM wb.tables
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        WHERE schemas.name=$1
+      `,
+      params: [schemaName],
+    });
+    if (result.success) {
+      result.payload = result.payload.rows.map(
+        (row: { permission: string }) => row.permission
+      );
+    }
+    return result;
   }
 
   public async userRolesForSchema(
@@ -546,11 +603,10 @@ export class DAL {
       results[0].payload = Schema.parseResult(results[0].payload);
       results[1].payload = Schema.parseResult(results[1].payload);
       if (results[0].payload.length != results[1].payload.length) {
-        return {
-          success: false,
+        return errResult({
           message:
             "dal.schemas: wb.schemas out of sync with information_schema.schemata",
-        } as ServiceResult;
+        } as ServiceResult);
       }
     }
     return results[results.length - 1];
@@ -566,14 +622,12 @@ export class DAL {
       params: [name],
     } as QueryParams);
     if (result.success) {
-      result.payload = Schema.parseResult(result.payload);
-      if (result.payload.length == 0) {
-        return (<ServiceResult>{
-          success: false,
-          message: `dal.schemaByName: Could not find schema where name=${name}`,
-        }) as ServiceResult;
-      } else {
-        result.payload = result.payload[0];
+      result.payload = Schema.parseResult(result.payload)[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_SCHEMA_NOT_FOUND",
+          values: [name],
+        });
       }
     }
     return result;
@@ -582,7 +636,8 @@ export class DAL {
   public async schemasByUserOwner(userEmail: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
-        SELECT wb.schemas.* FROM wb.schemas
+        SELECT wb.schemas.*
+        FROM wb.schemas
         JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
         WHERE wb.users.email=$1
       `,
@@ -655,10 +710,12 @@ export class DAL {
     const result = await this.executeQuery({
       query: `
         INSERT INTO wb.schema_users(
-          schema_id, user_id, role_id
-        ) VALUES($1, $2, $3)
+          schema_id, user_id, role_id, updated_at
+        ) VALUES($1, $2, $3, $4)
+        ON CONFLICT (schema_id, user_id)
+        DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
       `,
-      params: [schemaId, userId, schemaRoleId],
+      params: [schemaId, userId, schemaRoleId, new Date()],
     } as QueryParams);
     return result;
   }
@@ -764,7 +821,15 @@ export class DAL {
     columnName: string
   ): Promise<ServiceResult> {
     const result = await this.columns(schemaName, tableName, columnName);
-    if (result.success) result.payload = result.payload[0];
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "COLUMN_NOT_FOUND",
+          values: [schemaName, tableName, columnName],
+        });
+      }
+    }
     return result;
   }
 
@@ -1005,14 +1070,22 @@ export class DAL {
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
-        SELECT wb.tables.*
+        SELECT wb.tables.*, wb.schemas.name as schema_name
         FROM wb.tables
         JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
         WHERE wb.schemas.name=$1 AND wb.tables.name=$2 LIMIT 1
       `,
       params: [schemaName, tableName],
     } as QueryParams);
-    if (result.success) result.payload = Table.parseResult(result.payload)[0];
+    if (result.success) {
+      result.payload = Table.parseResult(result.payload)[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_TABLE_NOT_FOUND",
+          values: [schemaName, tableName],
+        });
+      }
+    }
     return result;
   }
 
@@ -1280,6 +1353,12 @@ export class DAL {
     } as QueryParams);
     if (result.success) {
       result.payload = TableUser.parseResult(result.payload)[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_TABLE_USER_NOT_FOUND",
+          values: [userEmail, schemaName, tableName],
+        });
+      }
     }
     return result;
   }
