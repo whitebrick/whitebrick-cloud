@@ -9,9 +9,11 @@ export const typeDefs = gql`
     label: String!
     organizationOwnerId: Int
     userOwnerId: Int
-    userRole: String
     createdAt: String!
     updatedAt: String!
+    userRole: String
+    organizationOwnerName: String
+    userOwnerEmail: String
   }
 
   extend type Query {

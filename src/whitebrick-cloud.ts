@@ -166,18 +166,14 @@ class WhitebrickCloud {
     let result = await this.dal.userIdFromAuthId(userAuthId);
     if (!result.success) return result;
     hasuraUserId = result.payload;
-    const randomNumber = Math.floor(Math.random() * 10000);
-    result = await this.dal.rolesForSchemaUser(schemaName, hasuraUserId);
-    if (!result.success) return result;
     return {
       success: true,
       payload: {
-        "X-Hasura-Allowed-Roles": [
-          "wbuser",
-          `RANDOM_ROLE_${randomNumber}`,
-        ].concat(result.payload),
+        "X-Hasura-Allowed-Roles": ["wbuser"],
         "x-Hasura-Default-Role": "wbuser",
-        "X-Hasura-User-ID": hasuraUserId,
+        "X-Hasura-User-Id": hasuraUserId,
+        "x-Hasura-Schema-Name": schemaName,
+        "x-Hasura-Authenticated-At": Date().toString(),
       },
     } as ServiceResult;
   }
@@ -191,6 +187,18 @@ class WhitebrickCloud {
     userEmail?: string,
     organizationId?: number
   ): Promise<ServiceResult> {
+    // this.addDefaultTablePermissions("test_the_daisy_blog", "authors");
+    let result = await this.dal.tableBySchemaTable(
+      "test_the_daisy_blog",
+      "authors"
+    );
+    if (!result.success) return result;
+    // result = await this.addDefaultTableUsersToTable(result.payload);
+    // if (!result.success) return result;
+
+    result = await this.setTablePermissions(result.payload);
+    if (!result.success) return result;
+
     return this.dal.organizations(userId, userEmail, organizationId);
   }
 
@@ -490,6 +498,20 @@ class WhitebrickCloud {
     return this.dal.roleByName(name);
   }
 
+  public async setTablePermissions(table: Table): Promise<ServiceResult> {
+    // TBD move this to SYS_ROLES_TABLE
+    const tableRoleToPermissionPrefixesMap: Record<string, string[]> = {
+      table_administrator: ["s", "i", "u", "d"],
+      table_manager: ["s", "i", "u", "d"],
+      table_editor: ["s", "i", "u", "d"],
+      table_reader: ["s"],
+    };
+    return await this.dal.setTablePermissions(
+      table.id,
+      tableRoleToPermissionPrefixesMap
+    );
+  }
+
   /**
    * Schemas
    * TBD: validate name ~ [a-z]{1}[_a-z0-9]{2,}
@@ -739,6 +761,7 @@ class WhitebrickCloud {
       create
     );
     if (!result.success) return result;
+    result = await this.addDefaultTableUsersToTable(result.payload);
     return await this.trackTableWithPermissions(schemaName, tableName);
   }
 
@@ -959,14 +982,15 @@ class WhitebrickCloud {
     );
     let tableResult = await this.dal.tableBySchemaTable(schemaName, tableName);
     if (!tableResult.success) return result;
-    for (const roleAndType of Role.defaultTablePermissionRoles(
+    for (const permissionCheckAndType of Role.hasuraTablePermissionChecksAndTypes(
       tableResult.payload.id
     )) {
       result = await hasuraApi.createPermission(
         schemaName,
         tableName,
-        roleAndType.role,
-        roleAndType.type,
+        permissionCheckAndType.permissionCheck,
+        permissionCheckAndType.permissionType,
+        "wbuser",
         columnNames
       );
       if (!result.success) return result;
@@ -986,14 +1010,14 @@ class WhitebrickCloud {
     }
     let tableResult = await this.dal.tableBySchemaTable(schemaName, tableName);
     if (!tableResult.success) return result;
-    for (const roleAndType of Role.defaultTablePermissionRoles(
+    for (const permissionKeyAndType of Role.tablePermissionKeysAndTypes(
       tableResult.payload.id
     )) {
-      result = await hasuraApi.dropPermission(
+      result = await hasuraApi.deletePermission(
         schemaName,
         tableName,
-        roleAndType.role,
-        roleAndType.type
+        permissionKeyAndType.type,
+        "wbuser"
       );
       if (!result.success) return result;
     }
@@ -1187,12 +1211,36 @@ class WhitebrickCloud {
     return result;
   }
 
+  /**
+   *
+   * Table Users
+   *
+   */
+
   public async tableUser(
     userEmail: string,
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
     return this.dal.tableUser(userEmail, schemaName, tableName);
+  }
+
+  public async addDefaultTableUsersToTable(
+    table: Table
+  ): Promise<ServiceResult> {
+    // tables inherit all schema permissions
+    const schemaToTableRoleMap: Record<string, string> = {
+      schema_owner: "table_administrator",
+      schema_administrator: "table_administrator",
+      schema_manager: "table_manager",
+      schema_editor: "table_editor",
+      schema_reader: "table_reader",
+    };
+    return await this.dal.inheritAllTableUsersFromSchema(
+      table.schemaId,
+      table.id,
+      schemaToTableRoleMap
+    );
   }
 
   public async saveTableUserSettings(

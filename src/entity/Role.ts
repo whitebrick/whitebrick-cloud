@@ -65,18 +65,66 @@ export class Role {
     return true;
   }
 
-  public static defaultTablePermissionRoles(
+  // eg {
+  // permissionKey: s1234, type: "select"
+  // permissionKey: i1234, type: "insert"
+  // permissionKey: u1234, type: "update"
+  // permissionKey: d1234, type: "delete"
+  // }
+  public static tablePermissionKeysAndTypes(
     tableId: number
   ): Record<string, string>[] {
-    const readOnlyRole: string = `ro${tableId}`;
-    const readWriteRole: string = `rw${tableId}`;
-    return [
-      { role: readOnlyRole, type: "select" } as Record<string, string>,
-      { role: readWriteRole, type: "select" } as Record<string, string>,
-      { role: readWriteRole, type: "insert" } as Record<string, string>,
-      { role: readWriteRole, type: "update" } as Record<string, string>,
-      { role: readWriteRole, type: "delete" } as Record<string, string>,
-    ];
+    const PERMISSION_PREFIXES_TYPES: Record<string, string> = {
+      s: "select",
+      i: "insert",
+      u: "update",
+      d: "delete",
+    };
+    const permissionKeysAndTypes: Record<string, string>[] = [];
+    for (const prefix of Object.keys(PERMISSION_PREFIXES_TYPES)) {
+      permissionKeysAndTypes.push({
+        permissionKey: Role.tablePermissionKey(prefix, tableId),
+        type: PERMISSION_PREFIXES_TYPES[prefix],
+      });
+    }
+    return permissionKeysAndTypes;
+  }
+
+  public static tablePermissionKey(
+    permissionPrefix: string,
+    tableId: number
+  ): string {
+    return `${permissionPrefix}${tableId}`;
+  }
+
+  // Used to generate the Hasura table permission
+  public static hasuraTablePermissionChecksAndTypes(
+    tableId: number
+  ): Record<string, any>[] {
+    const hasuraPermissionsAndTypes: Record<string, any>[] = [];
+    for (const permissionKeysAndType of Role.tablePermissionKeysAndTypes(
+      tableId
+    )) {
+      hasuraPermissionsAndTypes.push({
+        permissionCheck: {
+          _exists: {
+            _table: { schema: "wb", name: "table_permissions" },
+            _where: {
+              _and: [
+                {
+                  table_permission_key: {
+                    _eq: permissionKeysAndType.permissionKey,
+                  },
+                },
+                { user_id: { _eq: "X-Hasura-User-Id" } },
+              ],
+            },
+          },
+        },
+        permissionType: permissionKeysAndType.type,
+      });
+    }
+    return hasuraPermissionsAndTypes;
   }
 
   public static parseResult(data: QueryResult | null): Array<Role> {

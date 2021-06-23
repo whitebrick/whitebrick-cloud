@@ -251,11 +251,12 @@ class HasuraApi {
   public async createPermission(
     schemaName: string,
     tableName: string,
-    role: string,
+    permissionCheck: object,
     type: string,
+    role: string,
     columns: string[]
   ) {
-    const result = await this.post(`pg_create_${type}_permission`, {
+    const payload: Record<string, any> = {
       table: {
         schema: schemaName,
         name: tableName,
@@ -263,18 +264,25 @@ class HasuraApi {
       role: role,
       permission: {
         columns: columns,
-        filter: {},
-        check: {},
+        // filter: permissionCheck,
+        // check: permissionCheck,
       },
-    });
+    };
+    // https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/permission.html
+    if (type == "insert") {
+      payload.permission.check = permissionCheck;
+    } else {
+      payload.permission.filter = permissionCheck;
+    }
+    const result = await this.post(`pg_create_${type}_permission`, payload);
     return result;
   }
 
-  public async dropPermission(
+  public async deletePermission(
     schemaName: string,
     tableName: string,
-    role: string,
-    type: string
+    type: string,
+    role: string
   ) {
     const result = await this.post(`pg_drop_${type}_permission`, {
       table: {

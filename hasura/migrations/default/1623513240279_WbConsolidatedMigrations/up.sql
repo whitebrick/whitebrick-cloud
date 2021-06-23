@@ -29,7 +29,7 @@ ALTER SEQUENCE wb.users_id_seq RESTART WITH 20001;
 CREATE TABLE IF NOT EXISTS wb.roles (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  custom BOOLEAN DEFAULT true,
+  custom BOOLEAN DEFAULT false,
   label TEXT,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now())
@@ -92,6 +92,17 @@ CREATE TABLE IF NOT EXISTS wb.table_users(
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   PRIMARY KEY (table_id, user_id)
 );
+
+CREATE TABLE IF NOT EXISTS wb.table_permissions(
+  table_permission_key TEXT NOT NULL,
+  user_id BIGINT REFERENCES wb.users(id) NOT NULL,
+  table_id BIGINT REFERENCES wb.tables(id) NOT NULL,
+  created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+  updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
+  PRIMARY KEY (table_permission_key, user_id)
+);
+
+CREATE INDEX idx_wb_table_permissions_table_permission_key ON wb.table_permissions(table_permission_key);
 
 CREATE TABLE IF NOT EXISTS wb.columns(
   id BIGSERIAL PRIMARY KEY,

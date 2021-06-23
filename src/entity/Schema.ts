@@ -18,6 +18,8 @@ export class Schema {
   updatedAt!: Date;
   // not persisted
   userRole?: string;
+  organizationOwnerName?: string;
+  userOwnerEmail?: string;
 
   public static parseResult(data: QueryResult | null): Array<Schema> {
     if (!data) throw new Error("Schema.parseResult: input is null");
@@ -39,6 +41,10 @@ export class Schema {
     schema.createdAt = data.created_at;
     schema.updatedAt = data.updated_at;
     if (data.user_role) schema.userRole = data.user_role;
+    if (data.organization_owner_name) {
+      schema.organizationOwnerName = data.organization_owner_name;
+    }
+    if (data.user_owner_email) schema.userOwnerEmail = data.user_owner_email;
     return schema;
   }
 }
