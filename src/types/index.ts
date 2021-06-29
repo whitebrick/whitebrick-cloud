@@ -6,12 +6,13 @@ import {
 import { typeDefs as User, resolvers as userResolvers } from "./user";
 import { typeDefs as Table, resolvers as tableResolvers } from "./table";
 import { merge } from "lodash";
-import { gql, ApolloError, IResolvers } from "apollo-server-lambda";
+import { gql, IResolvers } from "apollo-server-lambda";
 import {
   constraintDirective,
   constraintDirectiveTypeDefs,
 } from "graphql-constraint-directive";
 import { makeExecutableSchema } from "graphql-tools";
+import { log } from "../whitebrick-cloud";
 
 export type ServiceResult =
   | { success: true; payload: any; message?: string }

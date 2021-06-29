@@ -1,5 +1,10 @@
 import { gql, IResolvers } from "apollo-server-lambda";
-import { ApolloError } from "apollo-server-lambda";
+import { log } from "../whitebrick-cloud";
+
+/**
+ * Only fields related to an isolated user or role objects live here
+ * For organization-users, schema-users, table-users see respective classes
+ */
 
 export const typeDefs = gql`
   type User {
@@ -13,13 +18,18 @@ export const typeDefs = gql`
   }
 
   extend type Query {
-    wbOrganizationUsers(name: String!, roles: [String]): [User]
+    """
+    Users
+    """
     wbUsersByOrganizationId(organizationId: ID!): [User]
     wbUserById(id: ID!): User
     wbUserByEmail(email: String!): User
   }
 
   extend type Mutation {
+    """
+    Users
+    """
     wbCreateUser(email: String!, firstName: String, lastName: String): User
     wbUpdateUser(
       id: ID!
@@ -27,36 +37,12 @@ export const typeDefs = gql`
       firstName: String
       lastName: String
     ): User
-    """
-    Organization-User-Roles
-    """
-    wbSetOrganizationUsersRole(
-      organizationName: String!
-      userEmails: [String]!
-      role: String!
-    ): Boolean
-    wbRemoveUsersFromOrganization(
-      userEmails: [String]!
-      organizationName: String!
-    ): Boolean
-    """
-    Schema-User-Roles
-    """
-    wbAddUserToSchema(
-      schemaName: String!
-      userEmail: String!
-      schemaRole: String!
-    ): User
   }
 `;
 
 export const resolvers: IResolvers = {
   Query: {
-    wbOrganizationUsers: async (_, { name, roles }, context) => {
-      const result = await context.wbCloud.organizationUsers(name, roles);
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.payload;
-    },
+    // Users
     wbUsersByOrganizationId: async (_, { organizationId }, context) => {
       const result = await context.wbCloud.usersByOrganizationId(
         organizationId
@@ -92,46 +78,6 @@ export const resolvers: IResolvers = {
         email,
         firstName,
         lastName
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.payload;
-    },
-    // Organization-User-Roles
-    wbSetOrganizationUsersRole: async (
-      _,
-      { organizationName, userEmails, role },
-      context
-    ) => {
-      const result = await context.wbCloud.setOrganizationUsersRole(
-        organizationName,
-        userEmails,
-        role
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
-    },
-    wbRemoveUsersFromOrganization: async (
-      _,
-      { userEmails, organizationName },
-      context
-    ) => {
-      const result = await context.wbCloud.removeUsersFromOrganization(
-        userEmails,
-        organizationName
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
-    },
-    // Organization-Schema-Roles
-    wbAddUserToSchema: async (
-      _,
-      { schemaName, userEmail, schemaRole },
-      context
-    ) => {
-      const result = await context.wbCloud.addUserToSchema(
-        schemaName,
-        userEmail,
-        schemaRole
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;

@@ -5,15 +5,15 @@ Feature: Add a user to a schema
     * path endpointPath
 
   
-  Scenario: Add a user to a schema
+  Scenario: Remove a user from a schema
     Given text query = 
     """
-      mutation ($schemaName: String!, $userEmails: [String]!, $role: String!){
-        wbSetSchemaUsersRole(schemaName: $schemaName, userEmails: $userEmails, role: $role)
+      mutation ($schemaName: String!, $userEmails: [String]!){
+        wbRemoveSchemaUsers(schemaName: $schemaName, userEmails: $userEmails)
       }
     """
     # Given def query = read('test.gql')
-    And def variables = { schemaName: '#(schemaName)', userEmails: '#(userEmails)', role: '#(role)' }
+    And def variables = { schemaName: '#(schemaName)', userEmails: '#(userEmails)'}
     And request { query: '#(query)', variables: '#(variables)' }
     When method POST
     Then status 200

@@ -10,6 +10,7 @@ type Environment = {
   dbPoolConnectionTimeoutMillis: number;
   hasuraHost: string;
   hasuraAdminSecret: string;
+  testIgnoreErrors: boolean;
 };
 
 export const environment: Environment = {
@@ -28,4 +29,5 @@ export const environment: Environment = {
   ) as number,
   hasuraHost: process.env.HASURA_HOST as string,
   hasuraAdminSecret: process.env.HASURA_ADMIN_SECRET as string,
+  testIgnoreErrors: (process.env.TEST_IGNORE_ERRORS || false) as boolean,
 };

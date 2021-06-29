@@ -1,5 +1,5 @@
 import { gql, IResolvers } from "apollo-server-lambda";
-import { ApolloError } from "apollo-server-lambda";
+import { log } from "../whitebrick-cloud";
 
 export const typeDefs = gql`
   type Organization {
@@ -12,12 +12,22 @@ export const typeDefs = gql`
   }
 
   extend type Query {
+    """
+    Organizations
+    """
     wbOrganizations(userEmail: String): [Organization]
     wbOrganizationById(id: ID!): Organization
     wbOrganizationByName(currentUserEmail: String!, name: String!): Organization
+    """
+    Organization Users
+    """
+    wbOrganizationUsers(name: String!, roles: [String]): [User]
   }
 
   extend type Mutation {
+    """
+    Organizations
+    """
     wbCreateOrganization(
       currentUserEmail: String!
       name: String!
@@ -29,11 +39,24 @@ export const typeDefs = gql`
       newLabel: String
     ): Organization
     wbDeleteOrganization(name: String!): Boolean
+    """
+    Organization Users
+    """
+    wbSetOrganizationUsersRole(
+      organizationName: String!
+      userEmails: [String]!
+      role: String!
+    ): Boolean
+    wbRemoveUsersFromOrganization(
+      userEmails: [String]!
+      organizationName: String!
+    ): Boolean
   }
 `;
 
 export const resolvers: IResolvers = {
   Query: {
+    // Organizations
     wbOrganizations: async (_, { userEmail }, context) => {
       const result = await context.wbCloud.organizations(
         undefined,
@@ -58,8 +81,15 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
+    // Organization Users
+    wbOrganizationUsers: async (_, { name, roles }, context) => {
+      const result = await context.wbCloud.organizationUsers(name, roles);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
   },
   Mutation: {
+    // Organizations
     wbCreateOrganization: async (
       _,
       { currentUserEmail, name, label },
@@ -84,6 +114,32 @@ export const resolvers: IResolvers = {
     },
     wbDeleteOrganization: async (_, { name }, context) => {
       const result = await context.wbCloud.deleteOrganization(name);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    // Organization Users
+    wbSetOrganizationUsersRole: async (
+      _,
+      { organizationName, userEmails, role },
+      context
+    ) => {
+      const result = await context.wbCloud.setOrganizationUsersRole(
+        organizationName,
+        userEmails,
+        role
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbRemoveUsersFromOrganization: async (
+      _,
+      { userEmails, organizationName },
+      context
+    ) => {
+      const result = await context.wbCloud.removeUsersFromOrganization(
+        userEmails,
+        organizationName
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },

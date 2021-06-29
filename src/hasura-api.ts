@@ -13,15 +13,16 @@ const headers: Readonly<Record<string, string | boolean>> = {
 };
 
 class HasuraApi {
-  // uncomment for debugging
+  static IGNORE_ERRORS = false;
   static HASURA_IGNORE_CODES: string[] = [
-    // "already-untracked",
-    // "already-tracked",
-    // "not-exists", // dropping a relationship
-    // "already-exists",
-    // "unexpected",
-    // "permission-denied",
+    "already-untracked",
+    "already-tracked",
+    "not-exists", // dropping a relationship
+    "already-exists",
+    "unexpected",
+    "permission-denied",
   ];
+
   private instance: AxiosInstance | null = null;
 
   private get http(): AxiosInstance {
@@ -37,6 +38,14 @@ class HasuraApi {
 
     this.instance = http;
     return http;
+  }
+
+  private static errIgnore() {
+    if (this.IGNORE_ERRORS || environment.testIgnoreErrors) {
+      return this.HASURA_IGNORE_CODES;
+    } else {
+      return [];
+    }
   }
 
   private async post(type: string, args: Record<string, any>) {
@@ -56,7 +65,7 @@ class HasuraApi {
       } as ServiceResult;
     } catch (error) {
       if (error.response && error.response.data) {
-        if (!HasuraApi.HASURA_IGNORE_CODES.includes(error.response.data.code)) {
+        if (!HasuraApi.errIgnore().includes(error.response.data.code)) {
           log.error(
             "error.response.data: " + JSON.stringify(error.response.data)
           );
@@ -92,7 +101,7 @@ class HasuraApi {
     if (
       !result.success &&
       result.refCode &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
+      HasuraApi.errIgnore().includes(result.refCode)
     ) {
       return {
         success: true,
@@ -114,7 +123,7 @@ class HasuraApi {
     if (
       !result.success &&
       result.refCode &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
+      HasuraApi.errIgnore().includes(result.refCode)
     ) {
       return {
         success: true,
@@ -152,7 +161,7 @@ class HasuraApi {
     if (
       !result.success &&
       result.refCode &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
+      HasuraApi.errIgnore().includes(result.refCode)
     ) {
       return {
         success: true,
@@ -192,7 +201,7 @@ class HasuraApi {
     if (
       !result.success &&
       result.refCode &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
+      HasuraApi.errIgnore().includes(result.refCode)
     ) {
       return {
         success: true,
@@ -218,8 +227,7 @@ class HasuraApi {
     if (
       !result.success &&
       (!result.refCode ||
-        (result.refCode &&
-          !HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)))
+        (result.refCode && !HasuraApi.errIgnore().includes(result.refCode)))
     ) {
       return result;
     }
@@ -233,7 +241,7 @@ class HasuraApi {
     if (
       !result.success &&
       result.refCode &&
-      HasuraApi.HASURA_IGNORE_CODES.includes(result.refCode)
+      HasuraApi.errIgnore().includes(result.refCode)
     ) {
       return {
         success: true,

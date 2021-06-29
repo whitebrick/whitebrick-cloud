@@ -7,6 +7,8 @@ export class TableUser {
   settings!: object;
   createdAt!: Date;
   updatedAt!: Date;
+  // not persisted
+  role?: string;
 
   public static parseResult(data: QueryResult | null): Array<TableUser> {
     if (!data) throw new Error("TableUser.parseResult: input is null");
@@ -26,6 +28,7 @@ export class TableUser {
     tableUser.settings = data.settings;
     tableUser.createdAt = data.created_at;
     tableUser.updatedAt = data.updated_at;
+    if (data.role) tableUser.role = data.role;
     return tableUser;
   }
 }

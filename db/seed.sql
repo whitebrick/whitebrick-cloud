@@ -11,7 +11,6 @@ INSERT INTO wb.roles(name, custom, label) VALUES
   ('schema_manager',             false, 'DB Manager'),
   ('schema_editor',              false, 'DB Editor'),
   ('schema_reader',              false, 'DB Reader'),
-  ('table_inherit',              false, 'Inherit Table Role From DB'),
   ('table_administrator',        false, 'Table Administrator'),
   ('table_manager',              false, 'Table Manager'),
   ('table_editor',               false, 'Table Editor'),

@@ -41,22 +41,35 @@ export const typeDefs = gql`
     tableId: Int!
     userId: Int!
     roleId: Int!
+    role: String
     settings: JSON
     createdAt: String!
     updatedAt: String!
   }
 
   extend type Query {
+    """
+    Tables
+    """
     wbTables(schemaName: String!, withColumns: Boolean): [Table]
-    wbColumns(schemaName: String!, tableName: String!): [Column]
+    """
+    Table Users
+    """
     wbTableUser(
       userEmail: String!
       schemaName: String!
       tableName: String!
     ): TableUser
+    """
+    Columns
+    """
+    wbColumns(schemaName: String!, tableName: String!): [Column]
   }
 
   extend type Mutation {
+    """
+    Tables
+    """
     wbAddOrCreateTable(
       schemaName: String!
       tableName: String!
@@ -75,6 +88,46 @@ export const typeDefs = gql`
       del: Boolean
     ): Boolean!
     wbAddAllExistingTables(schemaName: String!): Boolean!
+    wbAddAllExistingRelationships(schemaName: String!): Boolean!
+    wbCreateOrDeletePrimaryKey(
+      schemaName: String!
+      tableName: String!
+      columnNames: [String]!
+      del: Boolean
+    ): Boolean!
+    wbAddOrCreateForeignKey(
+      schemaName: String!
+      tableName: String!
+      columnNames: [String]!
+      parentTableName: String!
+      parentColumnNames: [String]!
+      create: Boolean
+    ): Boolean!
+    wbRemoveOrDeleteForeignKey(
+      schemaName: String!
+      tableName: String!
+      columnNames: [String]!
+      parentTableName: String!
+      del: Boolean
+    ): Boolean!
+    """
+    Table Users
+    """
+    wbSetTableUsersRole(
+      schemaName: String!
+      tableName: String!
+      userEmails: [String]!
+      role: String!
+    ): Boolean
+    wbSaveTableUserSettings(
+      userEmail: String!
+      schemaName: String!
+      tableName: String!
+      settings: JSON!
+    ): Boolean!
+    """
+    Columns
+    """
     wbAddOrCreateColumn(
       schemaName: String!
       tableName: String!
@@ -97,50 +150,19 @@ export const typeDefs = gql`
       columnName: String!
       del: Boolean
     ): Boolean!
-    wbCreateOrDeletePrimaryKey(
-      schemaName: String!
-      tableName: String!
-      columnNames: [String]!
-      del: Boolean
-    ): Boolean!
-    wbAddOrCreateForeignKey(
-      schemaName: String!
-      tableName: String!
-      columnNames: [String]!
-      parentTableName: String!
-      parentColumnNames: [String]!
-      create: Boolean
-    ): Boolean!
-    wbRemoveOrDeleteForeignKey(
-      schemaName: String!
-      tableName: String!
-      columnNames: [String]!
-      parentTableName: String!
-      del: Boolean
-    ): Boolean!
-    wbSaveTableUserSettings(
-      userEmail: String!
-      schemaName: String!
-      tableName: String!
-      settings: JSON!
-    ): Boolean!
-    wbAddAllExistingRelationships(schemaName: String!): Boolean!
   }
 `;
 
 export const resolvers: IResolvers = {
   JSON: GraphQLJSON,
   Query: {
+    // Tables
     wbTables: async (_, { schemaName, withColumns }, context) => {
       const result = await context.wbCloud.tables(schemaName, withColumns);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbColumns: async (_, { schemaName, tableName }, context) => {
-      const result = await context.wbCloud.columns(schemaName, tableName);
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.payload;
-    },
+    // Table Users
     wbTableUser: async (_, { schemaName, tableName, userEmail }, context) => {
       const result = await context.wbCloud.tableUser(
         userEmail,
@@ -150,8 +172,15 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
+    // Columns
+    wbColumns: async (_, { schemaName, tableName }, context) => {
+      const result = await context.wbCloud.columns(schemaName, tableName);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
   },
   Mutation: {
+    // Tables
     wbAddOrCreateTable: async (
       _,
       { schemaName, tableName, tableLabel, create },
@@ -201,59 +230,6 @@ export const resolvers: IResolvers = {
     wbAddAllExistingRelationships: async (_, { schemaName }, context) => {
       const result = await context.wbCloud.addOrRemoveAllExistingRelationships(
         schemaName
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
-    },
-    wbAddOrCreateColumn: async (
-      _,
-      { schemaName, tableName, columnName, columnLabel, create, columnType },
-      context
-    ) => {
-      const result = await context.wbCloud.addOrCreateColumn(
-        schemaName,
-        tableName,
-        columnName,
-        columnLabel,
-        create,
-        columnType
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
-    },
-    wbUpdateColumn: async (
-      _,
-      {
-        schemaName,
-        tableName,
-        columnName,
-        newColumnName,
-        newColumnLabel,
-        newType,
-      },
-      context
-    ) => {
-      const result = await context.wbCloud.updateColumn(
-        schemaName,
-        tableName,
-        columnName,
-        newColumnName,
-        newColumnLabel,
-        newType
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
-    },
-    wbRemoveOrDeleteColumn: async (
-      _,
-      { schemaName, tableName, columnName, del },
-      context
-    ) => {
-      const result = await context.wbCloud.removeOrDeleteColumn(
-        schemaName,
-        tableName,
-        columnName,
-        del
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
@@ -313,6 +289,75 @@ export const resolvers: IResolvers = {
         columnNames,
         parentTableName,
         del
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    // Columns
+    wbAddOrCreateColumn: async (
+      _,
+      { schemaName, tableName, columnName, columnLabel, create, columnType },
+      context
+    ) => {
+      const result = await context.wbCloud.addOrCreateColumn(
+        schemaName,
+        tableName,
+        columnName,
+        columnLabel,
+        create,
+        columnType
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbUpdateColumn: async (
+      _,
+      {
+        schemaName,
+        tableName,
+        columnName,
+        newColumnName,
+        newColumnLabel,
+        newType,
+      },
+      context
+    ) => {
+      const result = await context.wbCloud.updateColumn(
+        schemaName,
+        tableName,
+        columnName,
+        newColumnName,
+        newColumnLabel,
+        newType
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbRemoveOrDeleteColumn: async (
+      _,
+      { schemaName, tableName, columnName, del },
+      context
+    ) => {
+      const result = await context.wbCloud.removeOrDeleteColumn(
+        schemaName,
+        tableName,
+        columnName,
+        del
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    // Table Users
+    wbSetTableUsersRole: async (
+      _,
+      { schemaName, tableName, userEmails, role },
+      context
+    ) => {
+      const result = await context.wbCloud.setTableUsersRole(
+        schemaName,
+        tableName,
+        userEmails,
+        role
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

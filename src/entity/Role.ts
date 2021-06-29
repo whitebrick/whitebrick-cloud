@@ -23,7 +23,7 @@ export class Role {
     },
   };
 
-  static SYSROLES_SCHEMAS: Record<string, Record<string, string>> = {
+  static SYSROLES_SCHEMAS: Record<string, Record<string, any>> = {
     schema_owner: { label: "DB Owner" },
     schema_administrator: { label: "DB Administrator" },
     schema_manager: { label: "DB Manager" },
@@ -31,12 +31,31 @@ export class Role {
     schema_reader: { label: "DB Reader" },
   };
 
-  static SYSROLES_TABLES: Record<string, Record<string, string>> = {
-    table_inherit: { label: "Inherit Table Role From DB" },
-    table_administrator: { label: "Table Administrator" },
-    table_manager: { label: "Table Manager" },
-    table_editor: { label: "Table Editor" },
-    table_reader: { label: "Table Reader" },
+  static SYSROLES_TABLES: Record<string, Record<string, any>> = {
+    table_administrator: {
+      label: "Table Administrator",
+      permissionPrefixes: ["s", "i", "u", "d"],
+    },
+    table_manager: {
+      label: "Table Manager",
+      permissionPrefixes: ["s", "i", "u", "d"],
+    },
+    table_editor: {
+      label: "Table Editor",
+      permissionPrefixes: ["s", "i", "u", "d"],
+    },
+    table_reader: {
+      label: "Table Reader",
+      permissionPrefixes: ["s"],
+    },
+  };
+
+  static SCHEMA_TO_TABLE_ROLE_MAP: Record<string, string> = {
+    schema_owner: "table_administrator",
+    schema_administrator: "table_administrator",
+    schema_manager: "table_manager",
+    schema_editor: "table_editor",
+    schema_reader: "table_reader",
   };
 
   id!: number;
@@ -50,12 +69,21 @@ export class Role {
   tableId?: number;
   tableName?: string;
 
-  public static isRole(roleName: string): boolean {
-    return (
-      Object.keys(Role.SYSROLES_ORGANIZATIONS).includes(roleName) ||
-      Object.keys(Role.SYSROLES_SCHEMAS).includes(roleName) ||
-      Object.keys(Role.SYSROLES_TABLES).includes(roleName)
-    );
+  public static isRole(roleName: string, roleLevel?: RoleLevel): boolean {
+    switch (roleLevel) {
+      case "organization":
+        return Object.keys(Role.SYSROLES_ORGANIZATIONS).includes(roleName);
+      case "schema":
+        return Object.keys(Role.SYSROLES_SCHEMAS).includes(roleName);
+      case "table":
+        return Object.keys(Role.SYSROLES_TABLES).includes(roleName);
+      default:
+        return (
+          Object.keys(Role.SYSROLES_ORGANIZATIONS).includes(roleName) ||
+          Object.keys(Role.SYSROLES_SCHEMAS).includes(roleName) ||
+          Object.keys(Role.SYSROLES_TABLES).includes(roleName)
+        );
+    }
   }
 
   public static areRoles(roleNames: string[]): boolean {
