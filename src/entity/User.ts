@@ -1,21 +1,16 @@
 import { QueryResult } from "pg";
+import { userMessages } from "../environment";
 
 export class User {
-  static HASURA_ADMIN_ID: number = 1;
+  static SYS_ADMIN_ID: number = 1;
+  static PUBLIC_ID: number = 1;
 
   id!: number;
-  organization_id!: number;
   email!: string;
   firstName?: string;
   lastName?: string;
   createdAt!: Date;
   updatedAt!: Date;
-  // not persisted
-  role?: string;
-
-  public static isSysAdmin(uid: number) {
-    return uid == User.HASURA_ADMIN_ID;
-  }
 
   public static parseResult(data: QueryResult | null): Array<User> {
     if (!data) throw new Error("User.parseResult: input is null");
@@ -35,7 +30,30 @@ export class User {
     if (data.last_name) user.lastName = data.last_name;
     user.createdAt = data.created_at;
     user.updatedAt = data.updated_at;
-    if (data.role) user.role = data.role;
+    return user;
+  }
+
+  public static getSysAdminUser(): User {
+    const date: Date = new Date();
+    const user: User = new User();
+    user.id = User.SYS_ADMIN_ID;
+    user.email = "SYS_ADMIN@example.com";
+    user.firstName = "SYS Admin";
+    user.lastName = "SYS Admin";
+    user.createdAt = date;
+    user.updatedAt = date;
+    return user;
+  }
+
+  public static getPublicUser(): User {
+    const date: Date = new Date();
+    const user: User = new User();
+    user.id = User.PUBLIC_ID;
+    user.email = "PUBLIC@example.com";
+    user.firstName = "Public User";
+    user.lastName = "Public User";
+    user.createdAt = date;
+    user.updatedAt = date;
     return user;
   }
 }

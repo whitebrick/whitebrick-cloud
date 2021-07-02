@@ -6,6 +6,7 @@ import {
   User,
   Role,
   Schema,
+  SchemaUser,
   Table,
   Column,
   TableUser,
@@ -179,7 +180,7 @@ export class DAL {
     userIds: number[],
     roleLevel: RoleLevel,
     objectId?: number,
-    parentObjectId?: number // eg removing table_users from table.schema_id
+    parentObjectId?: number
   ): Promise<ServiceResult> {
     const params: (number | number[] | undefined)[] = [userIds];
     let wbTable: string = "";
@@ -192,8 +193,18 @@ export class DAL {
         break;
       case "schema" as RoleLevel:
         wbTable = "wb.schema_users";
-        wbWhere = "AND schema_id=$2";
-        params.push(objectId);
+        if (objectId) {
+          wbWhere = "AND schema_id=$2";
+          params.push(objectId);
+        } else if (parentObjectId) {
+          wbWhere = `
+            AND schema_id IN (
+              SELECT id FROM wb.schemas
+              WHERE organization_owner_id=$2
+            )
+          `;
+          params.push(parentObjectId);
+        }
         break;
       case "table" as RoleLevel:
         wbTable = "wb.table_users";
@@ -382,47 +393,30 @@ export class DAL {
    */
 
   public async organizations(
-    userId?: number,
-    userEmail?: string,
-    organizationId?: number,
-    organizationName?: string
+    organizationIds?: number[],
+    organizationNames?: string[],
+    organizationNamePattern?: string
   ): Promise<ServiceResult> {
-    const params: (string | number)[] = [];
+    const params: (string[] | number[] | string)[] = [];
     let query: string = `
       SELECT wb.organizations.*
       FROM wb.organizations
-      WHERE true
     `;
-    if (userId || userEmail) {
-      query = `
-        SELECT wb.organizations.*, wb.roles.name as user_role
-        FROM wb.organizations
-        JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
-        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
-      `;
-      if (userId) {
-        query += `
-          WHERE wb.organization_users.user_id=$1
-        `;
-        params.push(userId);
-      } else if (userEmail) {
-        query += `
-          JOIN wb.users ON wb.organization_users.user_id=wb.users.id
-          WHERE users.email=$1
-        `;
-        params.push(userEmail);
-      }
-    }
-    if (organizationId) {
+    if (organizationIds) {
       query += `
-        AND wb.organizations.id=$${params.length + 1}
+        WHERE wb.organizations.id=ANY($1)
       `;
-      params.push(organizationId);
-    } else if (organizationName) {
+      params.push(organizationIds);
+    } else if (organizationNames) {
       query += `
-        AND wb.organizations.name=$${params.length + 1}
+        WHERE wb.organizations.name=ANY($1)
       `;
-      params.push(organizationName);
+      params.push(organizationNames);
+    } else if (organizationNamePattern) {
+      query += `
+        WHERE wb.organizations.name LIKE $1
+      `;
+      params.push(organizationNamePattern);
     }
     const result = await this.executeQuery({
       query: query,
@@ -434,26 +428,35 @@ export class DAL {
     return result;
   }
 
-  public async organizationsByIdsOrNames(
-    ids?: number[],
-    names?: string[]
+  public async organizationsByUsers(
+    userIds?: number[],
+    userEmails?: string[]
   ): Promise<ServiceResult> {
-    let column = "id";
-    let params: any[] = [ids];
-    if (names) {
-      column = "name";
-      params = [names];
+    const params: (number[] | string[])[] = [];
+    let sqlWhere: string = "";
+    if (userIds) {
+      sqlWhere = "WHERE wb.users.id=ANY($1)";
+      params.push(userIds);
+    } else if (userEmails) {
+      sqlWhere = "WHERE wb.users.email=ANY($1)";
+      params.push(userEmails);
     }
     const result = await this.executeQuery({
       query: `
-        SELECT wb.organizations.*
+        SELECT
+        wb.organizations.*,
+        wb.roles.name as user_role,
         FROM wb.organizations
-        WHERE ${column}=ANY($1)
+        JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
+        JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+        ${sqlWhere}
       `,
       params: params,
     } as QueryParams);
-    if (result.success)
+    if (result.success) {
       result.payload = Organization.parseResult(result.payload);
+    }
     return result;
   }
 
@@ -538,36 +541,37 @@ export class DAL {
    */
 
   public async organizationUsers(
-    name: string,
+    name?: string,
+    id?: number,
     roles?: string[]
   ): Promise<ServiceResult> {
-    let query = `
-      SELECT wb.users.*, wb.roles.name as role
-      FROM wb.users
-      JOIN wb.organization_users ON wb.users.id=wb.organization_users.user_id
-      JOIN wb.organizations ON wb.organizations.id=wb.organization_users.organization_id
-      JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
-      WHERE wb.organizations.name=$1
-    `;
-    if (roles) query += `AND wb.roles.name IN ('${roles.join("','")}')`;
-    const result = await this.executeQuery({
-      query: query,
-      params: [name],
-    } as QueryParams);
-    if (result.success) result.payload = User.parseResult(result.payload);
-    return result;
-  }
-
-  public async usersByOrganizationId(
-    organizationId: number
-  ): Promise<ServiceResult> {
+    let sqlWhere: string = "";
+    const params: (string | number | string[])[] = [];
+    if (id) {
+      sqlWhere = "WHERE wb.organization_users.organization_id=$1";
+      params.push(id);
+    } else if (name) {
+      sqlWhere = "WHERE wb.organizations.name=$1";
+      params.push(name);
+    }
+    if (roles) {
+      sqlWhere += " AND wb.roles.name=ANY($2)";
+      params.push(roles);
+    }
     const result = await this.executeQuery({
       query: `
-        SELECT wb.users.*
-        FROM wb.users
-        WHERE organization_id=$1
+        SELECT
+        wb.organization_users.*,
+        wb.organizations.name as organization_name,
+        wb.users.email as user_email,
+        wb.roles.name as role
+        FROM wb.organization_users
+        JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+        JOIN wb.organizations ON wb.organization_users.organization_id=wb.organizations.id
+        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+        ${sqlWhere}
       `,
-      params: [organizationId],
+      params: params,
     } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload);
     return result;
@@ -576,6 +580,188 @@ export class DAL {
   /**
    * ========== Schemas ==========
    */
+
+  public async schemas(
+    schemaIds?: number[],
+    schemaNames?: string[],
+    schemaNamePattern?: string
+  ): Promise<ServiceResult> {
+    const pgParams: (string[] | number[] | string)[] = [
+      Schema.SYS_SCHEMA_NAMES,
+    ];
+    const wbParams: (string[] | number[] | string)[] = [];
+    let sqlPgWhere: string = "";
+    let sqlWbWhere: string = "";
+    if (schemaIds) {
+      sqlWbWhere = "WHERE id=ANY($1)";
+      wbParams.push(schemaIds);
+    } else if (schemaNames) {
+      sqlPgWhere = "AND schema_name=ANY($2)";
+      pgParams.push(schemaNames);
+      sqlWbWhere = "WHERE name=ANY($1)";
+      wbParams.push(schemaNames);
+    } else if (schemaNamePattern) {
+      sqlPgWhere = "AND schema_name LIKE $2";
+      pgParams.push(schemaNamePattern);
+      sqlWbWhere = "WHERE name LIKE $1";
+      wbParams.push(schemaNamePattern);
+    }
+    const results = await this.executeQueries([
+      {
+        query: `
+          SELECT information_schema.schemata.*
+          FROM information_schema.schemata
+          WHERE schema_name NOT LIKE 'pg_%'
+          AND schema_name!=ANY($1)
+          ${sqlPgWhere}
+        `,
+        params: pgParams,
+      } as QueryParams,
+      {
+        query: `
+          SELECT wb.schemas.*
+          FROM wb.schemas
+          ${sqlWbWhere}
+        `,
+        params: wbParams,
+      } as QueryParams,
+    ]);
+    if (results[0].success && results[1].success) {
+      if (results[0].payload.rows.length != results[1].payload.rows.length) {
+        return errResult({
+          message:
+            "dal.schemas: wb.schemas out of sync with information_schema.schemata",
+        } as ServiceResult);
+      } else {
+        results[1].payload = Schema.parseResult(results[1].payload);
+      }
+    }
+    return results[1];
+  }
+
+  public async schemasByUsers(
+    userIds?: number[],
+    userEmails?: string[]
+  ): Promise<ServiceResult> {
+    const params: (number[] | string[])[] = [];
+    let sqlWhere: string = "";
+    if (userIds) {
+      sqlWhere = "WHERE wb.users.id=ANY($1)";
+      params.push(userIds);
+    } else if (userEmails) {
+      sqlWhere = "WHERE wb.users.email=ANY($1)";
+      params.push(userEmails);
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT
+        wb.schemas.*,
+        wb.roles.name as user_role,
+        wb.organizations.name as organization_owner_name,
+        user_owners.email as user_owner_email
+        FROM wb.schemas
+        JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
+        JOIN wb.users ON wb.schema_users.user_id=wb.users.id
+        JOIN wb.roles ON wb.schema_users.role_id=wb.roles.id
+        LEFT JOIN wb.users user_owners ON wb.schemas.user_owner_id=user_owners.id
+        LEFT JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
+        ${sqlWhere}
+      `,
+      params: params,
+    } as QueryParams);
+    if (result.success) result.payload = Schema.parseResult(result.payload);
+    return result;
+  }
+
+  public async schemasByUserOwner(
+    userId?: number,
+    userEmail?: string
+  ): Promise<ServiceResult> {
+    const params: (number | string)[] = [];
+    let sqlWhere: string = "";
+    if (userId) {
+      sqlWhere = "WHERE wb.users.id=$1";
+      params.push(userId);
+    } else if (userEmail) {
+      sqlWhere = "WHERE wb.users.email=$1";
+      params.push(userEmail);
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT
+        wb.schemas.*,
+        wb.users.email as user_owner_email,
+        'schema_owner' as user_role
+        FROM wb.schemas
+        JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
+        ${sqlWhere}
+      `,
+      params: params,
+    } as QueryParams);
+    if (result.success) result.payload = Schema.parseResult(result.payload);
+    return result;
+  }
+
+  public async schemasByOrganizationOwner(
+    organizationId?: number,
+    organizationName?: string
+  ): Promise<ServiceResult> {
+    const params: (number | string)[] = [];
+    let sqlWhere: string = "";
+    if (organizationId) {
+      sqlWhere = "WHERE wb.organizations.id=$1";
+      params.push(organizationId);
+    } else if (organizationName) {
+      sqlWhere = "WHERE wb.organizations.name=$1";
+      params.push(organizationName);
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT
+        wb.schemas.*,
+        wb.organizations.name as organization_owner_name
+        FROM wb.schemas
+        JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
+        ${sqlWhere}
+      `,
+      params: params,
+    } as QueryParams);
+    if (result.success) result.payload = Schema.parseResult(result.payload);
+    return result;
+  }
+
+  public async schemasByOrganizationOwnerAdmin(
+    userId?: number,
+    userEmail?: string
+  ): Promise<ServiceResult> {
+    const params: (number | string)[] = [];
+    let sqlWhere: string = "";
+    if (userId) {
+      sqlWhere = "AND wb.users.id=$1";
+      params.push(userId);
+    } else if (userEmail) {
+      sqlWhere = "AND wb.users.email=$1";
+      params.push(userEmail);
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT
+        wb.schemas.*,
+        wb.organizations.name as organization_owner_name
+        wb.roles.name as user_role,
+        FROM wb.schemas
+        JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
+        JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
+        JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+        WHERE wb.roles.name='organization_administrator'
+        ${sqlWhere}
+      `,
+      params: params,
+    } as QueryParams);
+    if (result.success) result.payload = Schema.parseResult(result.payload);
+    return result;
+  }
 
   public async createSchema(
     name: string,
@@ -601,132 +787,6 @@ export class DAL {
       insertResult.payload = Schema.parseResult(insertResult.payload)[0];
     }
     return insertResult;
-  }
-
-  public async schemas(schemaNamePattern?: string): Promise<ServiceResult> {
-    if (!schemaNamePattern) schemaNamePattern = "%";
-    schemaNamePattern = DAL.sanitize(schemaNamePattern);
-    const results = await this.executeQueries([
-      {
-        query: `
-          SELECT information_schema.schemata.*
-          FROM information_schema.schemata
-          WHERE schema_name LIKE $1
-          AND schema_name NOT LIKE 'pg_%'
-          AND schema_name NOT IN ('${Schema.SYS_SCHEMA_NAMES.join("','")}')
-        `,
-        params: [schemaNamePattern],
-      } as QueryParams,
-      {
-        query: `
-          SELECT wb.schemas.*
-          FROM wb.schemas
-          WHERE name LIKE $1
-        `,
-        params: [schemaNamePattern],
-      } as QueryParams,
-    ]);
-    if (results[0].success && results[1].success) {
-      results[0].payload = Schema.parseResult(results[0].payload);
-      results[1].payload = Schema.parseResult(results[1].payload);
-      if (results[0].payload.length != results[1].payload.length) {
-        return errResult({
-          message:
-            "dal.schemas: wb.schemas out of sync with information_schema.schemata",
-        } as ServiceResult);
-      }
-    }
-    return results[results.length - 1];
-  }
-
-  public async schemaByName(name: string): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT wb.schemas.*
-        FROM wb.schemas
-        WHERE name=$1 LIMIT 1
-      `,
-      params: [name],
-    } as QueryParams);
-    if (result.success) {
-      result.payload = Schema.parseResult(result.payload)[0];
-      if (!result.payload) {
-        return errResult({
-          wbCode: "WB_SCHEMA_NOT_FOUND",
-          values: [name],
-        });
-      }
-    }
-    return result;
-  }
-
-  public async schemasByUserOwner(userEmail: string): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT wb.schemas.*, wb.users.email as user_owner_email
-        FROM wb.schemas
-        JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
-        WHERE wb.users.email=$1
-      `,
-      params: [userEmail],
-    } as QueryParams);
-    if (result.success) {
-      // TBD: map this instead
-      const schemasWithRole = Array<Schema>();
-      for (const schema of Schema.parseResult(result.payload)) {
-        schema.userRole = "schema_owner";
-        schemasWithRole.push(schema);
-      }
-      result.payload = schemasWithRole;
-    }
-    return result;
-  }
-
-  public async schemasByOrgOwnerAdmin(
-    userEmail: string
-  ): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT wb.schemas.*, wb.roles.name as user_role, wb.organizations.name as organization_owner_name
-        FROM wb.schemas
-        JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
-        JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
-        JOIN wb.users ON wb.organization_users.user_id=wb.users.id
-        JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
-        WHERE wb.roles.name='organization_administrator' AND wb.users.email=$1
-      `,
-      params: [userEmail],
-    } as QueryParams);
-    if (result.success) result.payload = Schema.parseResult(result.payload);
-    return result;
-  }
-
-  public async schemasByUser(userEmail: string): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        SELECT wb.schemas.*, wb.roles.name as role_name, wb.organizations.name as organization_owner_name, user_owners.email as user_owner_email
-        FROM wb.schemas
-        JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
-        JOIN wb.users ON wb.schema_users.user_id=wb.users.id
-        JOIN wb.roles ON wb.schema_users.role_id=wb.roles.id
-        LEFT JOIN wb.users user_owners ON wb.schemas.user_owner_id=wb.users.id
-        LEFT JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
-        WHERE wb.users.email=$1
-      `,
-      params: [userEmail],
-    } as QueryParams);
-    if (result.success) {
-      // TBD: map this instead
-      const schemasWithRole = Array<Schema>();
-      let schema: Schema;
-      result.payload.rows.forEach((row: any) => {
-        schema = Schema.parse(row);
-        schema.userRole = row.role_name;
-        schemasWithRole.push(schema);
-      });
-      result.payload = schemasWithRole;
-    }
-    return result;
   }
 
   public async removeOrDeleteSchema(
@@ -757,20 +817,41 @@ export class DAL {
    * ========== Schema Users ==========
    */
 
-  public async userRolesForSchema(
-    schemaId: number,
-    userId: number
+  public async schemaUsers(
+    schemaName: string,
+    userIds?: number[]
   ): Promise<ServiceResult> {
-    let result = await this.executeQuery({
+    const params: (string | number[])[] = [schemaName];
+    let whereSql = "";
+    if (userIds) {
+      whereSql = "AND wb.schema_users.user_id=ANY($2)";
+      params.push(userIds);
+    }
+    const result = await this.executeQuery({
       query: `
-        SELECT wb.roles.*
-        FROM wb.roles
-        JOIN wb.schema_users ON wb.roles.id=wb.schema_users.role_id
-        WHERE wb.schema_users.schema_id=$1 AND wb.schema_users.user_id=$2
+        SELECT
+        wb.schema_users.*,
+        wb.schemas.name as schema_name,
+        wb.users.email as user_email,
+        wb.roles.name as role
+        FROM wb.schema_users
+        JOIN wb.schemas ON wb.schema_users.schema_id=wb.schemas.id
+        JOIN wb.users ON wb.schema_users.user_id=wb.users.id
+        JOIN wb.roles ON wb.schema_users.role_id=wb.roles.id
+        WHERE wb.schemas.name=$1
+        ${whereSql}
       `,
-      params: [schemaId, userId],
+      params: params,
     } as QueryParams);
-    if (result.success) result.payload = Role.parseResult(result.payload);
+    if (result.success) {
+      result.payload = SchemaUser.parseResult(result.payload);
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_SCHEMA_USERS_NOT_FOUND",
+          values: [schemaName],
+        });
+      }
+    }
     return result;
   }
 
@@ -1045,7 +1126,7 @@ export class DAL {
     );
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
-    let result = await this.schemaByName(schemaName);
+    let result = await this.schemas(undefined, [schemaName]);
     if (!result.success) return result;
     const queriesAndParams: Array<QueryParams> = [
       {
@@ -1053,7 +1134,7 @@ export class DAL {
         INSERT INTO wb.tables(schema_id, name, label)
         VALUES ($1, $2, $3) RETURNING *
       `,
-        params: [result.payload.id, tableName, tableLabel],
+        params: [result.payload[0].id, tableName, tableLabel],
       } as QueryParams,
     ];
     if (create) {
@@ -1078,7 +1159,7 @@ export class DAL {
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
-    let result = await this.schemaByName(schemaName);
+    let result = await this.schemas(undefined, [schemaName]);
     if (!result.success) return result;
     const queriesAndParams: Array<QueryParams> = [
       {
@@ -1086,7 +1167,7 @@ export class DAL {
           DELETE FROM wb.tables
           WHERE schema_id=$1 AND name=$2
         `,
-        params: [result.payload.id, tableName],
+        params: [result.payload[0].id, tableName],
       } as QueryParams,
     ];
     if (del) {
@@ -1149,34 +1230,120 @@ export class DAL {
    * ========== Table Users ==========
    */
 
-  public async tableUser(
-    userEmail: string,
+  public async tableUsers(
     schemaName: string,
-    tableName: string
+    tableName: string,
+    userIds?: number[]
   ): Promise<ServiceResult> {
+    const params: (string | number[])[] = [schemaName, tableName];
+    let whereSql = "";
+    if (userIds) {
+      whereSql = "AND wb.table_users.user_id=ANY($3)";
+      params.push(userIds);
+    }
     const result = await this.executeQuery({
       query: `
-        SELECT wb.table_users.*, wb.roles.name as role
+        SELECT
+        wb.table_users.*,
+        wb.schemas.name as schema_name,
+        wb.tables.name as table_name,
+        wb.users.email as user_email,
+        wb.roles.name as role
         FROM wb.table_users
         JOIN wb.tables ON wb.table_users.table_id=wb.tables.id
         JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
         JOIN wb.users ON wb.table_users.user_id=wb.users.id
         JOIN wb.roles ON wb.table_users.role_id=wb.roles.id
-        WHERE wb.users.email=$1 AND wb.schemas.name=$2 AND wb.tables.name=$3
-        LIMIT 1
+        WHERE wb.schemas.name=$1 AND wb.tables.name=$2
+        ${whereSql}
       `,
-      params: [userEmail, schemaName, tableName],
+      params: params,
     } as QueryParams);
     if (result.success) {
-      result.payload = TableUser.parseResult(result.payload)[0];
+      result.payload = TableUser.parseResult(result.payload);
       if (!result.payload) {
         return errResult({
-          wbCode: "WB_TABLE_USER_NOT_FOUND",
-          values: [userEmail, schemaName, tableName],
+          wbCode: "WB_TABLE_USERS_NOT_FOUND",
+          values: [schemaName, tableName],
         });
       }
     }
     return result;
+  }
+
+  // if !tableIds all tables for schema
+  // if !userIds all schema_users
+  public async setSchemaUserRolesFromOrganizationRoles(
+    organizationId: number,
+    roleMap: Record<string, string>, // eg { schema_owner: "table_administrator" }
+    clearExisting?: boolean,
+    schemaIds?: number[],
+    userIds?: number[]
+  ): Promise<ServiceResult> {
+    log.debug(
+      `setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${clearExisting}, ${schemaIds}, ${userIds})`
+    );
+    let result = await this.rolesIdLookup();
+    if (!result.success) return result;
+    let whereSchemasSql = "";
+    let whereUsersSql = "";
+    let whereSchemaUsersSql = "";
+    let onConflictSql = "";
+    if (schemaIds && schemaIds.length > 0) {
+      whereSchemasSql = `AND wb.schemas.id IN (${schemaIds.join(",")})`;
+    }
+    if (userIds && userIds.length > 0) {
+      whereSchemaUsersSql = `
+        AND wb.schema_users.user_id IN (${userIds.join(",")})
+      `;
+      whereUsersSql = `AND wb.users.id IN (${userIds.join(",")})`;
+    }
+    const rolesIdLookup = result.payload;
+    const queryParams: QueryParams[] = [];
+    const date = new Date();
+    if (clearExisting) {
+      queryParams.push({
+        query: `
+          DELETE FROM wb.schema_users
+          WHERE
+            wb.schema_users.schema_id IN (
+              SELECT id FROM wb.schemas
+              WHERE wb.schemas.organization_owner_id=$1
+              ${whereSchemasSql}
+            )
+            ${whereSchemaUsersSql}
+        `,
+        params: [organizationId],
+      });
+    } else {
+      onConflictSql = `
+        ON CONFLICT (schema_id, user_id)
+        DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
+      `;
+    }
+    for (const organizationRole of Object.keys(roleMap)) {
+      queryParams.push({
+        query: `
+          INSERT INTO wb.schema_users(schema_id, user_id, role_id, implied_from_role_id, updated_at)
+          SELECT
+          wb.schemas.id,
+          user_id,
+          ${rolesIdLookup[roleMap[organizationRole]]},
+          ${rolesIdLookup[organizationRole]},
+          $1
+          FROM wb.organization_users
+          JOIN wb.schemas ON wb.schemas.organization_owner_id=wb.organization_users.organization_id
+          JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+          WHERE wb.organization_users.organization_id=$2 AND wb.organization_users.role_id=$3
+          ${whereSchemasSql}
+          ${whereUsersSql}
+          ${onConflictSql}
+        `,
+        params: [date, organizationId, rolesIdLookup[organizationRole]],
+      } as QueryParams);
+    }
+    const results = await this.executeQueries(queryParams);
+    return results[results.length - 1];
   }
 
   // if !tableIds all tables for schema
@@ -1189,7 +1356,7 @@ export class DAL {
     userIds?: number[]
   ): Promise<ServiceResult> {
     log.debug(
-      `setTableUserRolesFromSchemaRoles(${schemaId}, <roleMap>, ${tableIds}, ${userIds})`
+      `setTableUserRolesFromSchemaRoles(${schemaId}, <roleMap>, ${clearExisting}, ${tableIds}, ${userIds})`
     );
     let result = await this.rolesIdLookup();
     if (!result.success) return result;
@@ -1229,33 +1396,15 @@ export class DAL {
         DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
       `;
     }
-    // Schema owner (if owned by user)
-    queryParams.push({
-      query: `
-        INSERT INTO wb.table_users(table_id, user_id, role_id, updated_at)
-        SELECT
-        wb.tables.id,
-        user_owner_id,
-        ${rolesIdLookup[roleMap["schema_owner"]]},
-        $1
-        FROM wb.schemas
-        JOIN wb.tables ON wb.schemas.id=wb.tables.schema_id
-        JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
-        WHERE wb.schemas.id=$2
-        ${whereTablesSql}
-        ${whereUsersSql}
-        ${onConflictSql}
-      `,
-      params: [date, schemaId],
-    } as QueryParams);
-    // All other schema roles
     for (const schemaRole of Object.keys(roleMap)) {
       queryParams.push({
         query: `
-          INSERT INTO wb.table_users(table_id, user_id, role_id, updated_at)
+          INSERT INTO wb.table_users(table_id, user_id, role_id, implied_from_role_id, updated_at)
           SELECT
           wb.tables.id,
-          user_id, ${rolesIdLookup[roleMap[schemaRole]]},
+          user_id,
+          ${rolesIdLookup[roleMap[schemaRole]]},
+          ${rolesIdLookup[schemaRole]},
           $1
           FROM wb.schema_users
           JOIN wb.schemas ON wb.schema_users.schema_id=wb.schemas.id

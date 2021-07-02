@@ -1,4 +1,5 @@
 import { gql, IResolvers } from "apollo-server-lambda";
+import { CurrentUser } from "../entity/CurrentUser";
 import { log } from "../whitebrick-cloud";
 
 export const typeDefs = gql`
@@ -7,6 +8,19 @@ export const typeDefs = gql`
     name: String!
     label: String!
     userRole: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type OrganizationUser {
+    organizationId: Int!
+    userId: Int!
+    roleId: Int!
+    impliedFromRoleId: Int
+    organizationName: String
+    userEmail: String
+    role: String
+    settings: JSON
     createdAt: String!
     updatedAt: String!
   }
@@ -21,7 +35,10 @@ export const typeDefs = gql`
     """
     Organization Users
     """
-    wbOrganizationUsers(name: String!, roles: [String]): [User]
+    wbOrganizationUsers(
+      organizationName: String!
+      roles: [String]
+    ): [OrganizationUser]
   }
 
   extend type Mutation {
@@ -57,22 +74,14 @@ export const typeDefs = gql`
 export const resolvers: IResolvers = {
   Query: {
     // Organizations
-    wbOrganizations: async (_, { userEmail }, context) => {
-      const result = await context.wbCloud.organizations(
-        undefined,
-        userEmail,
-        undefined
-      );
+    wbOrganizations: async (_, __, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.accessibleOrganizations(currentUser);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     wbOrganizationByName: async (_, { currentUserEmail, name }, context) => {
-      const result = await context.wbCloud.organization(
-        undefined,
-        currentUserEmail,
-        undefined,
-        name
-      );
+      const result = await context.wbCloud.organizationByName(name);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
@@ -82,8 +91,12 @@ export const resolvers: IResolvers = {
       return result.payload;
     },
     // Organization Users
-    wbOrganizationUsers: async (_, { name, roles }, context) => {
-      const result = await context.wbCloud.organizationUsers(name, roles);
+    wbOrganizationUsers: async (_, { organizationName, roles }, context) => {
+      const result = await context.wbCloud.organizationUsers(
+        organizationName,
+        undefined,
+        roles
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

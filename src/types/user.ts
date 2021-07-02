@@ -14,14 +14,12 @@ export const typeDefs = gql`
     lastName: String
     createdAt: String!
     updatedAt: String!
-    role: String
   }
 
   extend type Query {
     """
     Users
     """
-    wbUsersByOrganizationId(organizationId: ID!): [User]
     wbUserById(id: ID!): User
     wbUserByEmail(email: String!): User
   }
@@ -43,13 +41,6 @@ export const typeDefs = gql`
 export const resolvers: IResolvers = {
   Query: {
     // Users
-    wbUsersByOrganizationId: async (_, { organizationId }, context) => {
-      const result = await context.wbCloud.usersByOrganizationId(
-        organizationId
-      );
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.payload;
-    },
     wbUserById: async (_, { id }, context) => {
       const result = await context.wbCloud.userById(id);
       if (!result.success) throw context.wbCloud.err(result);

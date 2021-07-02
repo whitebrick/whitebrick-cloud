@@ -43,6 +43,8 @@ CREATE TABLE IF NOT EXISTS wb.organization_users (
   organization_id INTEGER REFERENCES wb.organizations(id) NOT NULL,
   user_id BIGINT REFERENCES wb.users(id) NOT NULL,
   role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
+  implied_from_role_id BIGINT REFERENCES wb.roles(id),
+  settings jsonb,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   PRIMARY KEY (organization_id, user_id)
@@ -65,6 +67,8 @@ CREATE TABLE IF NOT EXISTS wb.schema_users (
   schema_id INTEGER REFERENCES wb.schemas(id) NOT NULL,
   user_id BIGINT REFERENCES wb.users(id) NOT NULL,
   role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
+  implied_from_role_id BIGINT REFERENCES wb.roles(id),
+  settings jsonb,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   PRIMARY KEY (schema_id, user_id)
@@ -87,6 +91,7 @@ CREATE TABLE IF NOT EXISTS wb.table_users(
   table_id BIGINT REFERENCES wb.tables(id) NOT NULL,
   user_id BIGINT REFERENCES wb.users(id) NOT NULL,
   role_id BIGINT REFERENCES wb.roles(id) NOT NULL,
+  implied_from_role_id BIGINT REFERENCES wb.roles(id),
   settings jsonb,
   created_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),

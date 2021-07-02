@@ -58,6 +58,10 @@ export class Role {
     schema_reader: "table_reader",
   };
 
+  static ORGANIZATION_TO_SCHEMA_ROLE_MAP: Record<string, string> = {
+    organization_administrator: "schema_administrator",
+  };
+
   id!: number;
   name!: string;
   label!: string;

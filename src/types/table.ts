@@ -41,6 +41,10 @@ export const typeDefs = gql`
     tableId: Int!
     userId: Int!
     roleId: Int!
+    impliedFromRoleId: Int
+    schemaName: String
+    tableName: String
+    userEmail: String
     role: String
     settings: JSON
     createdAt: String!
@@ -55,11 +59,11 @@ export const typeDefs = gql`
     """
     Table Users
     """
-    wbTableUser(
-      userEmail: String!
+    wbTableUsers(
       schemaName: String!
       tableName: String!
-    ): TableUser
+      userEmails: [String]
+    ): [TableUser]
     """
     Columns
     """
@@ -163,11 +167,11 @@ export const resolvers: IResolvers = {
       return result.payload;
     },
     // Table Users
-    wbTableUser: async (_, { schemaName, tableName, userEmail }, context) => {
-      const result = await context.wbCloud.tableUser(
-        userEmail,
+    wbTableUsers: async (_, { schemaName, tableName, userEmails }, context) => {
+      const result = await context.wbCloud.tableUsers(
         schemaName,
-        tableName
+        tableName,
+        userEmails
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
