@@ -3,9 +3,9 @@ Feature:
   Background:
     * url baseUrl
     * path endpointPath
-    * def newColumnNameChk = typeof newColumnName == 'undefined' ? null : newColumnName
-    * def newColumnLabelChk = typeof newColumnLabel == 'undefined' ? null : newColumnLabel
-    * def newTypeChk = typeof newType == 'undefined' ? null : newType
+    * def newColumnNameChk = typeof newColumnName == "undefined" ? null : newColumnName
+    * def newColumnLabelChk = typeof newColumnLabel == "undefined" ? null : newColumnLabel
+    * def newTypeChk = typeof newType == "undefined" ? null : newType
 
   Scenario: Update a column
     Given text query = 
@@ -21,9 +21,9 @@ Feature:
         )
       }
     """
-    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', columnName: '#(columnName)', newColumnName: '#(newColumnNameChk)', newColumnLabel: '#(newColumnLabelChk)', newType: '#(newTypeChk)'}
-    And request { query: '#(query)', variables: '#(variables)' }
+    And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnName: "#(columnName)", newColumnName: "#(newColumnNameChk)", newColumnLabel: "#(newColumnLabelChk)", newType: "#(newTypeChk)"}
+    And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
     Then print response
-    Then match response.errors == '#notpresent'
+    Then match response.errors == "#notpresent"

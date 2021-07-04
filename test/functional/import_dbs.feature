@@ -9,5 +9,5 @@ Feature: Run
     * print "************************************"
     * configure readTimeout = 600000
   Scenario: Import existing DBs
-    * call read('schemas/schemas_imported_dbs.feature')
-    * call read('tables/tables_imported_dbs.feature')
+    * call read("schemas/schemas_imported_dbs.feature")
+    * call read("tables/tables_imported_dbs.feature")

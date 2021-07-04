@@ -4,15 +4,16 @@ Feature: Schemas
 
     # A schema can be created with either a organization owner or a user owner
     * table schemas 
-      | currentUserEmail                  | name                   | label                | organizationOwnerName | userOwnerEmail
-      | 'test_daisy@test.whitebrick.com'  | 'test_the_daisy_blog'  | 'The Daisy Blog'     | null                  | 'test_daisy@test.whitebrick.com'
-      | 'test_debbie@test.whitebrick.com' | 'test_org_non_admin'   | 'Test Org Non-Admin' | 'test_donnas-media'   | null
-      | 'test_donna@test.whitebrick.com'  | 'test_3-admins-schema' | 'Test 3 Admins'      | 'test_3-admins-org'   | null
-    * def result = call read('schemas/schema-create.feature') schemas
+      | currentUserEmail                  | name                          | label                              | organizationOwnerName | userOwnerEmail
+      | "test_daisy@test.whitebrick.com"  | "test_the_daisy_blog"         | "The Daisy Blog"                   | null                  | "test_daisy@test.whitebrick.com"
+      | "test_donna@test.whitebrick.com"  | "test_org_admins"             | "Test with Org Admins"             | "test_admins-org"     | null
+      | "test_debbie@test.whitebrick.com" | "test_donnas_org_non_admin"   | "Test with Donnas Media Non-Admin" | "test_donnas-media"   | null
+    * def result = call read("schemas/schema-create.feature") schemas
 
   Scenario: Add users to schemas
-    * table organizationUsers 
+    * table schemaUsers 
       | schemaName            | userEmails                          | role
-      | 'test_the_daisy_blog' | ['test_donna@test.whitebrick.com']  | 'schema_manager'
-      | 'test_the_daisy_blog' | ['test_debbie@test.whitebrick.com'] | 'schema_reader'
-    * def result = call read('schemas/schema-add-user.feature') organizationUsers
+      | "test_the_daisy_blog" | ["test_donna@test.whitebrick.com"]  | "schema_manager"
+      | "test_the_daisy_blog" | ["test_debbie@test.whitebrick.com"] | "schema_reader"
+      | "test_org_admins"     | ["test_debbie@test.whitebrick.com"] | "schema_administrator"
+    * def result = call read("schemas/schema-add-user.feature") schemaUsers

@@ -171,47 +171,103 @@ export class WhitebrickCloud {
         message: `${roleName} is not a valid name for an ${roleLevel} Role.`,
       });
     }
-    let result = await this.dal.setRole(
-      userIds,
-      roleName,
-      roleLevel,
-      object.id
-    );
-    if (!result.success) return result;
+    let result = errResult();
     switch (roleLevel) {
       case "organization":
-        if (roleName == "organization_administrator") {
-          result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
-            object.id,
-            Role.ORGANIZATION_TO_SCHEMA_ROLE_MAP,
-            false, // delete existing roles for this schema/user
-            undefined,
-            userIds
-          );
-          if (result.success!) return result;
-          result = await this.schemasByOrganizationOwner(object.id);
-          if (!result.success) return result;
-          for (const schema of result.payload) {
-            result = await this.dal.setTableUserRolesFromSchemaRoles(
-              schema.id,
-              Role.SCHEMA_TO_TABLE_ROLE_MAP,
-              false,
+        switch (roleName) {
+          case "organization_user":
+            // are any of these user currently admins getting demoted?
+            result = await this.organizationUsers(object.name, undefined, [
+              "organization_administrator",
+            ]);
+            log.info(`@@@@@@@@@@@@@@@@@@ result ${JSON.stringify(result)}`);
+            if (!result.success) return result;
+            const currentAdminIds = result.payload.map(
+              (organizationUser: { userId: number }) => organizationUser.userId
+            );
+            const demotedAdmins: number[] = userIds.filter((id: number) =>
+              currentAdminIds.includes(id)
+            );
+            log.info(`@@@@@@@@@@@@@@@@@@ userIds ${userIds}`);
+            log.info(`@@@@@@@@@@@@@@@@@@ currentAdminIds ${currentAdminIds}`);
+            log.info(`@@@@@@@@@@@@@@@@@@ demotedAdmins ${currentAdminIds}`);
+            if (demotedAdmins.length > 0) {
+              // completely remove them (will raise error if no admins)
+              result = await this.removeUsersFromOrganization(
+                object.name,
+                demotedAdmins
+              );
+              if (!result.success) return result;
+            }
+            // add orgnaization_user
+            result = await this.dal.setRole(
+              userIds,
+              roleName,
+              roleLevel,
+              object.id
+            );
+            break;
+          case "organization_administrator":
+            result = await this.dal.setRole(
+              userIds,
+              roleName,
+              roleLevel,
+              object.id
+            );
+            if (result.success!) return result;
+            result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
+              object.id,
+              Role.ORGANIZATION_TO_SCHEMA_ROLE_MAP,
               undefined,
               userIds
             );
             if (result.success!) return result;
-          }
+            result = await this.schemasByOrganizationOwner(object.id);
+            if (!result.success) return result;
+            for (const schema of result.payload) {
+              result = await this.dal.setTableUserRolesFromSchemaRoles(
+                schema.id,
+                Role.SCHEMA_TO_TABLE_ROLE_MAP,
+                undefined,
+                userIds
+              );
+              if (result.success!) return result;
+            }
+            break;
+          case "organization_external_user":
+            result = await this.dal.setRole(
+              userIds,
+              roleName,
+              roleLevel,
+              object.id
+            );
+            break;
         }
         break;
       case "schema":
+        // add schema_user
+        result = await this.dal.setRole(
+          userIds,
+          roleName,
+          roleLevel,
+          object.id
+        );
+        if (result.success!) return result;
         // Changing role at the schema level resets all
         // table roles to the schema default inheritence
         result = await this.dal.setTableUserRolesFromSchemaRoles(
           object.id,
           Role.SCHEMA_TO_TABLE_ROLE_MAP, // eg { schema_owner: "table_administrator" }
-          false, // delete existing roles for this table/user
           undefined,
           userIds
+        );
+        break;
+      case "table":
+        result = await this.dal.setRole(
+          userIds,
+          roleName,
+          roleLevel,
+          object.id
         );
         break;
     }
@@ -227,13 +283,16 @@ export class WhitebrickCloud {
     if (!result.success) return result;
     switch (roleLevel) {
       case "organization":
+        // Delete schema admins implicitly set from organization admins
         result = await this.dal.deleteRole(
           userIds,
           "schema",
           undefined,
-          objectId // parentObjectId ie the organization id
+          objectId, // parentObjectId ie the organization id
+          ["organization_administrator"]
         );
         if (result.success!) return result;
+        // Delete table admins implicitly set from schema admins
         result = await this.schemasByOrganizationOwner(objectId);
         if (!result.success) return result;
         for (const schema of result.payload) {
@@ -241,17 +300,20 @@ export class WhitebrickCloud {
             userIds,
             "table",
             undefined,
-            schema.id
+            schema.id, // parentObjectId ie the schema id
+            ["schema_administrator"]
           );
           if (result.success!) return result;
         }
         break;
       case "schema":
+        // Delete table users implicitly set from schema users
         result = await this.dal.deleteRole(
           userIds,
           "table",
           undefined,
-          objectId // parentObjectId ie the schema id
+          objectId, // parentObjectId ie the schema id
+          Object.keys(Role.SCHEMA_TO_TABLE_ROLE_MAP)
         );
         break;
     }
@@ -268,7 +330,7 @@ export class WhitebrickCloud {
   }
 
   public async usersByIds(ids: number[]): Promise<ServiceResult> {
-    return this.dal.usersByIdsOrEmails(ids);
+    return this.dal.users(ids);
   }
 
   public async userById(id: number): Promise<ServiceResult> {
@@ -286,7 +348,7 @@ export class WhitebrickCloud {
   }
 
   public async usersByEmails(userEmails: string[]): Promise<ServiceResult> {
-    return this.dal.usersByIdsOrEmails(undefined, userEmails);
+    return this.dal.users(undefined, userEmails);
   }
 
   public async userByEmail(email: string): Promise<ServiceResult> {
@@ -397,7 +459,7 @@ export class WhitebrickCloud {
   }
 
   public async createOrganization(
-    currentUserEmail: string, // TBD: repace with uid
+    cU: CurrentUser = CurrentUser.getSysAdmin(this),
     name: string,
     label: string
   ): Promise<ServiceResult> {
@@ -414,8 +476,8 @@ export class WhitebrickCloud {
     if (!createOrgResult.success) return createOrgResult;
     const result = await this.setOrganizationUsersRole(
       name,
-      [currentUserEmail],
-      "organization_administrator"
+      "organization_administrator",
+      [cU.id]
     );
     if (!result.success) return result;
     return createOrgResult;
@@ -480,24 +542,38 @@ export class WhitebrickCloud {
 
   public async setOrganizationUsersRole(
     organizationName: string,
-    userEmails: [string],
-    role: string
+    role: string,
+    userIds?: number[],
+    userEmails?: string[]
   ): Promise<ServiceResult> {
+    log.debug(
+      `setOrganizationUsersRole(${organizationName},${role},${userIds},${userEmails})`
+    );
     const organizationResult = await this.organizationByName(organizationName);
     if (!organizationResult.success) return organizationResult;
-    const usersResult = await this.usersByEmails(userEmails);
-    if (!usersResult.success || !usersResult.payload) return usersResult;
-    if (usersResult.payload.length != userEmails.length) {
+    let result: ServiceResult = errResult();
+    let userIdsFound: number[] = [];
+    let usersRequested: (string | number)[] = [];
+    if (userIds) {
+      usersRequested = userIds;
+      result = await this.usersByIds(userIds);
+    } else if (userEmails) {
+      usersRequested = userEmails;
+      result = await this.usersByEmails(userEmails);
+    }
+    if (!result.success || !result.payload) return result;
+    userIdsFound = result.payload.map((user: { id: number }) => user.id);
+    if (usersRequested.length != userIdsFound.length) {
       return errResult({
         wbCode: "WB_USERS_NOT_FOUND",
-        values: userEmails.filter(
-          (x: string) => !usersResult.payload.includes(x)
-        ),
+        values: [
+          `Requested ${usersRequested.length}: ${usersRequested.join(",")}`,
+          `Found ${userIdsFound.length}: ${userIdsFound.join(",")}`,
+        ],
       } as ServiceResult);
     }
-    const userIds = usersResult.payload.map((user: { id: number }) => user.id);
     return await this.setRole(
-      userIds,
+      userIdsFound,
       role,
       "organization",
       organizationResult.payload
@@ -505,31 +581,38 @@ export class WhitebrickCloud {
   }
 
   public async removeUsersFromOrganization(
-    userEmails: string[],
-    organizationName: string
+    organizationName: string,
+    userIds?: number[],
+    userEmails?: string[]
   ): Promise<ServiceResult> {
-    const usersResult = await this.usersByEmails(userEmails);
-    if (!usersResult.success) return usersResult;
-    const userIds = usersResult.payload.map((user: { id: number }) => user.id);
+    let result: ServiceResult = errResult();
+    let userIdsToBeRemoved: number[] = [];
+    if (userIds) userIdsToBeRemoved = userIds;
+    if (userEmails) {
+      result = await this.usersByEmails(userEmails);
+      if (!result.success) return result;
+      userIdsToBeRemoved = result.payload.map(
+        (user: { id: number }) => user.id
+      );
+    }
     // check not all the admins will be removed
-    const adminsResult = await this.organizationUsers(
-      organizationName,
-      undefined,
-      ["organization_administrator"]
-    );
-    if (!adminsResult.success) return adminsResult;
-    const allAdminIds = adminsResult.payload.map(
-      (user: { id: number }) => user.id
-    );
-    if (allAdminIds.every((elem: number) => userIds.includes(elem))) {
+    result = await this.organizationUsers(organizationName, undefined, [
+      "organization_administrator",
+    ]);
+    if (!result.success) return result;
+    const allAdminIds = result.payload.map((user: { id: number }) => user.id);
+
+    if (
+      allAdminIds.every((elem: number) => userIdsToBeRemoved.includes(elem))
+    ) {
       return errResult({
         wbCode: "WB_ORGANIZATION_NO_ADMINS",
       } as ServiceResult);
     }
     const organizationResult = await this.organizationByName(organizationName);
     if (!organizationResult.success) return organizationResult;
-    const result = await this.deleteRole(
-      userIds,
+    result = await this.deleteRole(
+      userIdsToBeRemoved,
       "organization",
       organizationResult.payload.id
     );
@@ -696,7 +779,6 @@ export class WhitebrickCloud {
       result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
         organizationOwnerId,
         Role.ORGANIZATION_TO_SCHEMA_ROLE_MAP,
-        false,
         [schemaResult.payload.id]
       );
     } else {
@@ -1255,7 +1337,6 @@ export class WhitebrickCloud {
     return await this.dal.setTableUserRolesFromSchemaRoles(
       table.schemaId,
       Role.SCHEMA_TO_TABLE_ROLE_MAP,
-      true,
       [table.id]
     );
   }

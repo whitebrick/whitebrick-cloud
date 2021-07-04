@@ -1,10 +1,9 @@
-Feature: Add a user to a schema
+Feature:
 
   Background:
     * url baseUrl
     * path endpointPath
 
-  
   Scenario: Remove a user from a schema
     Given text query = 
     """
@@ -12,9 +11,9 @@ Feature: Add a user to a schema
         wbRemoveSchemaUsers(schemaName: $schemaName, userEmails: $userEmails)
       }
     """
-    # Given def query = read('test.gql')
-    And def variables = { schemaName: '#(schemaName)', userEmails: '#(userEmails)'}
-    And request { query: '#(query)', variables: '#(variables)' }
+    # Given def query = read("test.gql")
+    And def variables = { schemaName: "#(schemaName)", userEmails: "#(userEmails)"}
+    And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
-    Then match response.errors == '#notpresent'
+    Then match response.errors == "#notpresent"

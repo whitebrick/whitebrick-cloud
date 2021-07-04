@@ -16,9 +16,9 @@ Feature:
         )
       }
     """
-    And def variables = { schemaName: '#(schemaName)', tableName: '#(tableName)', columnName: '#(columnName)'}
-    And request { query: '#(query)', variables: '#(variables)' }
+    And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnName: "#(columnName)"}
+    And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
     Then print response
-    Then match response.errors == '#notpresent'
+    Then match response.errors == "#notpresent"

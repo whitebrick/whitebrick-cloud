@@ -2,15 +2,16 @@ import { environment } from "./environment";
 import { log, errResult } from "./whitebrick-cloud";
 import { Pool } from "pg";
 import {
-  Organization,
-  User,
   Role,
+  RoleLevel,
+  User,
+  Organization,
+  OrganizationUser,
   Schema,
   SchemaUser,
   Table,
-  Column,
   TableUser,
-  RoleLevel,
+  Column,
 } from "./entity";
 import { ConstraintId, QueryParams, ServiceResult } from "./types";
 import { first } from "voca";
@@ -103,6 +104,22 @@ export class DAL {
     return result;
   }
 
+  public async roleIdsFromNames(roleNames: string[]): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT wb.roles.id
+        FROM wb.roles
+        WHERE custom IS false
+        AND name=ANY($1)
+      `,
+      params: [roleNames],
+    } as QueryParams);
+    if (result.success) {
+      result.payload = result.payload.rows.map((row: { id: number }) => row.id);
+    }
+    return result;
+  }
+
   public async roleByName(name: string): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
@@ -124,11 +141,14 @@ export class DAL {
     return result;
   }
 
+  // Typically setting a role directly is explicit,
+  // so any implied_from_role_id is cleared unless keepImpliedFrom
   public async setRole(
     userIds: number[],
     roleName: string,
     roleLevel: RoleLevel,
-    objectId: number
+    objectId: number,
+    keepImpliedFrom?: boolean
   ): Promise<ServiceResult> {
     const roleResult = await this.roleByName(roleName);
     if (!roleResult.success) return roleResult;
@@ -168,8 +188,11 @@ export class DAL {
     }
     query += `
       ON CONFLICT (user_id, ${wbColumn})
-      DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
+      DO UPDATE SET
+      role_id=EXCLUDED.role_id,
+      updated_at=EXCLUDED.updated_at
     `;
+    if (!keepImpliedFrom) query += ", implied_from_role_id=NULL";
     return await this.executeQuery({
       query: query,
       params: params,
@@ -180,7 +203,8 @@ export class DAL {
     userIds: number[],
     roleLevel: RoleLevel,
     objectId?: number,
-    parentObjectId?: number
+    parentObjectId?: number,
+    impliedFromRoles?: string[]
   ): Promise<ServiceResult> {
     const params: (number | number[] | undefined)[] = [userIds];
     let wbTable: string = "";
@@ -222,7 +246,14 @@ export class DAL {
         }
         break;
     }
-    let result = await this.executeQuery({
+    let result: ServiceResult = errResult();
+    if (impliedFromRoles) {
+      wbWhere += `AND implied_from_role_id=ANY($3)`;
+      result = await this.roleIdsFromNames(impliedFromRoles);
+      if (!result.success) return result;
+      params.push(result.payload);
+    }
+    result = await this.executeQuery({
       query: `
         DELETE FROM ${wbTable}
         WHERE user_id=ANY($1)
@@ -299,22 +330,29 @@ export class DAL {
     return result;
   }
 
-  public async usersByIdsOrEmails(
+  public async users(
     ids?: number[],
-    emails?: string[]
+    emails?: string[],
+    emailPattern?: string
   ): Promise<ServiceResult> {
-    let column = "id";
-    let params: any[] = [ids];
-    if (emails) {
-      column = "email";
-      params = [emails];
+    let sqlWhere: string = "";
+    let params: (number[] | string[] | string)[] = [];
+    if (ids) {
+      sqlWhere = "WHERE id=ANY($1)";
+      params.push(ids);
+    } else if (emails) {
+      sqlWhere = "WHERE email=ANY($1)";
+      params.push(emails);
+    } else if (emailPattern) {
+      sqlWhere = "WHERE email LIKE $1";
+      params.push(emailPattern);
     }
     const result = await this.executeQuery({
       query: `
-        SELECT wb.users.*
-        FROM wb.users
-        WHERE ${column}=ANY($1)
-      `,
+      SELECT wb.users.*
+      FROM wb.users
+      ${sqlWhere}
+    `,
       params: params,
     } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload);
@@ -573,7 +611,8 @@ export class DAL {
       `,
       params: params,
     } as QueryParams);
-    if (result.success) result.payload = User.parseResult(result.payload);
+    if (result.success)
+      result.payload = OrganizationUser.parseResult(result.payload);
     return result;
   }
 
@@ -1276,12 +1315,12 @@ export class DAL {
   public async setSchemaUserRolesFromOrganizationRoles(
     organizationId: number,
     roleMap: Record<string, string>, // eg { schema_owner: "table_administrator" }
-    clearExisting?: boolean,
     schemaIds?: number[],
-    userIds?: number[]
+    userIds?: number[],
+    clearExisting?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${clearExisting}, ${schemaIds}, ${userIds})`
+      `setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${schemaIds}, ${userIds}, ${clearExisting})`
     );
     let result = await this.rolesIdLookup();
     if (!result.success) return result;
@@ -1316,9 +1355,11 @@ export class DAL {
         params: [organizationId],
       });
     } else {
+      // Update implied roles only, leave explicit roles alone
       onConflictSql = `
         ON CONFLICT (schema_id, user_id)
         DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
+        WHERE wb.schema_users.implied_from_role_id IS NOT NULL
       `;
     }
     for (const organizationRole of Object.keys(roleMap)) {
@@ -1334,7 +1375,8 @@ export class DAL {
           FROM wb.organization_users
           JOIN wb.schemas ON wb.schemas.organization_owner_id=wb.organization_users.organization_id
           JOIN wb.users ON wb.organization_users.user_id=wb.users.id
-          WHERE wb.organization_users.organization_id=$2 AND wb.organization_users.role_id=$3
+          WHERE wb.organization_users.organization_id=$2
+          AND wb.organization_users.role_id=$3
           ${whereSchemasSql}
           ${whereUsersSql}
           ${onConflictSql}
@@ -1351,12 +1393,12 @@ export class DAL {
   public async setTableUserRolesFromSchemaRoles(
     schemaId: number,
     roleMap: Record<string, string>, // eg { schema_owner: "table_administrator" }
-    clearExisting?: boolean,
     tableIds?: number[],
-    userIds?: number[]
+    userIds?: number[],
+    clearExisting?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `setTableUserRolesFromSchemaRoles(${schemaId}, <roleMap>, ${clearExisting}, ${tableIds}, ${userIds})`
+      `setTableUserRolesFromSchemaRoles(${schemaId}, <roleMap>, ${tableIds}, ${userIds}, ${clearExisting})`
     );
     let result = await this.rolesIdLookup();
     if (!result.success) return result;
@@ -1391,9 +1433,11 @@ export class DAL {
         params: [schemaId],
       });
     } else {
+      // Update implied roles only, leave explicit roles alone
       onConflictSql = `
         ON CONFLICT (table_id, user_id)
         DO UPDATE SET role_id=EXCLUDED.role_id, updated_at=EXCLUDED.updated_at
+        WHERE wb.table_users.implied_from_role_id IS NOT NULL
       `;
     }
     for (const schemaRole of Object.keys(roleMap)) {

@@ -45,11 +45,7 @@ export const typeDefs = gql`
     """
     Organizations
     """
-    wbCreateOrganization(
-      currentUserEmail: String!
-      name: String!
-      label: String!
-    ): Organization
+    wbCreateOrganization(name: String!, label: String!): Organization
     wbUpdateOrganization(
       name: String!
       newName: String
@@ -103,13 +99,10 @@ export const resolvers: IResolvers = {
   },
   Mutation: {
     // Organizations
-    wbCreateOrganization: async (
-      _,
-      { currentUserEmail, name, label },
-      context
-    ) => {
+    wbCreateOrganization: async (_, { name, label }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.createOrganization(
-        currentUserEmail,
+        currentUser,
         name,
         label
       );
@@ -138,8 +131,9 @@ export const resolvers: IResolvers = {
     ) => {
       const result = await context.wbCloud.setOrganizationUsersRole(
         organizationName,
-        userEmails,
-        role
+        role,
+        undefined,
+        userEmails
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
@@ -150,8 +144,9 @@ export const resolvers: IResolvers = {
       context
     ) => {
       const result = await context.wbCloud.removeUsersFromOrganization(
-        userEmails,
-        organizationName
+        organizationName,
+        undefined,
+        userEmails
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

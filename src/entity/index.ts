@@ -1,6 +1,7 @@
 export * from "./Role";
 export * from "./User";
 export * from "./Organization";
+export * from "./OrganizationUser";
 export * from "./Schema";
 export * from "./SchemaUser";
 export * from "./Table";

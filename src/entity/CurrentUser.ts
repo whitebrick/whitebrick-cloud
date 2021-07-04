@@ -1,4 +1,4 @@
-import { Organization, User } from ".";
+import { Organization, Schema, Table, User } from ".";
 import { ServiceResult } from "../types";
 import { errResult, log, WhitebrickCloud } from "../whitebrick-cloud";
 import { Role } from "./Role";
@@ -73,7 +73,7 @@ export class CurrentUser {
     return !this.isInOrganization(organizationId);
   }
 
-  public async is(role: string, objectId: any): Promise<boolean> {
+  public async is(role: string, objectId: number): Promise<boolean> {
     switch (role) {
       case "organization_administrator":
         await this.initOrganizationsIfEmpty();

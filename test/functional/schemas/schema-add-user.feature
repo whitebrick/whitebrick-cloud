@@ -1,4 +1,4 @@
-Feature: Add a user to a schema
+Feature:
 
   Background:
     * url baseUrl
@@ -12,9 +12,9 @@ Feature: Add a user to a schema
         wbSetSchemaUsersRole(schemaName: $schemaName, userEmails: $userEmails, role: $role)
       }
     """
-    # Given def query = read('test.gql')
-    And def variables = { schemaName: '#(schemaName)', userEmails: '#(userEmails)', role: '#(role)' }
-    And request { query: '#(query)', variables: '#(variables)' }
+    # Given def query = read("test.gql")
+    And def variables = { schemaName: "#(schemaName)", userEmails: "#(userEmails)", role: "#(role)" }
+    And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
-    Then match response.errors == '#notpresent'
+    Then match response.errors == "#notpresent"

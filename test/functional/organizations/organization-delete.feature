@@ -10,8 +10,8 @@ Feature:
         wbDeleteOrganization(name: $name)
       }
     """
-    And def variables = { name: '#(name)'}
-    And request { query: '#(query)', variables: '#(variables)' }
+    And def variables = { name: "#(name)"}
+    And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
-    Then match response.errors == '#notpresent'
+    Then match response.errors == "#notpresent"

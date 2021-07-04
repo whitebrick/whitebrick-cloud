@@ -14,8 +14,8 @@ Feature:
         }
       }
     """
-    And def variables = { email: '#(email)', firstName: '#(firstName)', lastName: '#(lastName)' }
-    And request { query: '#(query)', variables: '#(variables)' }
+    And def variables = { email: "#(email)", firstName: "#(firstName)", lastName: "#(lastName)" }
+    And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
-    Then match response.errors == '#notpresent'
+    Then match response.errors == "#notpresent"

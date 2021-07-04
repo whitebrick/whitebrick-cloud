@@ -12,7 +12,7 @@ Feature:
       wbResetTestData
     }
     """
-    And request { query: '#(query)' }
+    And request { query: "#(query)" }
     When method POST
     Then status 200
     Then print response.data
