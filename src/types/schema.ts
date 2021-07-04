@@ -12,6 +12,7 @@ export const typeDefs = gql`
     createdAt: String!
     updatedAt: String!
     userRole: String
+    userRoleImpliedFrom: String
     organizationOwnerName: String
     userOwnerEmail: String
   }
@@ -24,6 +25,7 @@ export const typeDefs = gql`
     schemaName: String
     userEmail: String
     role: String
+    userRoleImpliedFrom: String
     settings: JSON
     createdAt: String!
     updatedAt: String!

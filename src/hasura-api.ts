@@ -282,6 +282,9 @@ class HasuraApi {
     } else {
       payload.permission.filter = permissionCheck;
     }
+    if (type == "select") {
+      payload.permission.allow_aggregations = true;
+    }
     const result = await this.post(`pg_create_${type}_permission`, payload);
     return result;
   }

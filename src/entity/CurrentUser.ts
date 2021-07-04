@@ -104,7 +104,7 @@ export class CurrentUser {
     );
     let result: ServiceResult = errResult();
     if (
-      process.env.NODE_ENV == "development" &&
+      // process.env.NODE_ENV == "development" &&
       headersLowerCase["x-test-user-email"]
     ) {
       log.debug(

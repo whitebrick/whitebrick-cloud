@@ -696,12 +696,14 @@ export class DAL {
         SELECT
         wb.schemas.*,
         wb.roles.name as user_role,
+        implied_roles.name as user_role_implied_from,
         wb.organizations.name as organization_owner_name,
         user_owners.email as user_owner_email
         FROM wb.schemas
         JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
         JOIN wb.users ON wb.schema_users.user_id=wb.users.id
         JOIN wb.roles ON wb.schema_users.role_id=wb.roles.id
+        LEFT JOIN wb.roles implied_roles ON wb.schema_users.implied_from_role_id=implied_roles.id
         LEFT JOIN wb.users user_owners ON wb.schemas.user_owner_id=user_owners.id
         LEFT JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
         ${sqlWhere}
@@ -787,12 +789,16 @@ export class DAL {
         SELECT
         wb.schemas.*,
         wb.organizations.name as organization_owner_name
-        wb.roles.name as user_role,
+        schema_user_roles.name as user_role,
+        schema_user_implied_roles.name as user_role_implied_from,
         FROM wb.schemas
         JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
         JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
         JOIN wb.users ON wb.organization_users.user_id=wb.users.id
         JOIN wb.roles ON wb.organization_users.role_id=wb.roles.id
+        JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
+        JOIN wb.roles schema_user_roles ON wb.schema_users.role_id=schema_user_roles.id
+        LEFT JOIN wb.roles schema_user_implied_roles ON wb.schema_users.implied_from_role_id=schema_user_implied_roles.id
         WHERE wb.roles.name='organization_administrator'
         ${sqlWhere}
       `,
@@ -1287,12 +1293,14 @@ export class DAL {
         wb.schemas.name as schema_name,
         wb.tables.name as table_name,
         wb.users.email as user_email,
-        wb.roles.name as role
+        wb.roles.name as role,
+        implied_roles.name as role_implied_from
         FROM wb.table_users
         JOIN wb.tables ON wb.table_users.table_id=wb.tables.id
         JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
         JOIN wb.users ON wb.table_users.user_id=wb.users.id
         JOIN wb.roles ON wb.table_users.role_id=wb.roles.id
+        LEFT JOIN wb.roles implied_roles ON wb.table_users.implied_from_role_id=implied_roles.id
         WHERE wb.schemas.name=$1 AND wb.tables.name=$2
         ${whereSql}
       `,

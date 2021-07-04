@@ -18,6 +18,7 @@ export class Schema {
   updatedAt!: Date;
   // not persisted
   userRole?: string;
+  userRoleImpliedFrom?: string;
   organizationOwnerName?: string;
   userOwnerEmail?: string;
 
@@ -41,6 +42,9 @@ export class Schema {
     schema.createdAt = data.created_at;
     schema.updatedAt = data.updated_at;
     if (data.user_role) schema.userRole = data.user_role;
+    if (data.user_role_implied_from) {
+      schema.userRoleImpliedFrom = data.user_role_implied_from;
+    }
     if (data.organization_owner_name) {
       schema.organizationOwnerName = data.organization_owner_name;
     }

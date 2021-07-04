@@ -13,6 +13,7 @@ export class TableUser {
   tableName?: string;
   userEmail?: string;
   role?: string;
+  roleImpliedFrom?: string;
 
   public static parseResult(data: QueryResult | null): Array<TableUser> {
     if (!data) throw new Error("TableUser.parseResult: input is null");
@@ -29,7 +30,9 @@ export class TableUser {
     tableUser.tableId = data.table_id;
     tableUser.userId = data.user_id;
     tableUser.roleId = data.role_id;
-    tableUser.impliedFromroleId = data.implied_from_role_id;
+    if (data.implied_from_role_id) {
+      tableUser.impliedFromroleId = data.implied_from_role_id;
+    }
     tableUser.settings = data.settings;
     tableUser.createdAt = data.created_at;
     tableUser.updatedAt = data.updated_at;
@@ -37,6 +40,9 @@ export class TableUser {
     if (data.table_name) tableUser.tableName = data.table_name;
     if (data.user_email) tableUser.userEmail = data.user_email;
     if (data.role) tableUser.role = data.role;
+    if (data.role_implied_from) {
+      tableUser.roleImpliedFrom = data.role_implied_from;
+    }
     return tableUser;
   }
 }

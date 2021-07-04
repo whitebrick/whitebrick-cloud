@@ -46,6 +46,7 @@ export const typeDefs = gql`
     tableName: String
     userEmail: String
     role: String
+    roleImpliedFrom: String
     settings: JSON
     createdAt: String!
     updatedAt: String!
