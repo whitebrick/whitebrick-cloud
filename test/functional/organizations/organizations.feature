@@ -14,7 +14,7 @@ Feature: Organizations
       | organizationName    | role                         | userEmails
       | "test_donnas-media" | "organization_user"          | ["test_debbie@test.whitebrick.com"]
       | "test_donnas-media" | "organization_external_user" | ["test_daisy@test.whitebrick.com"]
-      | "test_admins-org"   | "organization_administrator" | ["test_daisy@test.whitebrick.com","test_nick_north@test.whitebrick.com"]
+      | "test_admins-org"   | "organization_administrator" | ["test_daisy@test.whitebrick.com"]
       | "test_vandelay"     | "organization_user"          | ["test_donna@test.whitebrick.com", "test_daisy@test.whitebrick.com"]
     * def result = call read("organizations/organization-set-users-role.feature") organizationUsers
 

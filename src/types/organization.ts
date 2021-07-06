@@ -8,6 +8,7 @@ export const typeDefs = gql`
     name: String!
     label: String!
     userRole: String
+    userRoleImpliedFrom: String
     createdAt: String!
     updatedAt: String!
   }
@@ -20,6 +21,7 @@ export const typeDefs = gql`
     organizationName: String
     userEmail: String
     role: String
+    roleImpliedFrom: String
     settings: JSON
     createdAt: String!
     updatedAt: String!
@@ -29,7 +31,7 @@ export const typeDefs = gql`
     """
     Organizations
     """
-    wbOrganizations(userEmail: String): [Organization]
+    wbOrganizations: [Organization]
     wbOrganizationById(id: ID!): Organization
     wbOrganizationByName(currentUserEmail: String!, name: String!): Organization
     """
@@ -38,6 +40,7 @@ export const typeDefs = gql`
     wbOrganizationUsers(
       organizationName: String!
       roles: [String]
+      userEmails: [String]
     ): [OrganizationUser]
   }
 
@@ -87,11 +90,16 @@ export const resolvers: IResolvers = {
       return result.payload;
     },
     // Organization Users
-    wbOrganizationUsers: async (_, { organizationName, roles }, context) => {
+    wbOrganizationUsers: async (
+      _,
+      { organizationName, roles, userEmails },
+      context
+    ) => {
       const result = await context.wbCloud.organizationUsers(
         organizationName,
         undefined,
-        roles
+        roles,
+        userEmails
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;

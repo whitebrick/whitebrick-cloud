@@ -44,7 +44,7 @@ export class WhitebrickCloud {
   public async uidFromHeaders(
     headers: Record<string, string>
   ): Promise<ServiceResult> {
-    //log.info("========== HEADERS: " + JSON.stringify(headers));
+    //log.debug("========== HEADERS: " + JSON.stringify(headers));
     const headersLowerCase = Object.entries(headers).reduce(
       (acc: Record<string, string>, [key, val]) => (
         (acc[key.toLowerCase()] = val), acc
@@ -163,7 +163,7 @@ export class WhitebrickCloud {
     roleLevel: RoleLevel,
     object: Organization | Schema | Table
   ): Promise<ServiceResult> {
-    log.info(
+    log.debug(
       `setRole(${userIds},${roleName},${roleLevel},${JSON.stringify(object)})`
     );
     if (!Role.isRole(roleName, roleLevel)) {
@@ -180,7 +180,6 @@ export class WhitebrickCloud {
             result = await this.organizationUsers(object.name, undefined, [
               "organization_administrator",
             ]);
-            log.info(`@@@@@@@@@@@@@@@@@@ result ${JSON.stringify(result)}`);
             if (!result.success) return result;
             const currentAdminIds = result.payload.map(
               (organizationUser: { userId: number }) => organizationUser.userId
@@ -188,9 +187,6 @@ export class WhitebrickCloud {
             const demotedAdmins: number[] = userIds.filter((id: number) =>
               currentAdminIds.includes(id)
             );
-            log.info(`@@@@@@@@@@@@@@@@@@ userIds ${userIds}`);
-            log.info(`@@@@@@@@@@@@@@@@@@ currentAdminIds ${currentAdminIds}`);
-            log.info(`@@@@@@@@@@@@@@@@@@ demotedAdmins ${currentAdminIds}`);
             if (demotedAdmins.length > 0) {
               // completely remove them (will raise error if no admins)
               result = await this.removeUsersFromOrganization(
@@ -214,14 +210,14 @@ export class WhitebrickCloud {
               roleLevel,
               object.id
             );
-            if (result.success!) return result;
+            if (!result.success) return result;
             result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
               object.id,
               Role.ORGANIZATION_TO_SCHEMA_ROLE_MAP,
               undefined,
               userIds
             );
-            if (result.success!) return result;
+            if (!result.success) return result;
             result = await this.schemasByOrganizationOwner(object.id);
             if (!result.success) return result;
             for (const schema of result.payload) {
@@ -231,7 +227,7 @@ export class WhitebrickCloud {
                 undefined,
                 userIds
               );
-              if (result.success!) return result;
+              if (!result.success) return result;
             }
             break;
           case "organization_external_user":
@@ -252,7 +248,7 @@ export class WhitebrickCloud {
           roleLevel,
           object.id
         );
-        if (result.success!) return result;
+        if (!result.success) return result;
         // Changing role at the schema level resets all
         // table roles to the schema default inheritence
         result = await this.dal.setTableUserRolesFromSchemaRoles(
@@ -291,7 +287,7 @@ export class WhitebrickCloud {
           objectId, // parentObjectId ie the organization id
           ["organization_administrator"]
         );
-        if (result.success!) return result;
+        if (!result.success) return result;
         // Delete table admins implicitly set from schema admins
         result = await this.schemasByOrganizationOwner(objectId);
         if (!result.success) return result;
@@ -303,7 +299,7 @@ export class WhitebrickCloud {
             schema.id, // parentObjectId ie the schema id
             ["schema_administrator"]
           );
-          if (result.success!) return result;
+          if (!result.success) return result;
         }
         break;
       case "schema":
@@ -345,6 +341,13 @@ export class WhitebrickCloud {
       }
     }
     return result;
+  }
+
+  // searchPattern across multiple fields
+  public async usersBySearchPattern(
+    searchPattern: string
+  ): Promise<ServiceResult> {
+    return this.dal.users(undefined, undefined, searchPattern);
   }
 
   public async usersByEmails(userEmails: string[]): Promise<ServiceResult> {
@@ -517,7 +520,8 @@ export class WhitebrickCloud {
   public async organizationUsers(
     name?: string,
     id?: number,
-    roles?: string[]
+    roles?: string[],
+    userEmails?: string[]
   ): Promise<ServiceResult> {
     let result: ServiceResult = errResult();
     if (name) {
@@ -537,7 +541,13 @@ export class WhitebrickCloud {
           "organizationUsers: roles contains one or more unrecognized strings",
       } as ServiceResult);
     }
-    return this.dal.organizationUsers(name, id, roles);
+    let userIds = undefined;
+    if (userEmails) {
+      const usersResult = await this.usersByEmails(userEmails);
+      if (!usersResult.success || !usersResult.payload) return usersResult;
+      userIds = usersResult.payload.map((user: { id: number }) => user.id);
+    }
+    return this.dal.organizationUsers(name, id, roles, userIds);
   }
 
   public async setOrganizationUsersRole(
@@ -911,7 +921,7 @@ export class WhitebrickCloud {
     tableLabel: string,
     create?: boolean
   ): Promise<ServiceResult> {
-    log.info(
+    log.debug(
       `addOrCreateTable(${schemaName},${tableName},${tableLabel},${create})`
     );
     if (!create) create = false;
@@ -1088,7 +1098,7 @@ export class WhitebrickCloud {
   public async addDefaultTablePermissions(
     table: Table
   ): Promise<ServiceResult> {
-    log.info(`addDefaultTablePermissions(${JSON.stringify(table)})`);
+    log.debug(`addDefaultTablePermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1118,7 +1128,7 @@ export class WhitebrickCloud {
   public async removeDefaultTablePermissions(
     table: Table
   ): Promise<ServiceResult> {
-    log.info(`addDefaultTablePermissions(${JSON.stringify(table)})`);
+    log.debug(`addDefaultTablePermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1290,7 +1300,7 @@ export class WhitebrickCloud {
   }
 
   public async trackTableWithPermissions(table: Table): Promise<ServiceResult> {
-    log.info(`trackTableWithPermissions(${JSON.stringify(table)})`);
+    log.debug(`trackTableWithPermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1302,7 +1312,7 @@ export class WhitebrickCloud {
   public async untrackTableWithPermissions(
     table: Table
   ): Promise<ServiceResult> {
-    log.info(`untrackTableWithPermissions(${JSON.stringify(table)})`);
+    log.debug(`untrackTableWithPermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1333,7 +1343,7 @@ export class WhitebrickCloud {
   public async addDefaultTableUsersToTable(
     table: Table
   ): Promise<ServiceResult> {
-    log.info(`addDefaultTableUsersToTable(${JSON.stringify(table)})`);
+    log.debug(`addDefaultTableUsersToTable(${JSON.stringify(table)})`);
     return await this.dal.setTableUserRolesFromSchemaRoles(
       table.schemaId,
       Role.SCHEMA_TO_TABLE_ROLE_MAP,
@@ -1467,7 +1477,7 @@ export class WhitebrickCloud {
     columnType?: string,
     skipTracking?: boolean
   ): Promise<ServiceResult> {
-    log.info(
+    log.debug(
       `addOrCreateColumn(${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${skipTracking})`
     );
     if (!create) create = false;

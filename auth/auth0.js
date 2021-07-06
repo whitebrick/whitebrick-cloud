@@ -1,34 +1,30 @@
 function (user, context, callback) {
   const namespace = "https://hasura.io/jwt/claims";
-  const authUserId = user.user_id;
+  const userAuthId = user.user_id;
+  const schemaName = (context.request.query.schema_name ? context.request.query.schema_name : "test_the_daisy_blog");
   const adminSecret = "Ha5uraWBStaging";
   const url = "https://graph-staging.whitebrick.com/v1/graphql";
   const query = `
-    mutation($authUserId: String!) {
+    mutation($schemaName: String!, $userAuthId: String!) {
       wbAuth(
-        authUserId: $authUserId,
-        schemaName: "test_the_daisy_blog"
+				schemaName: $schemaName,
+        userAuthId: $userAuthId
       )
     }
   `;
-  const variables = { "authUserId": authUserId};
+  const variables = { "schemaName": schemaName, "userAuthId": userAuthId };
   request.post(
     {
       url: url,
-      headers: {'content-type' : 'application/json', 'X-Hasura-Admin-Secret': adminSecret},
+      headers: {'content-type' : 'application/json', 'x-hasura-admin-secret': adminSecret},
       body: JSON.stringify({
         query: query,
         variables: variables
       })
     }, function(error, response, body){
-      if (error) return callback(error);
-      console.log(body);
-      context.idToken[namespace] = JSON.parse(body).data.wbAuth;
-      if(!context.idToken[namespace]["X-Hasura-User-ID"]){
-        return callback(new Error("User not found"));
-      } else {
-        return callback(null, user, context);
-      }
+        console.log(body);
+        context.idToken[namespace] = JSON.parse(body).data.wbAuth;
+        callback(null, user, context);
     }
   );
 }

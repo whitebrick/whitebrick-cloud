@@ -8,6 +8,7 @@ export class Organization {
   updatedAt!: Date;
   // not persisted
   userRole?: string;
+  userRoleImpliedFrom?: string;
 
   public static parseResult(data: QueryResult | null): Array<Organization> {
     if (!data) throw new Error("Organization.parseResult: input is null");
@@ -27,6 +28,9 @@ export class Organization {
     organization.createdAt = data.created_at;
     organization.updatedAt = data.updated_at;
     if (data.user_role) organization.userRole = data.user_role;
+    if (data.user_role_implied_from) {
+      organization.userRoleImpliedFrom = data.user_role_implied_from;
+    }
     return organization;
   }
 }

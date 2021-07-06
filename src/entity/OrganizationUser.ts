@@ -12,6 +12,7 @@ export class OrganizationUser {
   organizationName?: string;
   userEmail?: string;
   role?: string;
+  roleImpliedFrom?: string;
 
   public static parseResult(data: QueryResult | null): Array<OrganizationUser> {
     if (!data) throw new Error("OrganizationUser.parseResult: input is null");
@@ -36,6 +37,9 @@ export class OrganizationUser {
       organizationUser.organizationName = data.organization_name;
     if (data.user_email) organizationUser.userEmail = data.user_email;
     if (data.role) organizationUser.role = data.role;
+    if (data.role_implied_from) {
+      organizationUser.roleImpliedFrom = data.role_implied_from;
+    }
     return organizationUser;
   }
 }

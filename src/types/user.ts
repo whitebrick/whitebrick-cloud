@@ -22,6 +22,7 @@ export const typeDefs = gql`
     """
     wbUserById(id: ID!): User
     wbUserByEmail(email: String!): User
+    wbUsersBySearchPattern(searchPattern: String!): [User]
   }
 
   extend type Mutation {
@@ -48,6 +49,11 @@ export const resolvers: IResolvers = {
     },
     wbUserByEmail: async (_, { email }, context) => {
       const result = await context.wbCloud.userByEmail(email);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbUsersBySearchPattern: async (_, { searchPattern }, context) => {
+      const result = await context.wbCloud.usersBySearchPattern(searchPattern);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

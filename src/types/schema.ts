@@ -25,7 +25,7 @@ export const typeDefs = gql`
     schemaName: String
     userEmail: String
     role: String
-    userRoleImpliedFrom: String
+    roleImpliedFrom: String
     settings: JSON
     createdAt: String!
     updatedAt: String!
