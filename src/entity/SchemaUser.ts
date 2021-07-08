@@ -11,6 +11,8 @@ export class SchemaUser {
   // not persisted
   schemaName?: string;
   userEmail?: string;
+  userFirstName?: string;
+  userLastName?: string;
   role?: string;
   roleImpliedFrom?: string;
 
@@ -37,6 +39,8 @@ export class SchemaUser {
     schemaUser.updatedAt = data.updated_at;
     if (data.schema_name) schemaUser.schemaName = data.schema_name;
     if (data.user_email) schemaUser.userEmail = data.user_email;
+    if (data.user_first_name) schemaUser.userFirstName = data.user_first_name;
+    if (data.user_last_name) schemaUser.userLastName = data.user_last_name;
     if (data.role) schemaUser.role = data.role;
     if (data.role_implied_from) {
       schemaUser.roleImpliedFrom = data.role_implied_from;

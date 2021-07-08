@@ -12,6 +12,7 @@ Feature:
       wbResetTestData
     }
     """
+    And header X-Test-User-Email = "test_donna@test.whitebrick.com"
     And request { query: "#(query)" }
     When method POST
     Then status 200

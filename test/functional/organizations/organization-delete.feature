@@ -11,6 +11,7 @@ Feature:
       }
     """
     And def variables = { name: "#(name)"}
+    And header X-Test-User-Email = "test_donna@test.whitebrick.com"
     And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200

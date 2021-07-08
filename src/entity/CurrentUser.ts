@@ -1,14 +1,24 @@
-import { Organization, Schema, Table, User } from ".";
+import { User } from ".";
 import { ServiceResult } from "../types";
 import { errResult, log, WhitebrickCloud } from "../whitebrick-cloud";
-import { Role } from "./Role";
+import { RoleLevel, UserActionPermission } from "./Role";
+import { DEFAULT_POLICY } from "../policy";
 
 export class CurrentUser {
   wbCloud!: WhitebrickCloud;
   user!: User;
   id!: number;
-  organizations: Record<number, Organization> = {};
-  actionHistory: string[] = [];
+  actionHistory: UserActionPermission[] = [];
+
+  // { roleLevel: { objectId: { userAction: { checkedForRole: string, permitted: true/false} } } }
+  objectPermissionsLookup: Record<
+    RoleLevel,
+    Record<string, Record<string, Record<string, any>>>
+  > = {
+    organization: {},
+    schema: {},
+    table: {},
+  };
 
   constructor(wbCloud: WhitebrickCloud, user: User) {
     this.wbCloud = wbCloud;
@@ -25,7 +35,6 @@ export class CurrentUser {
   }
 
   public isSignedIn() {
-    //this.record("IS_SIGNED_IN");
     return this.user.id !== User.PUBLIC_ID;
   }
 
@@ -53,45 +62,194 @@ export class CurrentUser {
     return !this.idIs(otherId);
   }
 
-  public async initOrganizationsIfEmpty() {
-    if (Object.keys(this.organizations).length == 0) {
-      const organizationsResult = await this.wbCloud.organizationById(this.id);
-      // TBD try raise error below
-      if (!organizationsResult.success) return false;
-      for (const organization of organizationsResult.payload) {
-        this.organizations[organization.id] = organization;
+  public denied() {
+    let message = "INTERNAL ERROR: Last UserActionPermission not recorded. ";
+    let values: string[] = [];
+    const lastUAP = this.actionHistory.pop();
+    if (lastUAP) {
+      message = `You do not have permission to ${lastUAP.deniedMessage}.`;
+      let userStr = `userId=${this.id}`;
+      if (this.user && this.user.email) {
+        userStr = `userEmail=${this.user.email}, ${userStr}`;
+      }
+      values = [
+        userStr,
+        `objectId=${lastUAP.objectId}`,
+        `userAction=${lastUAP.userAction}`,
+        `checkedForRole=${lastUAP.checkedForRole}`,
+        `checkedAt=${lastUAP.checkedAt}`,
+      ];
+    }
+    return errResult({
+      success: false,
+      message: message,
+      values: values,
+      apolloErrorCode: "FORBIDDEN",
+    });
+  }
+
+  public mustBeSignedIn() {
+    return errResult({
+      success: false,
+      message: "You must be signed-in to perform this action.",
+      apolloErrorCode: "FORBIDDEN",
+    });
+  }
+
+  // TBD move to ElastiCache
+  private getObjectPermission(
+    roleLevel: RoleLevel,
+    userAction: string,
+    key: string
+  ) {
+    if (
+      this.objectPermissionsLookup[roleLevel][key] &&
+      this.objectPermissionsLookup[roleLevel][key][userAction]
+    ) {
+      return {
+        roleLevel: roleLevel,
+        userAction: userAction,
+        objectKey: key,
+        objectId:
+          this.objectPermissionsLookup[roleLevel][key][userAction].obkectId,
+        checkedForRole:
+          this.objectPermissionsLookup[roleLevel][key][userAction]
+            .checkedForRole,
+        permitted:
+          this.objectPermissionsLookup[roleLevel][key][userAction].permitted,
+        deniedMessage:
+          this.objectPermissionsLookup[roleLevel][key][userAction]
+            .deniedMessage,
+      } as UserActionPermission;
+    } else {
+      return null;
+    }
+  }
+
+  // TBD move to ElastiCache
+  private setObjectPermission(uAP: UserActionPermission) {
+    if (!this.objectPermissionsLookup[uAP.roleLevel][uAP.objectId]) {
+      this.objectPermissionsLookup[uAP.roleLevel][uAP.objectId] = {};
+    }
+    this.objectPermissionsLookup[uAP.roleLevel][uAP.objectId][uAP.userAction] =
+      {
+        permitted: uAP.permitted,
+        checkedForRole: uAP.checkedForRole,
+        deniedMessage: uAP.deniedMessage,
+      };
+    return uAP;
+  }
+
+  private recordActionHistory(uAP: UserActionPermission) {
+    uAP.checkedAt = new Date();
+    this.actionHistory.push(uAP);
+  }
+
+  public static getUserActionPolicy(
+    policy: Record<string, any>[],
+    userAction: string
+  ) {
+    for (const userActionPolicy of policy) {
+      if (userActionPolicy.userAction == userAction) {
+        return userActionPolicy;
       }
     }
   }
 
-  public async isInOrganization(organizationId: number): Promise<boolean> {
-    await this.initOrganizationsIfEmpty();
-    return this.organizations.hasOwnProperty(organizationId);
-  }
-
-  public async isNotInOrganization(organizationId: number) {
-    return !this.isInOrganization(organizationId);
-  }
-
-  public async is(role: string, objectId: number): Promise<boolean> {
-    switch (role) {
-      case "organization_administrator":
-        await this.initOrganizationsIfEmpty();
-        return (
-          this.organizations.hasOwnProperty(objectId) &&
-          this.organizations[objectId].userRole == role
-        );
+  private getObjectLookupKey(
+    objectIdOrName: number | string,
+    parentObjectName?: string
+  ) {
+    let key: string = objectIdOrName.toString();
+    if (typeof objectIdOrName === "number") {
+      key = `id${objectIdOrName}`;
+    } else if (parentObjectName) {
+      key = `${parentObjectName}.${objectIdOrName}`;
     }
-    return false;
+    return key;
   }
 
-  public async isNot(role: string, objectId: any): Promise<boolean> {
-    return !this.is(role, objectId);
+  public async can(
+    userAction: string,
+    objectIdOrName: number | string,
+    parentObjectName?: string
+  ): Promise<boolean> {
+    if (this.isSysAdmin()) return true;
+    const policy = CurrentUser.getUserActionPolicy(DEFAULT_POLICY, userAction);
+    log.debug(
+      `currentUser.can(${userAction},${objectIdOrName}) policy:${JSON.stringify(
+        policy
+      )}`
+    );
+    if (!policy) {
+      const message = `No policy found for userAction=${userAction}`;
+      log.error(message);
+      throw message;
+    }
+    let key = this.getObjectLookupKey(objectIdOrName, parentObjectName);
+    const alreadyChecked = this.getObjectPermission(
+      policy.roleLevel,
+      userAction,
+      key
+    );
+    if (alreadyChecked !== null) {
+      this.recordActionHistory(alreadyChecked);
+      return alreadyChecked.permitted;
+    }
+    const roleResult = await this.wbCloud.roleAndIdForUserObject(
+      this.id,
+      policy.roleLevel,
+      objectIdOrName,
+      parentObjectName
+    );
+    if (!roleResult.success) {
+      const message = `Error getting roleNameForUserObject(${this.id},${
+        policy.roleLevel
+      },${objectIdOrName},${parentObjectName}). ${JSON.stringify(roleResult)}`;
+      log.error(message);
+      throw message;
+    }
+    if (!roleResult.payload.objectId) {
+      const message = `ObjectId could not be found`;
+      log.error(message);
+      throw message;
+    }
+    let permitted = false;
+    if (
+      roleResult.payload.roleName &&
+      policy.permittedRoles.includes(roleResult.payload.roleName)
+    ) {
+      permitted = true;
+    }
+    const uAP: UserActionPermission = {
+      roleLevel: policy.roleLevel,
+      objectKey: key,
+      objectId: roleResult.payload.objectId,
+      userAction: userAction,
+      permitted: permitted,
+      deniedMessage: policy.deniedMessage,
+    };
+    if (roleResult.payload.roleName) {
+      uAP.checkedForRole = roleResult.payload.roleName;
+    }
+    this.setObjectPermission(uAP);
+    this.recordActionHistory(uAP);
+    log.debug(
+      `role: ${JSON.stringify(roleResult.payload)} permitted: ${permitted}`
+    );
+    return permitted;
   }
 
-  //if(cU.cant("edit_table", table.id)) return cU.denied();
+  public async cant(
+    userAction: string,
+    objectIdOrName: number | string,
+    parentObjectName?: string
+  ): Promise<boolean> {
+    const can = await this.can(userAction, objectIdOrName, parentObjectName);
+    return !can;
+  }
 
-  // async only required for testing
+  // async only required to lookup userId from email when testing
   public static async fromContext(context: any): Promise<CurrentUser> {
     //log.info("========== HEADERS: " + JSON.stringify(headers));
     const headersLowerCase = Object.entries(
@@ -111,6 +269,7 @@ export class CurrentUser {
         `========== FOUND TEST USER: ${headersLowerCase["x-test-user-email"]}`
       );
       result = await context.wbCloud.userByEmail(
+        this,
         headersLowerCase["x-test-user-email"]
       );
       if (result.success && result.payload && result.payload.id) {
@@ -132,6 +291,7 @@ export class CurrentUser {
         `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
       );
       const result = await context.wbCloud.userById(
+        this,
         parseInt(headersLowerCase["x-hasura-user-id"])
       );
       if (result.success && result.payload && result.payload.id) {

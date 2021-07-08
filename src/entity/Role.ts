@@ -12,6 +12,17 @@ import { Column } from "./Column";
 
 export type RoleLevel = "organization" | "schema" | "table";
 
+export type UserActionPermission = {
+  roleLevel: RoleLevel;
+  userAction: string;
+  objectKey?: string;
+  objectId: number;
+  checkedForRole?: string;
+  permitted: boolean;
+  deniedMessage: string;
+  checkedAt?: Date;
+};
+
 export class Role {
   static SYSROLES_ORGANIZATIONS: Record<string, Record<string, string>> = {
     organization_administrator: {

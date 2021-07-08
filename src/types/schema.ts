@@ -1,5 +1,5 @@
 import { gql, IResolvers } from "apollo-server-lambda";
-import { CurrentUser } from "../entity/CurrentUser";
+import { CurrentUser } from "../entity";
 import { log } from "../whitebrick-cloud";
 
 export const typeDefs = gql`
@@ -9,12 +9,13 @@ export const typeDefs = gql`
     label: String!
     organizationOwnerId: Int
     userOwnerId: Int
-    createdAt: String!
-    updatedAt: String!
     userRole: String
     userRoleImpliedFrom: String
+    settings: JSON
     organizationOwnerName: String
     userOwnerEmail: String
+    createdAt: String!
+    updatedAt: String!
   }
 
   type SchemaUser {
@@ -23,8 +24,10 @@ export const typeDefs = gql`
     roleId: Int!
     impliedFromRoleId: Int
     schemaName: String
-    userEmail: String
-    role: String
+    userEmail: String!
+    userFirstName: String
+    userLastName: String
+    role: String!
     roleImpliedFrom: String
     settings: JSON
     createdAt: String!
@@ -35,11 +38,16 @@ export const typeDefs = gql`
     """
     Schemas
     """
-    wbSchemas: [Schema]
+    wbMySchemas(withSettings: Boolean): [Schema]
+    wbMySchemaByName(name: String!, withSettings: Boolean): Schema
     """
     Schema Users
     """
-    wbSchemaUsers(schemaName: String!, userEmails: [String]): [SchemaUser]
+    wbSchemaUsers(
+      schemaName: String!
+      userEmails: [String]
+      withSettings: Boolean
+    ): [SchemaUser]
   }
 
   extend type Mutation {
@@ -61,21 +69,45 @@ export const typeDefs = gql`
       role: String!
     ): Boolean
     wbRemoveSchemaUsers(schemaName: String!, userEmails: [String]!): Boolean
+    wbSaveSchemaUserSettings(schemaName: String!, settings: JSON!): Boolean!
   }
 `;
 
 export const resolvers: IResolvers = {
   Query: {
     // Schemas
-    wbSchemas: async (_, __, context) => {
+    wbMySchemas: async (_, { withSettings }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.accessibleSchemas(currentUser);
+      const result = await context.wbCloud.accessibleSchemas(
+        currentUser,
+        withSettings
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbMySchemaByName: async (_, { name, withSettings }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.accessibleSchemaByName(
+        currentUser,
+        name,
+        withSettings
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     // Schema Users
-    wbSchemaUsers: async (_, { schemaName, userEmails }, context) => {
-      const result = await context.wbCloud.schemaUsers(schemaName, userEmails);
+    wbSchemaUsers: async (
+      _,
+      { schemaName, userEmails, withSettings },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.schemaUsers(
+        currentUser,
+        schemaName,
+        userEmails,
+        withSettings
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
@@ -104,7 +136,9 @@ export const resolvers: IResolvers = {
       { schemaName, userEmails, role },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.setSchemaUsersRole(
+        currentUser,
         schemaName,
         userEmails,
         role
@@ -113,9 +147,21 @@ export const resolvers: IResolvers = {
       return result.success;
     },
     wbRemoveSchemaUsers: async (_, { schemaName, userEmails }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.removeSchemaUsers(
+        currentUser,
         schemaName,
         userEmails
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbSaveSchemaUserSettings: async (_, { schemaName, settings }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.saveSchemaUserSettings(
+        currentUser,
+        schemaName,
+        settings
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

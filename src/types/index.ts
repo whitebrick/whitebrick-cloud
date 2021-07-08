@@ -12,6 +12,7 @@ import {
   constraintDirectiveTypeDefs,
 } from "graphql-constraint-directive";
 import { makeExecutableSchema } from "graphql-tools";
+import { CurrentUser } from "../entity";
 import { log } from "../whitebrick-cloud";
 
 export type ServiceResult =
@@ -46,7 +47,7 @@ const typeDefs = gql`
 
   type Mutation {
     wbResetTestData: Boolean!
-    wbAuth(schemaName: String!, userAuthId: String!): JSON!
+    wbAuth(userAuthId: String!): JSON!
   }
 `;
 
@@ -68,8 +69,8 @@ const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbAuth: async (_, { schemaName, userAuthId }, context) => {
-      const result = await context.wbCloud.auth(schemaName, userAuthId);
+    wbAuth: async (_, { userAuthId }, context) => {
+      const result = await context.wbCloud.auth(userAuthId);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

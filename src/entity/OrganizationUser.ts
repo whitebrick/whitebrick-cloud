@@ -11,6 +11,8 @@ export class OrganizationUser {
   // not persisted
   organizationName?: string;
   userEmail?: string;
+  userFirstName?: string;
+  userLastName?: string;
   role?: string;
   roleImpliedFrom?: string;
 
@@ -36,6 +38,10 @@ export class OrganizationUser {
     if (data.organization_name)
       organizationUser.organizationName = data.organization_name;
     if (data.user_email) organizationUser.userEmail = data.user_email;
+    if (data.user_first_name)
+      organizationUser.userFirstName = data.user_first_name;
+    if (data.user_last_name)
+      organizationUser.userLastName = data.user_last_name;
     if (data.role) organizationUser.role = data.role;
     if (data.role_implied_from) {
       organizationUser.roleImpliedFrom = data.role_implied_from;

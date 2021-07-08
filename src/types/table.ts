@@ -1,5 +1,6 @@
 import { gql, IResolvers } from "apollo-server-lambda";
 import { GraphQLJSON } from "graphql-type-json";
+import { CurrentUser } from "../entity";
 import { log } from "../whitebrick-cloud";
 
 export const typeDefs = gql`
@@ -10,10 +11,13 @@ export const typeDefs = gql`
     schemaId: Int!
     name: String!
     label: String!
+    columns: [Column]
+    schemaName: String
+    userRole: String
+    userRoleImpliedFrom: String
+    settings: JSON
     createdAt: String!
     updatedAt: String!
-    columns: [Column]!
-    schemaName: String
   }
 
   type Column {
@@ -42,10 +46,12 @@ export const typeDefs = gql`
     userId: Int!
     roleId: Int!
     impliedFromRoleId: Int
-    schemaName: String
-    tableName: String
-    userEmail: String
-    role: String
+    schemaName: String!
+    tableName: String!
+    userEmail: String!
+    userFirstName: String
+    userLastName: String
+    role: String!
     roleImpliedFrom: String
     settings: JSON
     createdAt: String!
@@ -56,7 +62,17 @@ export const typeDefs = gql`
     """
     Tables
     """
-    wbTables(schemaName: String!, withColumns: Boolean): [Table]
+    wbMyTables(
+      schemaName: String!
+      withColumns: Boolean
+      withSettings: Boolean
+    ): [Table]
+    wbMyTableByName(
+      schemaName: String!
+      tableName: String!
+      withColumns: Boolean
+      withSettings: Boolean
+    ): Table
     """
     Table Users
     """
@@ -64,6 +80,7 @@ export const typeDefs = gql`
       schemaName: String!
       tableName: String!
       userEmails: [String]
+      withSettings: Boolean
     ): [TableUser]
     """
     Columns
@@ -125,7 +142,6 @@ export const typeDefs = gql`
       role: String!
     ): Boolean
     wbSaveTableUserSettings(
-      userEmail: String!
       schemaName: String!
       tableName: String!
       settings: JSON!
@@ -162,17 +178,50 @@ export const resolvers: IResolvers = {
   JSON: GraphQLJSON,
   Query: {
     // Tables
-    wbTables: async (_, { schemaName, withColumns }, context) => {
-      const result = await context.wbCloud.tables(schemaName, withColumns);
+    wbMyTables: async (
+      _,
+      { schemaName, withColumns, withSettings },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.accessibleTables(
+        currentUser,
+        schemaName,
+        withColumns,
+        withSettings
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbMyTableByName: async (
+      _,
+      { schemaName, tableName, withColumns, withSettings },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.accessibleTableByName(
+        currentUser,
+        schemaName,
+        tableName,
+        withColumns,
+        withSettings
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     // Table Users
-    wbTableUsers: async (_, { schemaName, tableName, userEmails }, context) => {
+    wbTableUsers: async (
+      _,
+      { schemaName, tableName, userEmails, withSettings },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.tableUsers(
+        currentUser,
         schemaName,
         tableName,
-        userEmails
+        userEmails,
+        withSettings
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
@@ -191,7 +240,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, tableLabel, create },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.addOrCreateTable(
+        currentUser,
         schemaName,
         tableName,
         tableLabel,
@@ -205,7 +256,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, newTableName, newTableLabel },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.updateTable(
+        currentUser,
         schemaName,
         tableName,
         newTableName,
@@ -219,7 +272,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, del },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.removeOrDeleteTable(
+        currentUser,
         schemaName,
         tableName,
         del
@@ -228,12 +283,18 @@ export const resolvers: IResolvers = {
       return result.success;
     },
     wbAddAllExistingTables: async (_, { schemaName }, context) => {
-      const result = await context.wbCloud.addAllExistingTables(schemaName);
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.addAllExistingTables(
+        currentUser,
+        schemaName
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbAddAllExistingRelationships: async (_, { schemaName }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.addOrRemoveAllExistingRelationships(
+        currentUser,
         schemaName
       );
       if (!result.success) throw context.wbCloud.err(result);
@@ -244,7 +305,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, columnNames, del },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.createOrDeletePrimaryKey(
+        currentUser,
         schemaName,
         tableName,
         columnNames,
@@ -265,7 +328,9 @@ export const resolvers: IResolvers = {
       },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.addOrCreateForeignKey(
+        currentUser,
         schemaName,
         tableName,
         columnNames,
@@ -278,17 +343,12 @@ export const resolvers: IResolvers = {
     },
     wbRemoveOrDeleteForeignKey: async (
       _,
-      {
-        schemaName,
-        tableName,
-        columnNames,
-        parentTableName,
-        parentColumnNames,
-        del,
-      },
+      { schemaName, tableName, columnNames, parentTableName, del },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.removeOrDeleteForeignKey(
+        currentUser,
         schemaName,
         tableName,
         columnNames,
@@ -304,7 +364,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, columnName, columnLabel, create, columnType },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.addOrCreateColumn(
+        currentUser,
         schemaName,
         tableName,
         columnName,
@@ -327,7 +389,9 @@ export const resolvers: IResolvers = {
       },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.updateColumn(
+        currentUser,
         schemaName,
         tableName,
         columnName,
@@ -343,7 +407,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, columnName, del },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.removeOrDeleteColumn(
+        currentUser,
         schemaName,
         tableName,
         columnName,
@@ -358,7 +424,9 @@ export const resolvers: IResolvers = {
       { schemaName, tableName, userEmails, role },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.setTableUsersRole(
+        currentUser,
         schemaName,
         tableName,
         userEmails,
@@ -369,13 +437,14 @@ export const resolvers: IResolvers = {
     },
     wbSaveTableUserSettings: async (
       _,
-      { schemaName, tableName, userEmail, settings },
+      { schemaName, tableName, settings },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.saveTableUserSettings(
+        currentUser,
         schemaName,
         tableName,
-        userEmail,
         settings
       );
       if (!result.success) throw context.wbCloud.err(result);

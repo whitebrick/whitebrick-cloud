@@ -21,6 +21,7 @@ export class Schema {
   userRoleImpliedFrom?: string;
   organizationOwnerName?: string;
   userOwnerEmail?: string;
+  settings?: object;
 
   public static parseResult(data: QueryResult | null): Array<Schema> {
     if (!data) throw new Error("Schema.parseResult: input is null");
@@ -49,6 +50,7 @@ export class Schema {
       schema.organizationOwnerName = data.organization_owner_name;
     }
     if (data.user_owner_email) schema.userOwnerEmail = data.user_owner_email;
+    if (data.settings) schema.settings = data.settings;
     return schema;
   }
 }

@@ -66,7 +66,10 @@ export class WhitebrickCloud {
       process.env.NODE_ENV == "development" &&
       headersLowerCase["x-test-user-id"]
     ) {
-      result = await this.userByEmail(headersLowerCase["x-test-user-id"]);
+      result = await this.userByEmail(
+        CurrentUser.getSysAdmin(this),
+        headersLowerCase["x-test-user-id"]
+      );
       if (result.success) result.payload = result.payload.id;
       log.debug(
         `========== FOUND TEST USER: ${headersLowerCase["x-test-user-id"]}`
@@ -106,10 +109,19 @@ export class WhitebrickCloud {
 
   public async resetTestData(): Promise<ServiceResult> {
     log.debug(`resetTestData()`);
-    let result = await this.schemas(undefined, undefined, "test_%");
+    let result = await this.schemas(
+      CurrentUser.getSysAdmin(this),
+      undefined,
+      undefined,
+      "test_%"
+    );
     if (!result.success) return result;
     for (const schema of result.payload) {
-      result = await this.removeOrDeleteSchema(schema.name, true);
+      result = await this.removeOrDeleteSchema(
+        CurrentUser.getSysAdmin(this),
+        schema.name,
+        true
+      );
       if (!result.success) return result;
     }
     result = await this.dal.deleteTestOrganizations();
@@ -122,21 +134,16 @@ export class WhitebrickCloud {
    * ========== Auth ==========
    */
 
-  public async auth(
-    schemaName: string,
-    userAuthId: string
-  ): Promise<ServiceResult> {
-    let hasuraUserId: number;
-    let result = await this.dal.userIdFromAuthId(userAuthId);
+  public async auth(userAuthId: string): Promise<ServiceResult> {
+    const result = await this.dal.userIdFromAuthId(userAuthId);
     if (!result.success) return result;
-    hasuraUserId = result.payload;
+    const hasuraUserId: number = result.payload;
     return {
       success: true,
       payload: {
         "X-Hasura-Allowed-Roles": ["wbuser"],
         "X-Hasura-Default-Role": "wbuser",
         "X-Hasura-User-Id": hasuraUserId,
-        "X-Hasura-Schema-Name": schemaName,
         "X-Hasura-Authenticated-At": Date().toString(),
       },
     } as ServiceResult;
@@ -146,11 +153,15 @@ export class WhitebrickCloud {
    * ========== Roles & Permissions ==========
    */
 
-  public async roleByName(name: string): Promise<ServiceResult> {
+  public async roleByName(
+    cU: CurrentUser,
+    name: string
+  ): Promise<ServiceResult> {
     return this.dal.roleByName(name);
   }
 
   public async deleteAndSetTablePermissions(
+    cU: CurrentUser,
     table: Table,
     deleteOnly?: boolean
   ): Promise<ServiceResult> {
@@ -158,6 +169,7 @@ export class WhitebrickCloud {
   }
 
   public async setRole(
+    cU: CurrentUser,
     userIds: number[],
     roleName: string,
     roleLevel: RoleLevel,
@@ -177,7 +189,7 @@ export class WhitebrickCloud {
         switch (roleName) {
           case "organization_user":
             // are any of these user currently admins getting demoted?
-            result = await this.organizationUsers(object.name, undefined, [
+            result = await this.organizationUsers(cU, object.name, undefined, [
               "organization_administrator",
             ]);
             if (!result.success) return result;
@@ -190,6 +202,7 @@ export class WhitebrickCloud {
             if (demotedAdmins.length > 0) {
               // completely remove them (will raise error if no admins)
               result = await this.removeUsersFromOrganization(
+                cU,
                 object.name,
                 demotedAdmins
               );
@@ -218,7 +231,7 @@ export class WhitebrickCloud {
               userIds
             );
             if (!result.success) return result;
-            result = await this.schemasByOrganizationOwner(object.id);
+            result = await this.schemasByOrganizationOwner(cU, object.id);
             if (!result.success) return result;
             for (const schema of result.payload) {
               result = await this.dal.setTableUserRolesFromSchemaRoles(
@@ -271,6 +284,7 @@ export class WhitebrickCloud {
   }
 
   public async deleteRole(
+    cU: CurrentUser,
     userIds: number[],
     roleLevel: RoleLevel,
     objectId: number
@@ -289,7 +303,7 @@ export class WhitebrickCloud {
         );
         if (!result.success) return result;
         // Delete table admins implicitly set from schema admins
-        result = await this.schemasByOrganizationOwner(objectId);
+        result = await this.schemasByOrganizationOwner(cU, objectId);
         if (!result.success) return result;
         for (const schema of result.payload) {
           result = await this.dal.deleteRole(
@@ -316,6 +330,20 @@ export class WhitebrickCloud {
     return result;
   }
 
+  public async roleAndIdForUserObject(
+    userId: number,
+    roleLevel: RoleLevel,
+    objectIdOrName: number | string,
+    parentObjectName?: string
+  ): Promise<ServiceResult> {
+    return this.dal.roleAndIdForUserObject(
+      userId,
+      roleLevel,
+      objectIdOrName,
+      parentObjectName
+    );
+  }
+
   /**
    * ========== Users ==========
    */
@@ -325,12 +353,15 @@ export class WhitebrickCloud {
     return this.dal.deleteTestUsers();
   }
 
-  public async usersByIds(ids: number[]): Promise<ServiceResult> {
+  public async usersByIds(
+    cU: CurrentUser,
+    ids: number[]
+  ): Promise<ServiceResult> {
     return this.dal.users(ids);
   }
 
-  public async userById(id: number): Promise<ServiceResult> {
-    const result = await this.usersByIds([id]);
+  public async userById(cU: CurrentUser, id: number): Promise<ServiceResult> {
+    const result = await this.usersByIds(cU, [id]);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -345,17 +376,24 @@ export class WhitebrickCloud {
 
   // searchPattern across multiple fields
   public async usersBySearchPattern(
+    cU: CurrentUser,
     searchPattern: string
   ): Promise<ServiceResult> {
     return this.dal.users(undefined, undefined, searchPattern);
   }
 
-  public async usersByEmails(userEmails: string[]): Promise<ServiceResult> {
+  public async usersByEmails(
+    cU: CurrentUser,
+    userEmails: string[]
+  ): Promise<ServiceResult> {
     return this.dal.users(undefined, userEmails);
   }
 
-  public async userByEmail(email: string): Promise<ServiceResult> {
-    const result = await this.usersByEmails([email]);
+  public async userByEmail(
+    cU: CurrentUser,
+    email: string
+  ): Promise<ServiceResult> {
+    const result = await this.usersByEmails(cU, [email]);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -369,6 +407,7 @@ export class WhitebrickCloud {
   }
 
   public async createUser(
+    cU: CurrentUser,
     email: string,
     firstName: string,
     lastName: string
@@ -378,6 +417,7 @@ export class WhitebrickCloud {
   }
 
   public async updateUser(
+    cU: CurrentUser,
     id: number,
     email: string,
     firstName: string,
@@ -391,6 +431,7 @@ export class WhitebrickCloud {
    */
 
   public async organizations(
+    cU: CurrentUser,
     organizationIds?: number[],
     organizationNames?: string[],
     organizationNamePattern?: string
@@ -403,12 +444,18 @@ export class WhitebrickCloud {
     return result;
   }
 
-  public async organizationsByIds(ids: number[]): Promise<ServiceResult> {
-    return this.organizations(ids);
+  public async organizationsByIds(
+    cU: CurrentUser,
+    ids: number[]
+  ): Promise<ServiceResult> {
+    return this.organizations(cU, ids);
   }
 
-  public async organizationById(id: number): Promise<ServiceResult> {
-    const result = await this.organizationsByIds([id]);
+  public async organizationById(
+    cU: CurrentUser,
+    id: number
+  ): Promise<ServiceResult> {
+    const result = await this.organizationsByIds(cU, [id]);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -421,12 +468,18 @@ export class WhitebrickCloud {
     return result;
   }
 
-  public async organizationsByNames(names: string[]): Promise<ServiceResult> {
-    return this.organizations(undefined, names);
+  public async organizationsByNames(
+    cU: CurrentUser,
+    names: string[]
+  ): Promise<ServiceResult> {
+    return this.organizations(cU, undefined, names);
   }
 
-  public async organizationByName(name: string): Promise<ServiceResult> {
-    const result = await this.organizationsByNames([name]);
+  public async organizationByName(
+    cU: CurrentUser,
+    name: string
+  ): Promise<ServiceResult> {
+    const result = await this.organizationsByNames(cU, [name]);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -440,9 +493,15 @@ export class WhitebrickCloud {
   }
 
   public async organizationByNamePattern(
+    cU: CurrentUser,
     namePattern: string
   ): Promise<ServiceResult> {
-    const result = await this.organizations(undefined, undefined, namePattern);
+    const result = await this.organizations(
+      cU,
+      undefined,
+      undefined,
+      namePattern
+    );
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -455,47 +514,86 @@ export class WhitebrickCloud {
     return result;
   }
 
-  public async accessibleOrganizations(
-    cU: CurrentUser
+  public async accessibleOrganizationByName(
+    cU: CurrentUser,
+    organizationName: string,
+    withSettings?: boolean
   ): Promise<ServiceResult> {
-    return await this.dal.organizationsByUsers([cU.id]);
+    const result = await this.dal.organizationsByUsers(
+      [cU.id],
+      undefined,
+      [organizationName],
+      withSettings
+    );
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_ORGANIZATION_NOT_FOUND",
+          values: [organizationName],
+        });
+      }
+    }
+    return result;
+  }
+
+  public async accessibleOrganizations(
+    cU: CurrentUser,
+    withSettings?: boolean
+  ): Promise<ServiceResult> {
+    return await this.dal.organizationsByUsers(
+      [cU.id],
+      undefined,
+      undefined,
+      withSettings
+    );
   }
 
   public async createOrganization(
-    cU: CurrentUser = CurrentUser.getSysAdmin(this),
+    cU: CurrentUser,
     name: string,
     label: string
   ): Promise<ServiceResult> {
-    const checkNameResult = await this.organizationByName(name);
+    if (cU.isSignedOut()) return cU.mustBeSignedIn();
+    const checkNameResult = await this.organizationByName(cU, name);
     if (checkNameResult.success) {
       return errResult({
         wbCode: "WB_ORGANIZATION_NAME_TAKEN",
       } as ServiceResult);
-      // WB_ORGANIZATION_NOT_FOUND is the desired result
+      // ie WB_ORGANIZATION_NOT_FOUND is the desired result
     } else if (checkNameResult.wbCode != "WB_ORGANIZATION_NOT_FOUND") {
       return checkNameResult;
     }
-    const createOrgResult = await this.dal.createOrganization(name, label);
-    if (!createOrgResult.success) return createOrgResult;
+    const createOrganizationResult = await this.dal.createOrganization(
+      name,
+      label
+    );
+    if (!createOrganizationResult.success) return createOrganizationResult;
     const result = await this.setOrganizationUsersRole(
+      CurrentUser.getSysAdmin(this),
       name,
       "organization_administrator",
       [cU.id]
     );
     if (!result.success) return result;
-    return createOrgResult;
+    return createOrganizationResult;
   }
 
   public async updateOrganization(
+    cU: CurrentUser,
     name: string,
     newName?: string,
     newLabel?: string
   ): Promise<ServiceResult> {
+    if (await cU.cant("administer_organization", name)) return cU.denied();
     return this.dal.updateOrganization(name, newName, newLabel);
   }
 
-  public async deleteOrganization(name: string): Promise<ServiceResult> {
-    const result = await this.organizationUsers(name, undefined, [
+  public async deleteOrganization(
+    cU: CurrentUser,
+    name: string
+  ): Promise<ServiceResult> {
+    const result = await this.organizationUsers(cU, name, undefined, [
       "organization_user",
       "organization_external_user",
     ]);
@@ -518,16 +616,18 @@ export class WhitebrickCloud {
    */
 
   public async organizationUsers(
+    cU: CurrentUser,
     name?: string,
     id?: number,
     roles?: string[],
-    userEmails?: string[]
+    userEmails?: string[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     let result: ServiceResult = errResult();
     if (name) {
-      result = await this.organizationByName(name);
+      result = await this.organizationByName(cU, name);
     } else if (id) {
-      result = await this.organizationById(id);
+      result = await this.organizationById(cU, id);
     }
     if (!result.success) return result;
     if (!result.payload) {
@@ -543,33 +643,40 @@ export class WhitebrickCloud {
     }
     let userIds = undefined;
     if (userEmails) {
-      const usersResult = await this.usersByEmails(userEmails);
+      const usersResult = await this.usersByEmails(cU, userEmails);
       if (!usersResult.success || !usersResult.payload) return usersResult;
       userIds = usersResult.payload.map((user: { id: number }) => user.id);
     }
-    return this.dal.organizationUsers(name, id, roles, userIds);
+    return this.dal.organizationUsers(name, id, roles, userIds, withSettings);
   }
 
   public async setOrganizationUsersRole(
+    cU: CurrentUser,
     organizationName: string,
     role: string,
     userIds?: number[],
     userEmails?: string[]
   ): Promise<ServiceResult> {
+    if (await cU.cant("administer_organization", organizationName)) {
+      return cU.denied();
+    }
     log.debug(
       `setOrganizationUsersRole(${organizationName},${role},${userIds},${userEmails})`
     );
-    const organizationResult = await this.organizationByName(organizationName);
+    const organizationResult = await this.organizationByName(
+      cU,
+      organizationName
+    );
     if (!organizationResult.success) return organizationResult;
     let result: ServiceResult = errResult();
     let userIdsFound: number[] = [];
     let usersRequested: (string | number)[] = [];
     if (userIds) {
       usersRequested = userIds;
-      result = await this.usersByIds(userIds);
+      result = await this.usersByIds(cU, userIds);
     } else if (userEmails) {
       usersRequested = userEmails;
-      result = await this.usersByEmails(userEmails);
+      result = await this.usersByEmails(cU, userEmails);
     }
     if (!result.success || !result.payload) return result;
     userIdsFound = result.payload.map((user: { id: number }) => user.id);
@@ -583,6 +690,7 @@ export class WhitebrickCloud {
       } as ServiceResult);
     }
     return await this.setRole(
+      cU,
       userIdsFound,
       role,
       "organization",
@@ -591,6 +699,7 @@ export class WhitebrickCloud {
   }
 
   public async removeUsersFromOrganization(
+    cU: CurrentUser,
     organizationName: string,
     userIds?: number[],
     userEmails?: string[]
@@ -599,14 +708,14 @@ export class WhitebrickCloud {
     let userIdsToBeRemoved: number[] = [];
     if (userIds) userIdsToBeRemoved = userIds;
     if (userEmails) {
-      result = await this.usersByEmails(userEmails);
+      result = await this.usersByEmails(cU, userEmails);
       if (!result.success) return result;
       userIdsToBeRemoved = result.payload.map(
         (user: { id: number }) => user.id
       );
     }
     // check not all the admins will be removed
-    result = await this.organizationUsers(organizationName, undefined, [
+    result = await this.organizationUsers(cU, organizationName, undefined, [
       "organization_administrator",
     ]);
     if (!result.success) return result;
@@ -619,9 +728,13 @@ export class WhitebrickCloud {
         wbCode: "WB_ORGANIZATION_NO_ADMINS",
       } as ServiceResult);
     }
-    const organizationResult = await this.organizationByName(organizationName);
+    const organizationResult = await this.organizationByName(
+      cU,
+      organizationName
+    );
     if (!organizationResult.success) return organizationResult;
     result = await this.deleteRole(
+      cU,
       userIdsToBeRemoved,
       "organization",
       organizationResult.payload.id
@@ -629,11 +742,26 @@ export class WhitebrickCloud {
     return result;
   }
 
+  public async saveSchemaUserSettings(
+    cU: CurrentUser,
+    schemaName: string,
+    settings: object
+  ): Promise<ServiceResult> {
+    const schemaResult = await this.schemaByName(cU, schemaName);
+    if (!schemaResult.success) return schemaResult;
+    return this.dal.saveSchemaUserSettings(
+      schemaResult.payload.id,
+      cU.id,
+      settings
+    );
+  }
+
   /**
    * ========== Schemas ==========
    */
 
   public async schemas(
+    cU: CurrentUser,
     schemaIds?: number[],
     schemaNames?: string[],
     schemaNamePattern?: string
@@ -646,12 +774,15 @@ export class WhitebrickCloud {
     return result;
   }
 
-  public async schemasByIds(ids: number[]): Promise<ServiceResult> {
-    return this.schemas(ids);
+  public async schemasByIds(
+    cU: CurrentUser,
+    ids: number[]
+  ): Promise<ServiceResult> {
+    return this.schemas(cU, ids);
   }
 
-  public async schemaById(id: number): Promise<ServiceResult> {
-    const result = await this.schemasByIds([id]);
+  public async schemaById(cU: CurrentUser, id: number): Promise<ServiceResult> {
+    const result = await this.schemasByIds(cU, [id]);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -664,12 +795,18 @@ export class WhitebrickCloud {
     return result;
   }
 
-  public async schemasByNames(names: string[]): Promise<ServiceResult> {
-    return this.schemas(undefined, names);
+  public async schemasByNames(
+    cU: CurrentUser,
+    names: string[]
+  ): Promise<ServiceResult> {
+    return this.schemas(cU, undefined, names);
   }
 
-  public async schemaByName(name: string): Promise<ServiceResult> {
-    const result = await this.schemasByNames([name]);
+  public async schemaByName(
+    cU: CurrentUser,
+    name: string
+  ): Promise<ServiceResult> {
+    const result = await this.schemasByNames(cU, [name]);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -683,9 +820,10 @@ export class WhitebrickCloud {
   }
 
   public async schemaByNamePattern(
+    cU: CurrentUser,
     namePattern: string
   ): Promise<ServiceResult> {
-    const result = await this.schemas(undefined, undefined, namePattern);
+    const result = await this.schemas(cU, undefined, undefined, namePattern);
     if (result.success) {
       result.payload = result.payload[0];
       if (!result.payload) {
@@ -699,6 +837,7 @@ export class WhitebrickCloud {
   }
 
   public async schemasByUserOwner(
+    cU: CurrentUser,
     userId?: number,
     userEmail?: string
   ): Promise<ServiceResult> {
@@ -706,6 +845,7 @@ export class WhitebrickCloud {
   }
 
   public async schemasByOrganizationOwner(
+    cU: CurrentUser,
     organizationId?: number,
     organizationName?: string
   ): Promise<ServiceResult> {
@@ -716,19 +856,51 @@ export class WhitebrickCloud {
   }
 
   public async schemasByOrganizationOwnerAdmin(
+    cU: CurrentUser,
     userId?: number,
     userEmail?: string
   ): Promise<ServiceResult> {
     return this.dal.schemasByOrganizationOwnerAdmin(userId, userEmail);
   }
 
-  public async accessibleSchemas(cU: CurrentUser): Promise<ServiceResult> {
-    return await this.dal.schemasByUsers([cU.id]);
+  public async accessibleSchemaByName(
+    cU: CurrentUser,
+    schemaName: string,
+    withSettings?: boolean
+  ): Promise<ServiceResult> {
+    const result = await this.dal.schemasByUsers(
+      [cU.id],
+      undefined,
+      [schemaName],
+      withSettings
+    );
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_SCHEMA_NOT_FOUND",
+          values: [schemaName],
+        });
+      }
+    }
+    return result;
+  }
+
+  public async accessibleSchemas(
+    cU: CurrentUser,
+    withSettings?: boolean
+  ): Promise<ServiceResult> {
+    return await this.dal.schemasByUsers(
+      [cU.id],
+      undefined,
+      undefined,
+      withSettings
+    );
   }
 
   // If organizationOwner organization admins are implicitly granted schema admin roles
   public async createSchema(
-    cU: CurrentUser = CurrentUser.getSysAdmin(this),
+    cU: CurrentUser,
     name: string,
     label: string,
     organizationOwnerId?: number,
@@ -742,14 +914,14 @@ export class WhitebrickCloud {
     // run checks for organization owner
     if (organizationOwnerId || organizationOwnerName) {
       if (!organizationOwnerId && organizationOwnerName) {
-        result = await this.organizationByName(organizationOwnerName);
+        result = await this.organizationByName(cU, organizationOwnerName);
         if (!result.success) return result;
         organizationOwnerId = result.payload.id;
       }
       if (
         cU.isNotSysAdmin() &&
         organizationOwnerId &&
-        cU.isNotInOrganization(organizationOwnerId)
+        (await cU.cant("access_organization", organizationOwnerId))
       ) {
         return errResult({
           wbCode: "WB_USER_NOT_IN_ORG",
@@ -775,9 +947,10 @@ export class WhitebrickCloud {
       // add the user as a schema admin so they dont lose access
       if (
         cU.isNotSysAdmin() &&
-        cU.isNot("organization_administrator", organizationOwnerId)
+        (await cU.can("administer_organization", organizationOwnerId))
       ) {
         result = await this.setRole(
+          cU,
           [cU.id],
           "schema_administrator",
           "schema" as RoleLevel,
@@ -794,6 +967,7 @@ export class WhitebrickCloud {
     } else {
       // If owner is a user, add them to schema_users to save settings
       result = await this.setRole(
+        cU,
         [cU.id],
         "schema_owner",
         "schema" as RoleLevel,
@@ -805,11 +979,13 @@ export class WhitebrickCloud {
   }
 
   public async removeOrDeleteSchema(
+    cU: CurrentUser,
     schemaName: string,
     del: boolean
   ): Promise<ServiceResult> {
     log.debug(`removeOrDeleteSchema(${schemaName},${del})`);
     let result = await this.addOrRemoveAllExistingRelationships(
+      cU,
       schemaName,
       true
     );
@@ -817,7 +993,7 @@ export class WhitebrickCloud {
     result = await this.dal.tables(schemaName);
     if (!result.success) return result;
     for (const table of result.payload) {
-      result = await this.removeOrDeleteTable(schemaName, table.name, del);
+      result = await this.removeOrDeleteTable(cU, schemaName, table.name, del);
       if (!result.success) return result;
     }
     result = await this.dal.removeAllUsersFromSchema(schemaName);
@@ -830,26 +1006,29 @@ export class WhitebrickCloud {
    */
 
   public async schemaUsers(
+    cU: CurrentUser,
     schemaName: string,
-    userEmails?: string[]
+    userEmails?: string[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     let userIds = undefined;
     if (userEmails) {
-      const usersResult = await this.usersByEmails(userEmails);
+      const usersResult = await this.usersByEmails(cU, userEmails);
       if (!usersResult.success || !usersResult.payload) return usersResult;
       userIds = usersResult.payload.map((user: { id: number }) => user.id);
     }
-    return this.dal.schemaUsers(schemaName, userIds);
+    return this.dal.schemaUsers(schemaName, userIds, withSettings);
   }
 
   public async setSchemaUsersRole(
+    cU: CurrentUser,
     schemaName: string,
     userEmails: string[],
     role: string
   ): Promise<ServiceResult> {
-    const schemaResult = await this.schemaByName(schemaName);
+    const schemaResult = await this.schemaByName(cU, schemaName);
     if (!schemaResult.success) return schemaResult;
-    const usersResult = await this.usersByEmails(userEmails);
+    const usersResult = await this.usersByEmails(cU, userEmails);
     if (!usersResult.success || !usersResult.payload) return usersResult;
     if (usersResult.payload.length != userEmails.length) {
       return errResult({
@@ -860,17 +1039,24 @@ export class WhitebrickCloud {
       } as ServiceResult);
     }
     const userIds = usersResult.payload.map((user: { id: number }) => user.id);
-    return await this.setRole(userIds, role, "schema", schemaResult.payload);
+    return await this.setRole(
+      cU,
+      userIds,
+      role,
+      "schema",
+      schemaResult.payload
+    );
   }
 
   public async removeSchemaUsers(
+    cU: CurrentUser,
     schemaName: string,
     userEmails: string[]
   ): Promise<ServiceResult> {
-    const usersResult = await this.usersByEmails(userEmails);
+    const usersResult = await this.usersByEmails(cU, userEmails);
     if (!usersResult.success) return usersResult;
     const userIds = usersResult.payload.map((user: { id: number }) => user.id);
-    const schemaResult = await this.schemaByName(schemaName);
+    const schemaResult = await this.schemaByName(cU, schemaName);
     if (!schemaResult.success) return schemaResult;
     if (
       schemaResult.payload.user_owner_id &&
@@ -881,6 +1067,7 @@ export class WhitebrickCloud {
       } as ServiceResult);
     }
     const result = await this.deleteRole(
+      cU,
       userIds,
       "schema",
       schemaResult.payload.id
@@ -888,11 +1075,29 @@ export class WhitebrickCloud {
     return result;
   }
 
+  public async saveOrganizationUserSettings(
+    cU: CurrentUser,
+    organizationName: string,
+    settings: object
+  ): Promise<ServiceResult> {
+    const organizationResult = await this.organizationByName(
+      cU,
+      organizationName
+    );
+    if (!organizationResult.success) return organizationResult;
+    return this.dal.saveOrganizationUserSettings(
+      organizationResult.payload.id,
+      cU.id,
+      settings
+    );
+  }
+
   /**
    * ========== Tables ==========
    */
 
   public async tables(
+    cU: CurrentUser,
     schemaName: string,
     withColumns?: boolean
   ): Promise<ServiceResult> {
@@ -900,7 +1105,7 @@ export class WhitebrickCloud {
     if (withColumns) {
       if (!result.success) return result;
       for (const table of result.payload) {
-        const columnsResult = await this.columns(schemaName, table.name);
+        const columnsResult = await this.columns(cU, schemaName, table.name);
         if (!columnsResult.success) return columnsResult;
         table.columns = columnsResult.payload;
       }
@@ -909,13 +1114,74 @@ export class WhitebrickCloud {
   }
 
   public async tableBySchemaNameTableName(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
     return await this.dal.tableBySchemaNameTableName(schemaName, tableName);
   }
 
+  public async accessibleTableByName(
+    cU: CurrentUser,
+    schemaName: string,
+    tableName: string,
+    withColumns?: boolean,
+    withSettings?: boolean
+  ): Promise<ServiceResult> {
+    const result = await this.dal.tablesByUsers(
+      schemaName,
+      [cU.id],
+      undefined,
+      [tableName],
+      withSettings
+    );
+    if (result.success) {
+      result.payload = result.payload[0];
+      if (!result.payload) {
+        return errResult({
+          wbCode: "WB_TABLE_NOT_FOUND",
+          values: [tableName],
+        });
+      }
+      if (withColumns) {
+        const columnsResult = await this.columns(
+          cU,
+          schemaName,
+          result.payload.name
+        );
+        if (!columnsResult.success) return columnsResult;
+        result.payload.columns = columnsResult.payload;
+      }
+    }
+    return result;
+  }
+
+  public async accessibleTables(
+    cU: CurrentUser,
+    schemaName: string,
+    withColumns?: boolean,
+    withSettings?: boolean
+  ): Promise<ServiceResult> {
+    const result = await this.dal.tablesByUsers(
+      schemaName,
+      [cU.id],
+      undefined,
+      undefined,
+      withSettings
+    );
+    if (withColumns) {
+      if (!result.success) return result;
+      for (const table of result.payload) {
+        const columnsResult = await this.columns(cU, schemaName, table.name);
+        if (!columnsResult.success) return columnsResult;
+        table.columns = columnsResult.payload;
+      }
+    }
+    return result;
+  }
+
   public async addOrCreateTable(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     tableLabel: string,
@@ -932,15 +1198,19 @@ export class WhitebrickCloud {
       create
     );
     if (!tableResult.success) return tableResult;
-    let result = await this.addDefaultTableUsersToTable(tableResult.payload);
+    let result = await this.addDefaultTableUsersToTable(
+      cU,
+      tableResult.payload
+    );
     if (!result.success) return result;
-    result = await this.deleteAndSetTablePermissions(tableResult.payload);
+    result = await this.deleteAndSetTablePermissions(cU, tableResult.payload);
     if (!result.success) return result;
     tableResult.payload.schemaName = schemaName;
-    return await this.trackTableWithPermissions(tableResult.payload);
+    return await this.trackTableWithPermissions(cU, tableResult.payload);
   }
 
   public async removeOrDeleteTable(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     del?: boolean
@@ -952,6 +1222,7 @@ export class WhitebrickCloud {
     const columns = result.payload;
     for (const column of columns) {
       result = await this.removeOrDeleteColumn(
+        cU,
         schemaName,
         tableName,
         column.name,
@@ -961,22 +1232,28 @@ export class WhitebrickCloud {
       if (!result.success) return result;
     }
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
-    result = await this.untrackTableWithPermissions(tableResult.payload);
+    result = await this.untrackTableWithPermissions(cU, tableResult.payload);
     if (!result.success) return result;
     // 3. remove user settings
     result = await this.dal.removeAllTableUsers(tableResult.payload.id);
     if (!result.success) return result;
-    result = await this.deleteAndSetTablePermissions(tableResult.payload, true);
+    result = await this.deleteAndSetTablePermissions(
+      cU,
+      tableResult.payload,
+      true
+    );
     if (!result.success) return result;
     // 4. remove/delete the table
     return await this.dal.removeOrDeleteTable(schemaName, tableName, del);
   }
 
   public async updateTable(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     newTableName?: string,
@@ -984,12 +1261,13 @@ export class WhitebrickCloud {
   ): Promise<ServiceResult> {
     let result: ServiceResult;
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
     if (newTableName) {
-      result = await this.tables(schemaName, false);
+      result = await this.tables(cU, schemaName, false);
       if (!result.success) return result;
       const existingTableNames = result.payload.map(
         (table: { name: string }) => table.name
@@ -997,7 +1275,7 @@ export class WhitebrickCloud {
       if (existingTableNames.includes(newTableName)) {
         return errResult({ wbCode: "WB_TABLE_NAME_EXISTS" } as ServiceResult);
       }
-      result = await this.untrackTableWithPermissions(tableResult.payload);
+      result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     result = await this.dal.updateTable(
@@ -1008,13 +1286,14 @@ export class WhitebrickCloud {
     );
     if (!result.success) return result;
     if (newTableName) {
-      result = await this.trackTableWithPermissions(tableResult.payload);
+      result = await this.trackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     return result;
   }
 
   public async addAllExistingTables(
+    cU: CurrentUser,
     schemaName: string
   ): Promise<ServiceResult> {
     let result = await this.dal.discoverTables(schemaName);
@@ -1022,19 +1301,21 @@ export class WhitebrickCloud {
     const tableNames = result.payload;
     for (const tableName of tableNames) {
       const tableResult = await this.addOrCreateTable(
+        cU,
         schemaName,
         tableName,
         v.titleCase(tableName.replaceAll("_", " ")),
         false
       );
       if (!tableResult.success) return tableResult;
-      result = await this.untrackTableWithPermissions(tableResult.payload);
+      result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
       result = await this.dal.discoverColumns(schemaName, tableName);
       if (!result.success) return result;
       const columns = result.payload;
       for (const column of columns) {
         result = await this.addOrCreateColumn(
+          cU,
           schemaName,
           tableName,
           column.name,
@@ -1045,13 +1326,14 @@ export class WhitebrickCloud {
         );
         if (!result.success) return result;
       }
-      result = await this.trackTableWithPermissions(tableResult.payload);
+      result = await this.trackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     return result;
   }
 
   public async addOrRemoveAllExistingRelationships(
+    cU: CurrentUser,
     schemaName: string,
     remove?: boolean
   ): Promise<ServiceResult> {
@@ -1069,6 +1351,7 @@ export class WhitebrickCloud {
           let result: ServiceResult;
           if (remove) {
             result = await this.removeOrDeleteForeignKey(
+              cU,
               schemaName,
               relationship.tableName,
               [relationship.columnName],
@@ -1076,6 +1359,7 @@ export class WhitebrickCloud {
             );
           } else {
             result = await this.addOrCreateForeignKey(
+              cU,
               schemaName,
               relationship.tableName,
               [relationship.columnName],
@@ -1096,13 +1380,14 @@ export class WhitebrickCloud {
   }
 
   public async addDefaultTablePermissions(
+    cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
     log.debug(`addDefaultTablePermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
-    let result = await this.columns(table.schemaName, table.name);
+    let result = await this.columns(cU, table.schemaName, table.name);
     if (!result.success) return result;
     // dont add permissions for tables with no columns
     if (result.payload.length == 0) return { success: true } as ServiceResult;
@@ -1126,6 +1411,7 @@ export class WhitebrickCloud {
   }
 
   public async removeDefaultTablePermissions(
+    cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
     log.debug(`addDefaultTablePermissions(${JSON.stringify(table)})`);
@@ -1133,7 +1419,7 @@ export class WhitebrickCloud {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
     // If this table no longer has any columns, there will be no permissions
-    let result = await this.columns(table.schemaName, table.name);
+    let result = await this.columns(cU, table.schemaName, table.name);
     if (!result.success) return result;
     if (result.payload.length == 0) {
       return { success: true, payload: true } as ServiceResult;
@@ -1154,6 +1440,7 @@ export class WhitebrickCloud {
 
   // Pass empty columnNames[] to clear
   public async createOrDeletePrimaryKey(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnNames: string[],
@@ -1186,6 +1473,7 @@ export class WhitebrickCloud {
   }
 
   public async addOrCreateForeignKey(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnNames: string[],
@@ -1196,6 +1484,7 @@ export class WhitebrickCloud {
     let operation: string = "CREATE";
     if (!create) operation = "ADD";
     return await this.setForeignKey(
+      cU,
       schemaName,
       tableName,
       columnNames,
@@ -1206,6 +1495,7 @@ export class WhitebrickCloud {
   }
 
   public async removeOrDeleteForeignKey(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnNames: string[],
@@ -1215,6 +1505,7 @@ export class WhitebrickCloud {
     let operation: string = "DELETE";
     if (!del) operation = "REMOVE";
     return await this.setForeignKey(
+      cU,
       schemaName,
       tableName,
       columnNames,
@@ -1226,6 +1517,7 @@ export class WhitebrickCloud {
 
   // operation = "ADD|CREATE|REMOVE|DELETE"
   public async setForeignKey(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnNames: string[],
@@ -1299,24 +1591,28 @@ export class WhitebrickCloud {
     return result;
   }
 
-  public async trackTableWithPermissions(table: Table): Promise<ServiceResult> {
+  public async trackTableWithPermissions(
+    cU: CurrentUser,
+    table: Table
+  ): Promise<ServiceResult> {
     log.debug(`trackTableWithPermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
     let result = await hasuraApi.trackTable(table.schemaName, table.name);
     if (!result.success) return result;
-    return await this.addDefaultTablePermissions(table);
+    return await this.addDefaultTablePermissions(cU, table);
   }
 
   public async untrackTableWithPermissions(
+    cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
     log.debug(`untrackTableWithPermissions(${JSON.stringify(table)})`);
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
-    let result = await this.removeDefaultTablePermissions(table);
+    let result = await this.removeDefaultTablePermissions(cU, table);
     if (!result.success) return result;
     result = await hasuraApi.untrackTable(table.schemaName, table.name);
     return result;
@@ -1327,20 +1623,23 @@ export class WhitebrickCloud {
    */
 
   public async tableUsers(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
-    userEmails?: string[]
+    userEmails?: string[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     let userIds = undefined;
     if (userEmails) {
-      const usersResult = await this.usersByEmails(userEmails);
+      const usersResult = await this.usersByEmails(cU, userEmails);
       if (!usersResult.success || !usersResult.payload) return usersResult;
       userIds = usersResult.payload.map((user: { id: number }) => user.id);
     }
-    return this.dal.tableUsers(schemaName, tableName, userIds);
+    return this.dal.tableUsers(schemaName, tableName, userIds, withSettings);
   }
 
   public async addDefaultTableUsersToTable(
+    cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
     log.debug(`addDefaultTableUsersToTable(${JSON.stringify(table)})`);
@@ -1352,17 +1651,19 @@ export class WhitebrickCloud {
   }
 
   public async setTableUsersRole(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     userEmails: [string],
     role: string
   ): Promise<ServiceResult> {
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
-    const usersResult = await this.usersByEmails(userEmails);
+    const usersResult = await this.usersByEmails(cU, userEmails);
     if (!usersResult.success || !usersResult.payload) return usersResult;
     if (usersResult.payload.length != userEmails.length) {
       return errResult({
@@ -1373,16 +1674,17 @@ export class WhitebrickCloud {
       } as ServiceResult);
     }
     const userIds = usersResult.payload.map((user: { id: number }) => user.id);
-    return await this.setRole(userIds, role, "table", tableResult.payload);
+    return await this.setRole(cU, userIds, role, "table", tableResult.payload);
   }
 
   // not used yet
   public async removeUsersFromTable(
+    cU: CurrentUser,
     userEmails: string[],
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
-    const usersResult = await this.usersByEmails(userEmails);
+    const usersResult = await this.usersByEmails(cU, userEmails);
     if (!usersResult.success) return usersResult;
     // TBD do any checks against schema
     // const userIds = usersResult.payload.map((user: { id: number }) => user.id);
@@ -1400,11 +1702,13 @@ export class WhitebrickCloud {
     //   } as ServiceResult);
     // }
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
     const result = await this.deleteRole(
+      cU,
       usersResult.payload,
       "table",
       tableResult.payload.id
@@ -1413,21 +1717,20 @@ export class WhitebrickCloud {
   }
 
   public async saveTableUserSettings(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
-    userEmail: string,
     settings: object
   ): Promise<ServiceResult> {
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
-    const userResult = await this.userByEmail(userEmail);
-    if (!userResult.success) return userResult;
     return this.dal.saveTableUserSettings(
       tableResult.payload.id,
-      userResult.payload.id,
+      cU.id,
       settings
     );
   }
@@ -1437,6 +1740,7 @@ export class WhitebrickCloud {
    */
 
   public async columns(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
@@ -1469,6 +1773,7 @@ export class WhitebrickCloud {
   }
 
   public async addOrCreateColumn(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnName: string,
@@ -1483,12 +1788,13 @@ export class WhitebrickCloud {
     if (!create) create = false;
     let result: ServiceResult = errResult();
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
     if (!skipTracking) {
-      result = await this.untrackTableWithPermissions(tableResult.payload);
+      result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     result = await this.dal.addOrCreateColumn(
@@ -1500,13 +1806,14 @@ export class WhitebrickCloud {
       columnType
     );
     if (result.success && !skipTracking) {
-      result = await this.trackTableWithPermissions(tableResult.payload);
+      result = await this.trackTableWithPermissions(cU, tableResult.payload);
     }
     return result;
   }
 
   // Must enter and exit with tracked table, regardless of if there are columns
   public async removeOrDeleteColumn(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnName: string,
@@ -1519,12 +1826,13 @@ export class WhitebrickCloud {
     if (!del) del = false;
     let result: ServiceResult = errResult();
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
     if (!skipTracking) {
-      result = await this.untrackTableWithPermissions(tableResult.payload);
+      result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     result = await this.dal.removeOrDeleteColumn(
@@ -1534,12 +1842,13 @@ export class WhitebrickCloud {
       del
     );
     if (result.success && !skipTracking) {
-      result = await this.trackTableWithPermissions(tableResult.payload);
+      result = await this.trackTableWithPermissions(cU, tableResult.payload);
     }
     return result;
   }
 
   public async updateColumn(
+    cU: CurrentUser,
     schemaName: string,
     tableName: string,
     columnName: string,
@@ -1550,12 +1859,13 @@ export class WhitebrickCloud {
     // TBD: if this is a fk
     let result: ServiceResult;
     const tableResult = await this.tableBySchemaNameTableName(
+      cU,
       schemaName,
       tableName
     );
     if (!tableResult.success) return tableResult;
     if (newColumnName) {
-      result = await this.columns(schemaName, tableName);
+      result = await this.columns(cU, schemaName, tableName);
       if (!result.success) return result;
       const existingColumnNames = result.payload.map(
         (table: { name: string }) => table.name
@@ -1565,7 +1875,7 @@ export class WhitebrickCloud {
       }
     }
     if (newColumnName || newType) {
-      result = await this.untrackTableWithPermissions(tableResult.payload);
+      result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     result = await this.dal.updateColumn(
@@ -1578,7 +1888,7 @@ export class WhitebrickCloud {
     );
     if (!result.success) return result;
     if (newColumnName || newType) {
-      result = await this.trackTableWithPermissions(tableResult.payload);
+      result = await this.trackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
     return result;
@@ -1634,7 +1944,7 @@ export function errResult(result?: ServiceResult): ServiceResult {
       success: false,
       message: `WhitebrickCloud err: Could not find apolloErrorCode for wbCode=${result.wbCode}`,
     };
-  } else {
+  } else if (!result.apolloErrorCode) {
     result.apolloErrorCode = "INTERNAL_SERVER_ERROR";
   }
   return result;

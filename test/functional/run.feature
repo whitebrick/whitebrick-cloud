@@ -14,5 +14,5 @@ Feature: Run
     * call read("users/users.feature")
     * call read("organizations/organizations.feature")
     * call read("schemas/schemas.feature")
-    # * call read("tables/tables.feature")
+    * call read("tables/tables.feature")
     * call read("permissions/permissions.feature")

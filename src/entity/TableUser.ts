@@ -12,6 +12,8 @@ export class TableUser {
   schemaName?: string;
   tableName?: string;
   userEmail?: string;
+  userFirstName?: string;
+  userLastName?: string;
   role?: string;
   roleImpliedFrom?: string;
 
@@ -39,6 +41,8 @@ export class TableUser {
     if (data.schema_name) tableUser.schemaName = data.schema_name;
     if (data.table_name) tableUser.tableName = data.table_name;
     if (data.user_email) tableUser.userEmail = data.user_email;
+    if (data.user_first_name) tableUser.userFirstName = data.user_first_name;
+    if (data.user_last_name) tableUser.userLastName = data.user_last_name;
     if (data.role) tableUser.role = data.role;
     if (data.role_implied_from) {
       tableUser.roleImpliedFrom = data.role_implied_from;

@@ -1,5 +1,5 @@
 import { gql, IResolvers } from "apollo-server-lambda";
-import { CurrentUser } from "../entity/CurrentUser";
+import { CurrentUser } from "../entity";
 import { log } from "../whitebrick-cloud";
 
 export const typeDefs = gql`
@@ -9,6 +9,7 @@ export const typeDefs = gql`
     label: String!
     userRole: String
     userRoleImpliedFrom: String
+    settings: JSON
     createdAt: String!
     updatedAt: String!
   }
@@ -18,9 +19,11 @@ export const typeDefs = gql`
     userId: Int!
     roleId: Int!
     impliedFromRoleId: Int
-    organizationName: String
-    userEmail: String
-    role: String
+    organizationName: String!
+    userEmail: String!
+    userFirstName: String
+    userLastName: String
+    role: String!
     roleImpliedFrom: String
     settings: JSON
     createdAt: String!
@@ -31,9 +34,9 @@ export const typeDefs = gql`
     """
     Organizations
     """
-    wbOrganizations: [Organization]
-    wbOrganizationById(id: ID!): Organization
-    wbOrganizationByName(currentUserEmail: String!, name: String!): Organization
+    wbMyOrganizations(withSettings: Boolean): [Organization]
+    wbMyOrganizationByName(name: String!, withSettings: Boolean): Organization
+    wbOrganizationByName(name: String!): Organization
     """
     Organization Users
     """
@@ -41,6 +44,7 @@ export const typeDefs = gql`
       organizationName: String!
       roles: [String]
       userEmails: [String]
+      withSettings: Boolean
     ): [OrganizationUser]
   }
 
@@ -67,39 +71,58 @@ export const typeDefs = gql`
       userEmails: [String]!
       organizationName: String!
     ): Boolean
+    wbSaveOrganizationUserSettings(
+      organizationName: String!
+      settings: JSON!
+    ): Boolean!
   }
 `;
 
 export const resolvers: IResolvers = {
   Query: {
     // Organizations
-    wbOrganizations: async (_, __, context) => {
+    wbMyOrganizations: async (_, { withSettings }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.accessibleOrganizations(currentUser);
+      const result = await context.wbCloud.accessibleOrganizations(
+        currentUser,
+        withSettings
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbOrganizationByName: async (_, { currentUserEmail, name }, context) => {
-      const result = await context.wbCloud.organizationByName(name);
+    wbMyOrganizationByName: async (_, { name, withSettings }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.accessibleOrganizationByName(
+        currentUser,
+        name,
+        withSettings
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbOrganizationById: async (_, { id }, context) => {
-      const result = await context.wbCloud.organizationById(id);
+    wbOrganizationByName: async (_, { name }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.organizationByName(
+        currentUser,
+        name
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
     // Organization Users
     wbOrganizationUsers: async (
       _,
-      { organizationName, roles, userEmails },
+      { organizationName, roles, userEmails, withSettings },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.organizationUsers(
+        currentUser,
         organizationName,
         undefined,
         roles,
-        userEmails
+        userEmails,
+        withSettings
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
@@ -118,7 +141,9 @@ export const resolvers: IResolvers = {
       return result.payload;
     },
     wbUpdateOrganization: async (_, { name, newName, newLabel }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.updateOrganization(
+        currentUser,
         name,
         newName,
         newLabel
@@ -127,7 +152,11 @@ export const resolvers: IResolvers = {
       return result.payload;
     },
     wbDeleteOrganization: async (_, { name }, context) => {
-      const result = await context.wbCloud.deleteOrganization(name);
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.deleteOrganization(
+        currentUser,
+        name
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
@@ -137,7 +166,9 @@ export const resolvers: IResolvers = {
       { organizationName, userEmails, role },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.setOrganizationUsersRole(
+        currentUser,
         organizationName,
         role,
         undefined,
@@ -151,10 +182,26 @@ export const resolvers: IResolvers = {
       { userEmails, organizationName },
       context
     ) => {
+      const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.removeUsersFromOrganization(
+        currentUser,
         organizationName,
         undefined,
         userEmails
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbSaveOrganizationUserSettings: async (
+      _,
+      { organizationName, settings },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.saveSchemaUserSettings(
+        currentUser,
+        organizationName,
+        settings
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

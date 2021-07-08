@@ -307,6 +307,145 @@ export class DAL {
     return results[results.length - 1];
   }
 
+  public async roleAndIdForUserObject(
+    userId: number,
+    roleLevel: RoleLevel,
+    objectIdOrName: number | string,
+    parentObjectName?: string
+  ): Promise<ServiceResult> {
+    let objectId: number | undefined = undefined;
+    let queryObjId: string = "";
+    let sqlJoin: string = "";
+    let sqlWhere: string = "";
+    if (typeof objectIdOrName === "number") objectId = objectIdOrName;
+    const params: (number | string)[] = [userId];
+    const paramsObjId: string[] = [];
+    switch (roleLevel) {
+      case "organization" as RoleLevel:
+        sqlJoin = `
+         JOIN wb.organization_users ON wb.roles.id=wb.organization_users.role_id
+        `;
+        sqlWhere = `
+         WHERE wb.organization_users.user_id=$1
+        `;
+        if (objectId) {
+          params.push(objectId);
+          sqlWhere += `
+            AND wb.organization_users.organization_id=$2
+          `;
+        } else {
+          params.push(objectIdOrName);
+          sqlJoin += `
+            JOIN wb.organizations ON wb.organization_users.organization_id=wb.organizations.id
+          `;
+          sqlWhere += `
+            AND wb.organizations.name=$2
+          `;
+          queryObjId =
+            "SELECT id as object_id FROM wb.organizations WHERE name=$1 LIMIT 1";
+          paramsObjId.push(objectIdOrName.toString());
+        }
+        break;
+      case "schema" as RoleLevel:
+        sqlJoin = `
+         JOIN wb.schema_users ON wb.roles.id=wb.schema_users.role_id
+        `;
+        sqlWhere = `
+         WHERE wb.schema_users.user_id=$1
+        `;
+        if (objectId) {
+          params.push(objectId);
+          sqlWhere += `
+            AND wb.schema_users.schema_id=$2
+          `;
+        } else {
+          params.push(objectIdOrName);
+          sqlJoin += `
+            JOIN wb.schemas ON wb.schema_users.schema_id=wb.schemas.id
+          `;
+          sqlWhere += `
+            AND wb.schemas.name=$2
+          `;
+          queryObjId =
+            "SELECT id as object_id FROM wb.schemas WHERE name=$1 LIMIT 1";
+          paramsObjId.push(objectIdOrName.toString());
+        }
+        break;
+      case "table" as RoleLevel:
+        sqlJoin = `
+         JOIN wb.table_users ON wb.roles.id=wb.table_users.role_i
+        `;
+        sqlWhere = `
+         WHERE wb.table_users.user_id=$1
+        `;
+        if (objectId) {
+          params.push(objectId);
+          sqlWhere += `
+            AND wb.table_users.table_id=$2
+          `;
+        } else {
+          if (!parentObjectName) {
+            throw `dal.roleNameForUserObject parentObjectName required for table level`;
+          }
+          params.push(objectIdOrName, parentObjectName);
+          sqlJoin += `
+            JOIN wb.tables ON wb.table_users.table_id=wb.tables.id
+            JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+          `;
+          sqlWhere += `
+            AND wb.tables.name=$2
+            AND wb.schemas.name=$3
+          `;
+          queryObjId = `
+            SELECT id as object_id
+            FROM wb.tables
+            JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+            WHERE wb.tables.name=$1 AND wb.schemas.name=$2
+            LIMIT 1
+          `;
+          paramsObjId.push(objectIdOrName.toString(), parentObjectName);
+        }
+        break;
+    }
+    const queries: QueryParams[] = [
+      {
+        query: `
+        SELECT wb.roles.name as role_name
+        FROM wb.roles
+        ${sqlJoin}
+        ${sqlWhere}  
+        LIMIT 1
+      `,
+        params: params,
+      } as QueryParams,
+    ];
+    if (!objectId) {
+      queries.push({
+        query: queryObjId,
+        params: paramsObjId,
+      } as QueryParams);
+    }
+    const results = await this.executeQueries(queries);
+    if (!results[0].success) return results[0];
+    if (!results[1].success) return results[1];
+    const result: ServiceResult = {
+      success: true,
+      payload: {
+        roleName: null,
+        objectId: null,
+      },
+    };
+    if (results[0].payload.rows.length == 1) {
+      result.payload.roleName = results[0].payload.rows[0].role_name;
+    }
+    if (objectId) {
+      result.payload.objectId = objectId;
+    } else if (results[1].payload.rows.length == 1) {
+      result.payload.objectId = results[1].payload.rows[0].object_id;
+    }
+    return result;
+  }
+
   /**
    * ========== Users =========
    */
@@ -478,11 +617,13 @@ export class DAL {
   // userRole and userRoleImpliedFrom only returned if userIds/Emails.length==1
   public async organizationsByUsers(
     userIds?: number[],
-    userEmails?: string[]
+    userEmails?: string[],
+    organizationNames?: string[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     const params: (number[] | string[])[] = [];
-    let sqlWhere: string = "";
     let sqlSelect: string = "";
+    let sqlWhere: string = "";
     if (userIds) {
       sqlWhere = "WHERE wb.users.id=ANY($1)";
       params.push(userIds);
@@ -490,15 +631,20 @@ export class DAL {
       sqlWhere = "WHERE wb.users.email=ANY($1)";
       params.push(userEmails);
     }
-    // if((userIds && userIds.length==1) || (userEmails && userEmails.length==1)){
-    //   sqlSelect = "implied_roles.name as user_role_implied_from
-    // }
+    if (organizationNames) {
+      sqlWhere += "AND wb.organizations.name=ANY($2)";
+      params.push(organizationNames);
+    }
+    if (withSettings) {
+      sqlSelect += ", wb.schema_users.settings as settings";
+    }
     const result = await this.executeQuery({
       query: `
         SELECT
         wb.organizations.*,
         wb.roles.name as user_role,
         implied_roles.name as user_role_implied_from
+        ${sqlSelect}
         FROM wb.organizations
         JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
         JOIN wb.users ON wb.organization_users.user_id=wb.users.id
@@ -598,8 +744,10 @@ export class DAL {
     name?: string,
     id?: number,
     roles?: string[],
-    userIds?: number[]
+    userIds?: number[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
+    let sqlSelect: string = "";
     let sqlWhere: string = "";
     const params: (string | number | string[] | number[])[] = [];
     if (id) {
@@ -619,12 +767,23 @@ export class DAL {
       })`;
       params.push(userIds);
     }
+    if (withSettings) {
+      sqlSelect = "wb.organization_users.settings,";
+    }
     const result = await this.executeQuery({
       query: `
         SELECT
-        wb.organization_users.*,
+        wb.organization_users.organization_id,
+        wb.organization_users.user_id,
+        wb.organization_users.role_id,
+        wb.organization_users.implied_from_role_id,
+        wb.organization_users.created_at,
+        wb.organization_users.updated_at,
+        ${sqlSelect}
         wb.organizations.name as organization_name,
         wb.users.email as user_email,
+        wb.users.first_name as user_first_name,
+        wb.users.last_name as user_last_name,
         wb.roles.name as role,
         implied_roles.name as role_implied_from
         FROM wb.organization_users
@@ -638,6 +797,23 @@ export class DAL {
     } as QueryParams);
     if (result.success)
       result.payload = OrganizationUser.parseResult(result.payload);
+    return result;
+  }
+
+  public async saveOrganizationUserSettings(
+    organizationId: number,
+    userId: number,
+    settings: object
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        UPDATE wb.organization_users
+        SET settings=$1, updated_at=$2
+        WHERE organization_id=$3
+        AND user_id=$4
+      `,
+      params: [settings, new Date(), organizationId, userId],
+    } as QueryParams);
     return result;
   }
 
@@ -705,9 +881,12 @@ export class DAL {
 
   public async schemasByUsers(
     userIds?: number[],
-    userEmails?: string[]
+    userEmails?: string[],
+    schemaNames?: string[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     const params: (number[] | string[])[] = [];
+    let sqlSelect: string = "";
     let sqlWhere: string = "";
     if (userIds) {
       sqlWhere = "WHERE wb.users.id=ANY($1)";
@@ -715,6 +894,13 @@ export class DAL {
     } else if (userEmails) {
       sqlWhere = "WHERE wb.users.email=ANY($1)";
       params.push(userEmails);
+    }
+    if (schemaNames) {
+      sqlWhere += "AND wb.schemas.name=ANY($2)";
+      params.push(schemaNames);
+    }
+    if (withSettings) {
+      sqlSelect += ", wb.schema_users.settings as settings";
     }
     const result = await this.executeQuery({
       query: `
@@ -724,6 +910,7 @@ export class DAL {
         implied_roles.name as user_role_implied_from,
         wb.organizations.name as organization_owner_name,
         user_owners.email as user_owner_email
+        ${sqlSelect}
         FROM wb.schemas
         JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
         JOIN wb.users ON wb.schema_users.user_id=wb.users.id
@@ -889,20 +1076,33 @@ export class DAL {
 
   public async schemaUsers(
     schemaName: string,
-    userIds?: number[]
+    userIds?: number[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     const params: (string | number[])[] = [schemaName];
+    let sqlSelect: string = "";
     let sqlWhere = "";
     if (userIds) {
       sqlWhere = "AND wb.schema_users.user_id=ANY($2)";
       params.push(userIds);
     }
+    if (withSettings) {
+      sqlSelect = "wb.organization_users.settings,";
+    }
     const result = await this.executeQuery({
       query: `
         SELECT
-        wb.schema_users.*,
+        wb.schema_users.schema_id,
+        wb.schema_users.user_id,
+        wb.schema_users.role_id,
+        wb.schema_users.implied_from_role_id,
+        wb.schema_users.created_at,
+        wb.schema_users.updated_at,
+        ${sqlSelect}
         wb.schemas.name as schema_name,
         wb.users.email as user_email,
+        wb.users.first_name as user_first_name,
+        wb.users.last_name as user_last_name,
         wb.roles.name as role,
         implied_roles.name as role_implied_from
         FROM wb.schema_users
@@ -942,6 +1142,23 @@ export class DAL {
     return result;
   }
 
+  public async saveSchemaUserSettings(
+    schemaId: number,
+    userId: number,
+    settings: object
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        UPDATE wb.schema_users
+        SET settings=$1, updated_at=$2
+        WHERE schema_id=$3
+        AND user_id=$4
+      `,
+      params: [settings, new Date(), schemaId, userId],
+    } as QueryParams);
+    return result;
+  }
+
   /**
    * ========== Tables ==========
    */
@@ -974,6 +1191,52 @@ export class DAL {
         (row: { table_name: string }) => row.table_name
       );
     }
+    return result;
+  }
+
+  public async tablesByUsers(
+    schemaName: string,
+    userIds?: number[],
+    userEmails?: string[],
+    tableNames?: string[],
+    withSettings?: boolean
+  ): Promise<ServiceResult> {
+    const params: (string | number[] | string[])[] = [schemaName];
+    let sqlSelect: string = "";
+    let sqlWhere: string = "";
+    if (userIds) {
+      sqlWhere = "AND wb.users.id=ANY($2)";
+      params.push(userIds);
+    } else if (userEmails) {
+      sqlWhere = "AND wb.users.email=ANY($2)";
+      params.push(userEmails);
+    }
+    if (tableNames) {
+      sqlWhere += "AND wb.tables.name=ANY($3)";
+      params.push(tableNames);
+    }
+    if (withSettings) {
+      sqlSelect += ", wb.table_users.settings as settings";
+    }
+    const result = await this.executeQuery({
+      query: `
+        SELECT
+        wb.tables.*,
+        wb.roles.name as user_role,
+        implied_roles.name as user_role_implied_from
+        ${sqlSelect}
+        FROM wb.tables
+        JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
+        JOIN wb.table_users ON wb.tables.id=wb.table_users.table_id
+        JOIN wb.users ON wb.table_users.user_id=wb.users.id
+        JOIN wb.roles ON wb.table_users.role_id=wb.roles.id
+        LEFT JOIN wb.roles implied_roles ON wb.table_users.implied_from_role_id=implied_roles.id
+        WHERE wb.schemas.name=$1
+        ${sqlWhere}
+      `,
+      params: params,
+    } as QueryParams);
+    if (result.success) result.payload = Table.parseResult(result.payload);
     return result;
   }
 
@@ -1305,21 +1568,34 @@ export class DAL {
   public async tableUsers(
     schemaName: string,
     tableName: string,
-    userIds?: number[]
+    userIds?: number[],
+    withSettings?: boolean
   ): Promise<ServiceResult> {
     const params: (string | number[])[] = [schemaName, tableName];
+    let sqlSelect: string = "";
     let sqlWhere = "";
     if (userIds) {
       sqlWhere = "AND wb.table_users.user_id=ANY($3)";
       params.push(userIds);
     }
+    if (withSettings) {
+      sqlSelect = "wb.organization_users.settings,";
+    }
     const result = await this.executeQuery({
       query: `
         SELECT
-        wb.table_users.*,
+        wb.table_users.table_id,
+        wb.table_users.user_id,
+        wb.table_users.role_id,
+        wb.table_users.implied_from_role_id,
+        wb.table_users.created_at,
+        wb.table_users.updated_at,
+        ${sqlSelect}
         wb.schemas.name as schema_name,
         wb.tables.name as table_name,
         wb.users.email as user_email,
+        wb.users.first_name as user_first_name,
+        wb.users.last_name as user_last_name,
         wb.roles.name as role,
         implied_roles.name as role_implied_from
         FROM wb.table_users

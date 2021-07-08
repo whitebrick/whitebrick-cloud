@@ -20,6 +20,7 @@ Feature:
     """
     And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnNames: "#(columnNames)", parentTableName: "#(parentTableName)", parentColumnNames: "#(parentColumnNames)", create: "#(create)"}
     And request { query: "#(query)", variables: "#(variables)" }
+    And header X-Test-User-Email = "test_donna@test.whitebrick.com"
     When method POST
     Then status 200
     Then print response

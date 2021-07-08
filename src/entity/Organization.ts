@@ -9,6 +9,7 @@ export class Organization {
   // not persisted
   userRole?: string;
   userRoleImpliedFrom?: string;
+  settings?: object;
 
   public static parseResult(data: QueryResult | null): Array<Organization> {
     if (!data) throw new Error("Organization.parseResult: input is null");
@@ -31,6 +32,7 @@ export class Organization {
     if (data.user_role_implied_from) {
       organization.userRoleImpliedFrom = data.user_role_implied_from;
     }
+    if (data.settings) organization.settings = data.settings;
     return organization;
   }
 }
