@@ -1,11 +1,10 @@
 import { QueryResult } from "pg";
-import { Column } from "./Column";
+import { DEFAULT_POLICY } from "../policy";
 
 /**
  * SCHEMA
  * - If a schema is owned by an organization
  *   - All administrators of the organization have implicit admin access
- *   - There are no exceptions
  * - If a schema is owned by a user, the user has implicit admin access
  *   - Additional users can be granted admin access explicitly
  */
@@ -17,9 +16,9 @@ export type UserActionPermission = {
   userAction: string;
   objectKey?: string;
   objectId: number;
-  checkedForRole?: string;
+  checkedForRoleName?: string;
   permitted: boolean;
-  deniedMessage: string;
+  description: string;
   checkedAt?: Date;
 };
 
@@ -36,7 +35,10 @@ export class Role {
 
   static SYSROLES_SCHEMAS: Record<string, Record<string, any>> = {
     schema_owner: { label: "DB Owner" },
-    schema_administrator: { label: "DB Administrator" },
+    schema_administrator: {
+      label: "DB Administrator",
+      impliedFrom: ["organization_administrator"],
+    },
     schema_manager: { label: "DB Manager" },
     schema_editor: { label: "DB Editor" },
     schema_reader: { label: "DB Reader" },
@@ -45,44 +47,84 @@ export class Role {
   static SYSROLES_TABLES: Record<string, Record<string, any>> = {
     table_administrator: {
       label: "Table Administrator",
-      permissionPrefixes: ["s", "i", "u", "d"],
+      impliedFrom: ["schema_owner", "schema_administrator"],
     },
     table_manager: {
       label: "Table Manager",
-      permissionPrefixes: ["s", "i", "u", "d"],
+      impliedFrom: ["schema_manager"],
     },
     table_editor: {
       label: "Table Editor",
-      permissionPrefixes: ["s", "i", "u", "d"],
+      impliedFrom: ["schema_editor"],
     },
     table_reader: {
       label: "Table Reader",
-      permissionPrefixes: ["s"],
+      impliedFrom: ["schema_reader"],
     },
   };
 
-  static SCHEMA_TO_TABLE_ROLE_MAP: Record<string, string> = {
-    schema_owner: "table_administrator",
-    schema_administrator: "table_administrator",
-    schema_manager: "table_manager",
-    schema_editor: "table_editor",
-    schema_reader: "table_reader",
+  static sysRoleMap(from: RoleLevel, to: RoleLevel) {
+    let toRoleDefinitions: Record<string, Record<string, any>> = {};
+    let map: Record<string, string> = {};
+    switch (to) {
+      case "table" as RoleLevel:
+        toRoleDefinitions = Role.SYSROLES_TABLES;
+      case "schema" as RoleLevel:
+        toRoleDefinitions = Role.SYSROLES_SCHEMAS;
+    }
+    for (const toRoleName of Object.keys(toRoleDefinitions)) {
+      if (toRoleDefinitions[toRoleName].impliedFrom) {
+        for (const fromRoleName of toRoleDefinitions[toRoleName].impliedFrom) {
+          map[fromRoleName] = toRoleName;
+        }
+      }
+    }
+    return map;
+  }
+
+  static HASURA_PREFIXES_ACTIONS: Record<string, string> = {
+    s: "select",
+    i: "insert",
+    u: "update",
+    d: "delete",
   };
 
-  static ORGANIZATION_TO_SCHEMA_ROLE_MAP: Record<string, string> = {
-    organization_administrator: "schema_administrator",
-  };
-
-  id!: number;
+  id?: number;
   name!: string;
-  label!: string;
-  createdAt!: Date;
-  updatedAt!: Date;
+  label?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
   // not persisted
-  schemaId?: number;
-  schemaName?: string;
-  tableId?: number;
-  tableName?: string;
+  impliedFrom?: String;
+  permissions?: Record<string, boolean>;
+
+  constructor(name: string, roleLevel?: RoleLevel) {
+    this.name = name;
+    this.permissions = Role.getPermissions(
+      DEFAULT_POLICY,
+      this.name,
+      roleLevel
+    );
+  }
+
+  public static getPermissions(
+    policy: Record<string, Record<string, any>>,
+    roleName: string,
+    roleLevel?: RoleLevel
+  ) {
+    const permissions: Record<string, boolean> = {};
+    for (const userAction of Object.keys(policy)) {
+      if (
+        roleLevel &&
+        (policy[userAction].roleLevel as RoleLevel) != roleLevel
+      ) {
+        continue;
+      }
+      permissions[userAction] =
+        policy[userAction].permittedRoles.includes(roleName);
+    }
+    return permissions;
+  }
 
   public static isRole(roleName: string, roleLevel?: RoleLevel): boolean {
     switch (roleLevel) {
@@ -108,29 +150,42 @@ export class Role {
     return true;
   }
 
-  // eg {
-  // permissionKey: s1234, type: "select"
-  // permissionKey: i1234, type: "insert"
-  // permissionKey: u1234, type: "update"
-  // permissionKey: d1234, type: "delete"
-  // }
-  public static tablePermissionKeysAndTypes(
+  public static tablePermissionPrefixes(roleName: string) {
+    let actions: string[] = [];
+    let prefixes: string[] = [];
+    if (
+      DEFAULT_POLICY["read_and_write_table_records"].permittedRoles.includes(
+        roleName
+      )
+    ) {
+      actions = DEFAULT_POLICY["read_and_write_table_records"].hasuraActions;
+    } else if (
+      DEFAULT_POLICY["read_table_records"].permittedRoles.includes(roleName)
+    ) {
+      actions = DEFAULT_POLICY["read_table_records"].hasuraActions;
+    }
+    for (const action of actions) {
+      const prefix = Object.keys(Role.HASURA_PREFIXES_ACTIONS).find(
+        (key) => Role.HASURA_PREFIXES_ACTIONS[key] === action
+      );
+      if (prefix) prefixes.push(prefix);
+    }
+    return prefixes;
+  }
+
+  // eg [{ permissionKey: s1234, action: "select"},
+  // { permissionKey: i1234, action: "insert"}...
+  public static tablePermissionKeysAndActions(
     tableId: number
   ): Record<string, string>[] {
-    const PERMISSION_PREFIXES_TYPES: Record<string, string> = {
-      s: "select",
-      i: "insert",
-      u: "update",
-      d: "delete",
-    };
-    const permissionKeysAndTypes: Record<string, string>[] = [];
-    for (const prefix of Object.keys(PERMISSION_PREFIXES_TYPES)) {
-      permissionKeysAndTypes.push({
+    const permissionKeysAndActions: Record<string, string>[] = [];
+    for (const prefix of Object.keys(Role.HASURA_PREFIXES_ACTIONS)) {
+      permissionKeysAndActions.push({
         permissionKey: Role.tablePermissionKey(prefix, tableId),
-        type: PERMISSION_PREFIXES_TYPES[prefix],
+        action: Role.HASURA_PREFIXES_ACTIONS[prefix],
       });
     }
-    return permissionKeysAndTypes;
+    return permissionKeysAndActions;
   }
 
   public static tablePermissionKey(
@@ -145,7 +200,7 @@ export class Role {
     tableId: number
   ): Record<string, any>[] {
     const hasuraPermissionsAndTypes: Record<string, any>[] = [];
-    for (const permissionKeysAndType of Role.tablePermissionKeysAndTypes(
+    for (const permissionKeysAndType of Role.tablePermissionKeysAndActions(
       tableId
     )) {
       hasuraPermissionsAndTypes.push({
@@ -181,16 +236,12 @@ export class Role {
 
   public static parse(data: Record<string, any>): Role {
     if (!data) throw new Error("Role.parse: input is null");
-    const role = new Role();
+    const role = new Role(data.name);
     role.id = data.id;
     role.name = data.name;
     role.label = data.label;
     role.createdAt = data.created_at;
     role.updatedAt = data.updated_at;
-    if (data.schemaId) role.schemaId = data.schemaId;
-    if (data.schemaName) role.schemaName = data.schemaName;
-    if (data.tableId) role.tableId = data.tableId;
-    if (data.tableName) role.tableName = data.tableName;
     return role;
   }
 }

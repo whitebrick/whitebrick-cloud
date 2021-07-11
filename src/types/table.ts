@@ -13,9 +13,8 @@ export const typeDefs = gql`
     label: String!
     columns: [Column]
     schemaName: String
-    userRole: String
-    userRoleImpliedFrom: String
     settings: JSON
+    role: Role
     createdAt: String!
     updatedAt: String!
   }
@@ -44,16 +43,13 @@ export const typeDefs = gql`
   type TableUser {
     tableId: Int!
     userId: Int!
-    roleId: Int!
-    impliedFromRoleId: Int
     schemaName: String!
     tableName: String!
     userEmail: String!
     userFirstName: String
     userLastName: String
-    role: String!
-    roleImpliedFrom: String
     settings: JSON
+    role: Role
     createdAt: String!
     updatedAt: String!
   }
@@ -139,7 +135,7 @@ export const typeDefs = gql`
       schemaName: String!
       tableName: String!
       userEmails: [String]!
-      role: String!
+      roleName: String!
     ): Boolean
     wbSaveTableUserSettings(
       schemaName: String!
@@ -421,7 +417,7 @@ export const resolvers: IResolvers = {
     // Table Users
     wbSetTableUsersRole: async (
       _,
-      { schemaName, tableName, userEmails, role },
+      { schemaName, tableName, userEmails, roleName },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
@@ -430,7 +426,7 @@ export const resolvers: IResolvers = {
         schemaName,
         tableName,
         userEmails,
-        role
+        roleName
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

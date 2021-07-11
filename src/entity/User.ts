@@ -24,7 +24,7 @@ export class User {
   public static parse(data: Record<string, any>): User {
     if (!data) throw new Error("User.parse: input is null");
     const user = new User();
-    user.id = data.id;
+    user.id = parseInt(data.id);
     user.email = data.email;
     if (data.first_name) user.firstName = data.first_name;
     if (data.last_name) user.lastName = data.last_name;

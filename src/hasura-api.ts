@@ -261,7 +261,7 @@ class HasuraApi {
     tableName: string,
     permissionCheck: object,
     type: string,
-    role: string,
+    roleName: string,
     columns: string[]
   ) {
     const payload: Record<string, any> = {
@@ -269,7 +269,7 @@ class HasuraApi {
         schema: schemaName,
         name: tableName,
       },
-      role: role,
+      role: roleName,
       permission: {
         columns: columns,
         // filter: permissionCheck,
@@ -293,14 +293,14 @@ class HasuraApi {
     schemaName: string,
     tableName: string,
     type: string,
-    role: string
+    roleName: string
   ) {
     const result = await this.post(`pg_drop_${type}_permission`, {
       table: {
         schema: schemaName,
         name: tableName,
       },
-      role: role,
+      role: roleName,
     });
     return result;
   }

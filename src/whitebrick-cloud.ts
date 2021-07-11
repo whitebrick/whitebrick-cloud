@@ -16,6 +16,7 @@ import {
   User,
 } from "./entity";
 import { CurrentUser } from "./entity/CurrentUser";
+import { DEFAULT_POLICY } from "./policy";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -96,10 +97,11 @@ export class WhitebrickCloud {
     return {
       defaultColumnTypes: Column.COMMON_TYPES,
       roles: {
-        organizations: Role.SYSROLES_ORGANIZATIONS,
-        schemas: Role.SYSROLES_SCHEMAS,
-        tables: Role.SYSROLES_TABLES,
+        organization: Role.SYSROLES_ORGANIZATIONS,
+        schema: Role.SYSROLES_SCHEMAS,
+        table: Role.SYSROLES_TABLES,
       },
+      policy: DEFAULT_POLICY,
     };
   }
 
@@ -226,7 +228,10 @@ export class WhitebrickCloud {
             if (!result.success) return result;
             result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
               object.id,
-              Role.ORGANIZATION_TO_SCHEMA_ROLE_MAP,
+              Role.sysRoleMap(
+                "organization" as RoleLevel,
+                "schema" as RoleLevel
+              ),
               undefined,
               userIds
             );
@@ -236,7 +241,7 @@ export class WhitebrickCloud {
             for (const schema of result.payload) {
               result = await this.dal.setTableUserRolesFromSchemaRoles(
                 schema.id,
-                Role.SCHEMA_TO_TABLE_ROLE_MAP,
+                Role.sysRoleMap("schema" as RoleLevel, "table" as RoleLevel),
                 undefined,
                 userIds
               );
@@ -266,7 +271,7 @@ export class WhitebrickCloud {
         // table roles to the schema default inheritence
         result = await this.dal.setTableUserRolesFromSchemaRoles(
           object.id,
-          Role.SCHEMA_TO_TABLE_ROLE_MAP, // eg { schema_owner: "table_administrator" }
+          Role.sysRoleMap("schema" as RoleLevel, "table" as RoleLevel), // eg { schema_owner: "table_administrator" }
           undefined,
           userIds
         );
@@ -323,7 +328,9 @@ export class WhitebrickCloud {
           "table",
           undefined,
           objectId, // parentObjectId ie the schema id
-          Object.keys(Role.SCHEMA_TO_TABLE_ROLE_MAP)
+          Object.keys(
+            Role.sysRoleMap("schema" as RoleLevel, "table" as RoleLevel)
+          )
         );
         break;
     }
@@ -554,6 +561,7 @@ export class WhitebrickCloud {
     name: string,
     label: string
   ): Promise<ServiceResult> {
+    log.debug(`createOrganization(${cU.id}, ${name}, ${label})`);
     if (cU.isSignedOut()) return cU.mustBeSignedIn();
     const checkNameResult = await this.organizationByName(cU, name);
     if (checkNameResult.success) {
@@ -585,7 +593,7 @@ export class WhitebrickCloud {
     newName?: string,
     newLabel?: string
   ): Promise<ServiceResult> {
-    if (await cU.cant("administer_organization", name)) return cU.denied();
+    if (await cU.cant("edit_organization", name)) return cU.denied();
     return this.dal.updateOrganization(name, newName, newLabel);
   }
 
@@ -593,6 +601,10 @@ export class WhitebrickCloud {
     cU: CurrentUser,
     name: string
   ): Promise<ServiceResult> {
+    log.debug(`deleteOrganization(${cU.id},${name})`);
+    if (await cU.cant("edit_organization", name)) {
+      return cU.denied();
+    }
     const result = await this.organizationUsers(cU, name, undefined, [
       "organization_user",
       "organization_external_user",
@@ -653,16 +665,16 @@ export class WhitebrickCloud {
   public async setOrganizationUsersRole(
     cU: CurrentUser,
     organizationName: string,
-    role: string,
+    roleName: string,
     userIds?: number[],
     userEmails?: string[]
   ): Promise<ServiceResult> {
-    if (await cU.cant("administer_organization", organizationName)) {
+    log.debug(
+      `setOrganizationUsersRole(${cU.id},${organizationName},${roleName},${userIds},${userEmails})`
+    );
+    if (await cU.cant("manage_access_to_organization", organizationName)) {
       return cU.denied();
     }
-    log.debug(
-      `setOrganizationUsersRole(${organizationName},${role},${userIds},${userEmails})`
-    );
     const organizationResult = await this.organizationByName(
       cU,
       organizationName
@@ -692,7 +704,7 @@ export class WhitebrickCloud {
     return await this.setRole(
       cU,
       userIdsFound,
-      role,
+      roleName,
       "organization",
       organizationResult.payload
     );
@@ -704,6 +716,12 @@ export class WhitebrickCloud {
     userIds?: number[],
     userEmails?: string[]
   ): Promise<ServiceResult> {
+    log.debug(
+      `removeUsersFromOrganization(${cU.id},${organizationName},${userIds},${userEmails})`
+    );
+    if (await cU.cant("manage_access_to_organization", organizationName)) {
+      return cU.denied();
+    }
     let result: ServiceResult = errResult();
     let userIdsToBeRemoved: number[] = [];
     if (userIds) userIdsToBeRemoved = userIds;
@@ -719,8 +737,9 @@ export class WhitebrickCloud {
       "organization_administrator",
     ]);
     if (!result.success) return result;
-    const allAdminIds = result.payload.map((user: { id: number }) => user.id);
-
+    const allAdminIds = result.payload.map(
+      (organizationUser: { userId: number }) => organizationUser.userId
+    );
     if (
       allAdminIds.every((elem: number) => userIdsToBeRemoved.includes(elem))
     ) {
@@ -961,7 +980,7 @@ export class WhitebrickCloud {
       // Every organization admin is implicitly also a schema admin
       result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
         organizationOwnerId,
-        Role.ORGANIZATION_TO_SCHEMA_ROLE_MAP,
+        Role.sysRoleMap("organization" as RoleLevel, "schema" as RoleLevel),
         [schemaResult.payload.id]
       );
     } else {
@@ -1024,7 +1043,7 @@ export class WhitebrickCloud {
     cU: CurrentUser,
     schemaName: string,
     userEmails: string[],
-    role: string
+    roleName: string
   ): Promise<ServiceResult> {
     const schemaResult = await this.schemaByName(cU, schemaName);
     if (!schemaResult.success) return schemaResult;
@@ -1042,7 +1061,7 @@ export class WhitebrickCloud {
     return await this.setRole(
       cU,
       userIds,
-      role,
+      roleName,
       "schema",
       schemaResult.payload
     );
@@ -1424,13 +1443,13 @@ export class WhitebrickCloud {
     if (result.payload.length == 0) {
       return { success: true, payload: true } as ServiceResult;
     }
-    for (const permissionKeyAndType of Role.tablePermissionKeysAndTypes(
+    for (const permissionKeyAndType of Role.tablePermissionKeysAndActions(
       table.id
     )) {
       result = await hasuraApi.deletePermission(
         table.schemaName,
         table.name,
-        permissionKeyAndType.type,
+        permissionKeyAndType.action,
         "wbuser"
       );
       if (!result.success) return result;
@@ -1645,7 +1664,7 @@ export class WhitebrickCloud {
     log.debug(`addDefaultTableUsersToTable(${JSON.stringify(table)})`);
     return await this.dal.setTableUserRolesFromSchemaRoles(
       table.schemaId,
-      Role.SCHEMA_TO_TABLE_ROLE_MAP,
+      Role.sysRoleMap("schema" as RoleLevel, "table" as RoleLevel),
       [table.id]
     );
   }
@@ -1655,7 +1674,7 @@ export class WhitebrickCloud {
     schemaName: string,
     tableName: string,
     userEmails: [string],
-    role: string
+    roleName: string
   ): Promise<ServiceResult> {
     const tableResult = await this.tableBySchemaNameTableName(
       cU,
@@ -1674,7 +1693,13 @@ export class WhitebrickCloud {
       } as ServiceResult);
     }
     const userIds = usersResult.payload.map((user: { id: number }) => user.id);
-    return await this.setRole(cU, userIds, role, "table", tableResult.payload);
+    return await this.setRole(
+      cU,
+      userIds,
+      roleName,
+      "table",
+      tableResult.payload
+    );
   }
 
   // not used yet

@@ -9,11 +9,10 @@ export const typeDefs = gql`
     label: String!
     organizationOwnerId: Int
     userOwnerId: Int
-    userRole: String
-    userRoleImpliedFrom: String
-    settings: JSON
     organizationOwnerName: String
     userOwnerEmail: String
+    settings: JSON
+    role: Role
     createdAt: String!
     updatedAt: String!
   }
@@ -21,15 +20,12 @@ export const typeDefs = gql`
   type SchemaUser {
     schemaId: Int!
     userId: Int!
-    roleId: Int!
-    impliedFromRoleId: Int
     schemaName: String
     userEmail: String!
     userFirstName: String
     userLastName: String
-    role: String!
-    roleImpliedFrom: String
     settings: JSON
+    role: Role
     createdAt: String!
     updatedAt: String!
   }
@@ -66,7 +62,7 @@ export const typeDefs = gql`
     wbSetSchemaUsersRole(
       schemaName: String!
       userEmails: [String]!
-      role: String!
+      roleName: String!
     ): Boolean
     wbRemoveSchemaUsers(schemaName: String!, userEmails: [String]!): Boolean
     wbSaveSchemaUserSettings(schemaName: String!, settings: JSON!): Boolean!
@@ -133,7 +129,7 @@ export const resolvers: IResolvers = {
     // Schema Users
     wbSetSchemaUsersRole: async (
       _,
-      { schemaName, userEmails, role },
+      { schemaName, userEmails, roleName },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
@@ -141,7 +137,7 @@ export const resolvers: IResolvers = {
         currentUser,
         schemaName,
         userEmails,
-        role
+        roleName
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

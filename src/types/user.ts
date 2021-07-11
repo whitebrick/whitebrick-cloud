@@ -17,6 +17,12 @@ export const typeDefs = gql`
     updatedAt: String!
   }
 
+  type Role {
+    name: String!
+    impliedFrom: String
+    permissions: JSON
+  }
+
   extend type Query {
     """
     Users

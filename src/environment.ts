@@ -78,4 +78,5 @@ export const userMessages: Record<string, string[]> = {
   WB_TABLE_USERS_NOT_FOUND: ["One or more Table Users not found."],
   // Roles
   ROLE_NOT_FOUND: ["This role could not be found."],
+  WB_FORBIDDEN: ["You do not permitted to perform this action.", "FORBIDDEN"],
 };

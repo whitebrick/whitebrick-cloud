@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { Role, RoleLevel } from ".";
 
 export class Organization {
   id!: number;
@@ -7,8 +8,7 @@ export class Organization {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
-  userRole?: string;
-  userRoleImpliedFrom?: string;
+  role?: Role;
   settings?: object;
 
   public static parseResult(data: QueryResult | null): Array<Organization> {
@@ -28,11 +28,13 @@ export class Organization {
     organization.label = data.label;
     organization.createdAt = data.created_at;
     organization.updatedAt = data.updated_at;
-    if (data.user_role) organization.userRole = data.user_role;
-    if (data.user_role_implied_from) {
-      organization.userRoleImpliedFrom = data.user_role_implied_from;
-    }
     if (data.settings) organization.settings = data.settings;
+    if (data.role_name) {
+      organization.role = new Role(data.role_name, "organization" as RoleLevel);
+      if (data.role_implied_from) {
+        organization.role.impliedFrom = data.role_implied_from;
+      }
+    }
     return organization;
   }
 }

@@ -285,8 +285,9 @@ export class DAL {
     ];
     if (!deleteOnly) {
       for (const tableRole of Object.keys(Role.SYSROLES_TABLES)) {
-        for (const permissionPrefix of Role.SYSROLES_TABLES[tableRole]
-          .permissionPrefixes) {
+        for (const permissionPrefix of Role.tablePermissionPrefixes(
+          tableRole
+        )) {
           queryParams.push({
             query: `
               INSERT INTO wb.table_permissions(table_permission_key, user_id, table_id)
@@ -642,8 +643,8 @@ export class DAL {
       query: `
         SELECT
         wb.organizations.*,
-        wb.roles.name as user_role,
-        implied_roles.name as user_role_implied_from
+        wb.roles.name as role_name,
+        implied_roles.name as role_implied_from
         ${sqlSelect}
         FROM wb.organizations
         JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
@@ -784,7 +785,7 @@ export class DAL {
         wb.users.email as user_email,
         wb.users.first_name as user_first_name,
         wb.users.last_name as user_last_name,
-        wb.roles.name as role,
+        wb.roles.name as role_name,
         implied_roles.name as role_implied_from
         FROM wb.organization_users
         JOIN wb.users ON wb.organization_users.user_id=wb.users.id
@@ -906,8 +907,8 @@ export class DAL {
       query: `
         SELECT
         wb.schemas.*,
-        wb.roles.name as user_role,
-        implied_roles.name as user_role_implied_from,
+        wb.roles.name as role_name,
+        implied_roles.name as role_implied_from,
         wb.organizations.name as organization_owner_name,
         user_owners.email as user_owner_email
         ${sqlSelect}
@@ -944,7 +945,7 @@ export class DAL {
         SELECT
         wb.schemas.*,
         wb.users.email as user_owner_email,
-        'schema_owner' as user_role
+        'schema_owner' as role_name
         FROM wb.schemas
         JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
         ${sqlWhere}
@@ -1001,8 +1002,8 @@ export class DAL {
         SELECT
         wb.schemas.*,
         wb.organizations.name as organization_owner_name
-        schema_user_roles.name as user_role,
-        schema_user_implied_roles.name as user_role_implied_from,
+        schema_user_roles.name as role_name,
+        schema_user_implied_roles.name as role_implied_from,
         FROM wb.schemas
         JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
         JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
@@ -1103,7 +1104,7 @@ export class DAL {
         wb.users.email as user_email,
         wb.users.first_name as user_first_name,
         wb.users.last_name as user_last_name,
-        wb.roles.name as role,
+        wb.roles.name as role_name,
         implied_roles.name as role_implied_from
         FROM wb.schema_users
         JOIN wb.schemas ON wb.schema_users.schema_id=wb.schemas.id
@@ -1222,8 +1223,8 @@ export class DAL {
       query: `
         SELECT
         wb.tables.*,
-        wb.roles.name as user_role,
-        implied_roles.name as user_role_implied_from
+        wb.roles.name as role_name,
+        implied_roles.name as role_implied_from
         ${sqlSelect}
         FROM wb.tables
         JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
@@ -1596,7 +1597,7 @@ export class DAL {
         wb.users.email as user_email,
         wb.users.first_name as user_first_name,
         wb.users.last_name as user_last_name,
-        wb.roles.name as role,
+        wb.roles.name as role_name,
         implied_roles.name as role_implied_from
         FROM wb.table_users
         JOIN wb.tables ON wb.table_users.table_id=wb.tables.id
@@ -1631,7 +1632,7 @@ export class DAL {
     clearExisting?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${schemaIds}, ${userIds}, ${clearExisting})`
+      `dal.setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${schemaIds}, ${userIds}, ${clearExisting})`
     );
     let result = await this.rolesIdLookup();
     if (!result.success) return result;

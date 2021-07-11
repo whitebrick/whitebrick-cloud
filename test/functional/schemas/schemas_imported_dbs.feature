@@ -12,7 +12,7 @@ Feature: Schemas
   
   Scenario: Add users to schemas
     * table schemaUsers 
-      | schemaName       | userEmails                          | role
+      | schemaName       | userEmails                          | roleName
       | "test_donnasdvd" | ["test_donna@test.whitebrick.com"]  | "schema_administrator"
       | "test_donnasdvd" | ["test_debbie@test.whitebrick.com"] | "schema_editor"
       | "test_donnasdvd" | ["test_daisy@test.whitebrick.com"]  | "schema_reader"
@@ -20,7 +20,7 @@ Feature: Schemas
       | "test_chinook"   | ["test_debbie@test.whitebrick.com"] | "schema_reader"
       | "test_chinook"   | ["test_daisy@test.whitebrick.com"]  | "schema_editor"
       | "test_northwind" | ["test_debbie@test.whitebrick.com"] | "schema_reader"
-    * def result = call read("schemas/schema-add-user.feature") schemaUsers
+    * def result = call read("schemas/schema-set-users-role.feature") schemaUsers
 
   Scenario: Load test data for imported DBs
     * karate.exec("bash load_test_schemas.bash")

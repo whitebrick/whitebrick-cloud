@@ -1,5 +1,5 @@
 import { QueryResult } from "pg";
-import { Column } from ".";
+import { Column, Role, RoleLevel } from ".";
 
 export class Table {
   id!: number;
@@ -9,10 +9,9 @@ export class Table {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
+  role?: Role;
   columns!: [Column];
   schemaName?: string;
-  userRole?: string;
-  userRoleImpliedFrom?: string;
   settings?: object;
 
   public static parseResult(data: QueryResult | null): Array<Table> {
@@ -34,11 +33,13 @@ export class Table {
     table.createdAt = data.created_at;
     table.updatedAt = data.updated_at;
     if (data.schema_name) table.schemaName = data.schema_name;
-    if (data.user_role) table.userRole = data.user_role;
-    if (data.user_role_implied_from) {
-      table.userRoleImpliedFrom = data.user_role_implied_from;
-    }
     if (data.settings) table.settings = data.settings;
+    if (data.role_name) {
+      table.role = new Role(data.role_name, "table" as RoleLevel);
+      if (data.role_implied_from) {
+        table.role.impliedFrom = data.role_implied_from;
+      }
+    }
     return table;
   }
 }

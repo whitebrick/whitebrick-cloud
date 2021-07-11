@@ -7,9 +7,8 @@ export const typeDefs = gql`
     id: ID!
     name: String!
     label: String!
-    userRole: String
-    userRoleImpliedFrom: String
     settings: JSON
+    role: Role
     createdAt: String!
     updatedAt: String!
   }
@@ -17,15 +16,12 @@ export const typeDefs = gql`
   type OrganizationUser {
     organizationId: Int!
     userId: Int!
-    roleId: Int!
-    impliedFromRoleId: Int
     organizationName: String!
     userEmail: String!
     userFirstName: String
     userLastName: String
-    role: String!
-    roleImpliedFrom: String
     settings: JSON
+    role: Role
     createdAt: String!
     updatedAt: String!
   }
@@ -65,7 +61,7 @@ export const typeDefs = gql`
     wbSetOrganizationUsersRole(
       organizationName: String!
       userEmails: [String]!
-      role: String!
+      roleName: String!
     ): Boolean
     wbRemoveUsersFromOrganization(
       userEmails: [String]!
@@ -163,14 +159,14 @@ export const resolvers: IResolvers = {
     // Organization Users
     wbSetOrganizationUsersRole: async (
       _,
-      { organizationName, userEmails, role },
+      { organizationName, userEmails, roleName },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.setOrganizationUsersRole(
         currentUser,
         organizationName,
-        role,
+        roleName,
         undefined,
         userEmails
       );

@@ -1,5 +1,5 @@
 import { QueryResult } from "pg";
-import { User, Organization } from ".";
+import { Role, RoleLevel } from ".";
 
 export class Schema {
   static SYS_SCHEMA_NAMES: string[] = [
@@ -17,8 +17,7 @@ export class Schema {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
-  userRole?: string;
-  userRoleImpliedFrom?: string;
+  role?: Role;
   organizationOwnerName?: string;
   userOwnerEmail?: string;
   settings?: object;
@@ -42,15 +41,17 @@ export class Schema {
     schema.userOwnerId = data.user_owner_id;
     schema.createdAt = data.created_at;
     schema.updatedAt = data.updated_at;
-    if (data.user_role) schema.userRole = data.user_role;
-    if (data.user_role_implied_from) {
-      schema.userRoleImpliedFrom = data.user_role_implied_from;
-    }
     if (data.organization_owner_name) {
       schema.organizationOwnerName = data.organization_owner_name;
     }
     if (data.user_owner_email) schema.userOwnerEmail = data.user_owner_email;
     if (data.settings) schema.settings = data.settings;
+    if (data.role_name) {
+      schema.role = new Role(data.role_name, "schema" as RoleLevel);
+      if (data.role_implied_from) {
+        schema.role.impliedFrom = data.role_implied_from;
+      }
+    }
     return schema;
   }
 }

@@ -1,46 +1,67 @@
 Feature: Organizations
   
-  Scenario: Create organizations
+  Scenario: Anyone signed-in can create organizations
     * table organizations 
       | currentUserEmail                      | name                | label
       | "test_donna@test.whitebrick.com"      | "test_donnas-media" | "Donna's Media"       
       | "test_donna@test.whitebrick.com"      | "test_admins-org"   | "Admins Test Org"     
       | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | "Vandelay Industries" 
     * def result = call read("organizations/organization-create.feature") organizations
+    * match each result[*].response contains { errors: "#notpresent" }
   
-  Scenario: Organization administrators can add users to organizations
+  Scenario: Organization admins can add users to organizations
     * table organizationUsers 
-      | currentUserEmail                      | organizationName    | role                         | userEmails
+      | currentUserEmail                      | organizationName    | roleName                     | userEmails
       | "test_donna@test.whitebrick.com"      | "test_donnas-media" | "organization_user"          | ["test_debbie@test.whitebrick.com"]
       | "test_donna@test.whitebrick.com"      | "test_donnas-media" | "organization_external_user" | ["test_daisy@test.whitebrick.com"]
       | "test_donna@test.whitebrick.com"      | "test_admins-org"   | "organization_administrator" | ["test_daisy@test.whitebrick.com"]
       | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | "organization_user"          | ["test_donna@test.whitebrick.com", "test_daisy@test.whitebrick.com"]
     * def result = call read("organizations/organization-set-users-role.feature") organizationUsers
-    * match result[0].response.errors == "#notpresent"
+    * match each result[*].response contains { errors: "#notpresent" }
 
-  Scenario: Non administrators can not add users to organizations
+  Scenario: Organization non-admins can not add users to organizations
     * table organizationUsers
-      | currentUserEmail                      | organizationName    | role                         | userEmails
-      | "test_daisy@test.whitebrick.com"      | "test_vandelay"     | "organization_user"          | ["test_debbie@test.whitebrick.com"]
+      | currentUserEmail                 | organizationName    | roleName                     | userEmails
+      | "test_daisy@test.whitebrick.com" | "test_vandelay"     | "organization_user"          | ["test_debbie@test.whitebrick.com"]
     * def result = call read("organizations/organization-set-users-role.feature") organizationUsers
-    * match result[0].response.errors == "#present"
-    * match result[0].response.errors[0].extensions.code == "FORBIDDEN"
+    * match each result[*].response contains { errors: "#present" }
+    * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"
 
-  Scenario: Modify user role
-    * table organizationUsers 
-      | currentUserEmail                      | organizationName    | role                         | userEmails
-      | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | "organization_administrator" | ["test_donna@test.whitebrick.com"]
-      | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | "organization_external_user" | ["test_daisy@test.whitebrick.com"]
-    * def result = call read("organizations/organization-set-users-role.feature") organizationUsers
-
-  Scenario: Remove user from an organization
-    * table organizationUsers 
-      | currentUserEmail                      | organizationName    | userEmails
-      | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | ["test_daisy@test.whitebrick.com"]
+  Scenario: Organization non-admins can not remove users from an organization
+    * table organizationUsers
+      | currentUserEmail                 | organizationName    | userEmails
+      | "test_daisy@test.whitebrick.com" | "test_vandelay"     | ["test_donna@test.whitebrick.com"]
     * def result = call read("organizations/organization-remove-user.feature") organizationUsers
+    * match each result[*].response contains { errors: "#present" }
+    * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"
 
-  Scenario: Delete organization
+
+  Scenario: Organization admins can not remove all admins from an organization
+    * table organizationUsers
+      | currentUserEmail                      | organizationName    | userEmails
+      | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | ["test_daisy@test.whitebrick.com", "test_nick_north@test.whitebrick.com"]
+    * def result = call read("organizations/organization-remove-user.feature") organizationUsers
+    * match each result[*].response contains { errors: "#present" }
+    * match each result[*].response.errors[*].extensions.wbCode == "WB_ORGANIZATION_NO_ADMINS"
+
+  Scenario: Organization admins can remove users from an organization
+    * table organizationUsers
+      | currentUserEmail                      | organizationName    | userEmails
+      | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | ["test_donna@test.whitebrick.com", "test_daisy@test.whitebrick.com"]
+    * def result = call read("organizations/organization-remove-user.feature") organizationUsers
+    * match each result[*].response contains { errors: "#notpresent" }
+
+  Scenario: Organization non-admins can not delete organizations
+    * table organizations
+      | currentUserEmail                 | name
+      | "test_daisy@test.whitebrick.com" | "test_vandelay"
+    * def result = call read("organizations/organization-delete.feature") organizations
+    * match each result[*].response contains { errors: "#present" }
+    * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"
+
+  Scenario: Organization admins can delete organizations
     * table organizations 
       | currentUserEmail                      | name
       | "test_nick_north@test.whitebrick.com" | "test_vandelay"
     * def result = call read("organizations/organization-delete.feature") organizations
+    * match each result[*].response contains { errors: "#notpresent" }

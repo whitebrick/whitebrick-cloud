@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { Role, RoleLevel } from ".";
 
 export class OrganizationUser {
   organizationId!: number;
@@ -9,12 +10,11 @@ export class OrganizationUser {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
+  role!: Role;
   organizationName?: string;
   userEmail?: string;
   userFirstName?: string;
   userLastName?: string;
-  role?: string;
-  roleImpliedFrom?: string;
 
   public static parseResult(data: QueryResult | null): Array<OrganizationUser> {
     if (!data) throw new Error("OrganizationUser.parseResult: input is null");
@@ -29,12 +29,14 @@ export class OrganizationUser {
     if (!data) throw new Error("OrganizationUser.parse: input is null");
     const organizationUser = new OrganizationUser();
     organizationUser.organizationId = data.organization_id;
-    organizationUser.userId = data.user_id;
-    organizationUser.roleId = data.role_id;
-    organizationUser.impliedFromroleId = data.implied_from_role_id;
+    organizationUser.userId = parseInt(data.user_id);
+    organizationUser.roleId = parseInt(data.role_id);
+    if (data.implied_from_role_id)
+      organizationUser.impliedFromroleId = parseInt(data.implied_from_role_id);
     organizationUser.settings = data.settings;
     organizationUser.createdAt = data.created_at;
     organizationUser.updatedAt = data.updated_at;
+    organizationUser.role = new Role(data.role_id);
     if (data.organization_name)
       organizationUser.organizationName = data.organization_name;
     if (data.user_email) organizationUser.userEmail = data.user_email;
@@ -42,9 +44,14 @@ export class OrganizationUser {
       organizationUser.userFirstName = data.user_first_name;
     if (data.user_last_name)
       organizationUser.userLastName = data.user_last_name;
-    if (data.role) organizationUser.role = data.role;
-    if (data.role_implied_from) {
-      organizationUser.roleImpliedFrom = data.role_implied_from;
+    if (data.role_name) {
+      organizationUser.role = new Role(
+        data.role_name,
+        "organization" as RoleLevel
+      );
+      if (data.role_implied_from) {
+        organizationUser.role.impliedFrom = data.role_implied_from;
+      }
     }
     return organizationUser;
   }

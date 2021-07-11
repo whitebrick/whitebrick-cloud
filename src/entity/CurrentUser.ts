@@ -10,7 +10,7 @@ export class CurrentUser {
   id!: number;
   actionHistory: UserActionPermission[] = [];
 
-  // { roleLevel: { objectId: { userAction: { checkedForRole: string, permitted: true/false} } } }
+  // { roleLevel: { objectId: { userAction: { checkedForRoleName: string, permitted: true/false} } } }
   objectPermissionsLookup: Record<
     RoleLevel,
     Record<string, Record<string, Record<string, any>>>
@@ -67,7 +67,7 @@ export class CurrentUser {
     let values: string[] = [];
     const lastUAP = this.actionHistory.pop();
     if (lastUAP) {
-      message = `You do not have permission to ${lastUAP.deniedMessage}.`;
+      message = `You do not have permission to ${lastUAP.description}.`;
       let userStr = `userId=${this.id}`;
       if (this.user && this.user.email) {
         userStr = `userEmail=${this.user.email}, ${userStr}`;
@@ -76,7 +76,7 @@ export class CurrentUser {
         userStr,
         `objectId=${lastUAP.objectId}`,
         `userAction=${lastUAP.userAction}`,
-        `checkedForRole=${lastUAP.checkedForRole}`,
+        `checkedForRoleName=${lastUAP.checkedForRoleName}`,
         `checkedAt=${lastUAP.checkedAt}`,
       ];
     }
@@ -84,7 +84,7 @@ export class CurrentUser {
       success: false,
       message: message,
       values: values,
-      apolloErrorCode: "FORBIDDEN",
+      wbCode: "WB_FORBIDDEN",
     });
   }
 
@@ -92,7 +92,7 @@ export class CurrentUser {
     return errResult({
       success: false,
       message: "You must be signed-in to perform this action.",
-      apolloErrorCode: "FORBIDDEN",
+      wbCode: "WB_FORBIDDEN",
     });
   }
 
@@ -112,14 +112,13 @@ export class CurrentUser {
         objectKey: key,
         objectId:
           this.objectPermissionsLookup[roleLevel][key][userAction].obkectId,
-        checkedForRole:
+        checkedForRoleName:
           this.objectPermissionsLookup[roleLevel][key][userAction]
-            .checkedForRole,
+            .checkedForRoleName,
         permitted:
           this.objectPermissionsLookup[roleLevel][key][userAction].permitted,
-        deniedMessage:
-          this.objectPermissionsLookup[roleLevel][key][userAction]
-            .deniedMessage,
+        description:
+          this.objectPermissionsLookup[roleLevel][key][userAction].description,
       } as UserActionPermission;
     } else {
       return null;
@@ -134,8 +133,8 @@ export class CurrentUser {
     this.objectPermissionsLookup[uAP.roleLevel][uAP.objectId][uAP.userAction] =
       {
         permitted: uAP.permitted,
-        checkedForRole: uAP.checkedForRole,
-        deniedMessage: uAP.deniedMessage,
+        checkedForRoleName: uAP.checkedForRoleName,
+        description: uAP.description,
       };
     return uAP;
   }
@@ -175,7 +174,7 @@ export class CurrentUser {
     parentObjectName?: string
   ): Promise<boolean> {
     if (this.isSysAdmin()) return true;
-    const policy = CurrentUser.getUserActionPolicy(DEFAULT_POLICY, userAction);
+    const policy = DEFAULT_POLICY[userAction];
     log.debug(
       `currentUser.can(${userAction},${objectIdOrName}) policy:${JSON.stringify(
         policy
@@ -184,7 +183,7 @@ export class CurrentUser {
     if (!policy) {
       const message = `No policy found for userAction=${userAction}`;
       log.error(message);
-      throw message;
+      throw new Error(message);
     }
     let key = this.getObjectLookupKey(objectIdOrName, parentObjectName);
     const alreadyChecked = this.getObjectPermission(
@@ -207,12 +206,12 @@ export class CurrentUser {
         policy.roleLevel
       },${objectIdOrName},${parentObjectName}). ${JSON.stringify(roleResult)}`;
       log.error(message);
-      throw message;
+      throw new Error(message);
     }
     if (!roleResult.payload.objectId) {
       const message = `ObjectId could not be found`;
       log.error(message);
-      throw message;
+      throw new Error(message);
     }
     let permitted = false;
     if (
@@ -227,10 +226,10 @@ export class CurrentUser {
       objectId: roleResult.payload.objectId,
       userAction: userAction,
       permitted: permitted,
-      deniedMessage: policy.deniedMessage,
+      description: policy.description,
     };
     if (roleResult.payload.roleName) {
-      uAP.checkedForRole = roleResult.payload.roleName;
+      uAP.checkedForRoleName = roleResult.payload.roleName;
     }
     this.setObjectPermission(uAP);
     this.recordActionHistory(uAP);

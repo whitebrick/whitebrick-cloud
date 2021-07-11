@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { Role, RoleLevel } from ".";
 
 export class TableUser {
   tableId!: number;
@@ -9,13 +10,12 @@ export class TableUser {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
+  role!: Role;
   schemaName?: string;
   tableName?: string;
   userEmail?: string;
   userFirstName?: string;
   userLastName?: string;
-  role?: string;
-  roleImpliedFrom?: string;
 
   public static parseResult(data: QueryResult | null): Array<TableUser> {
     if (!data) throw new Error("TableUser.parseResult: input is null");
@@ -43,9 +43,11 @@ export class TableUser {
     if (data.user_email) tableUser.userEmail = data.user_email;
     if (data.user_first_name) tableUser.userFirstName = data.user_first_name;
     if (data.user_last_name) tableUser.userLastName = data.user_last_name;
-    if (data.role) tableUser.role = data.role;
-    if (data.role_implied_from) {
-      tableUser.roleImpliedFrom = data.role_implied_from;
+    if (data.role_name) {
+      tableUser.role = new Role(data.role_name, "table" as RoleLevel);
+      if (data.role_implied_from) {
+        tableUser.role.impliedFrom = data.role_implied_from;
+      }
     }
     return tableUser;
   }

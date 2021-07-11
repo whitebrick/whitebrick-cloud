@@ -12,8 +12,8 @@ Feature: Schemas
 
   Scenario: Add users to schemas
     * table schemaUsers 
-      | schemaName            | userEmails                          | role
+      | schemaName            | userEmails                          | roleName
       | "test_the_daisy_blog" | ["test_donna@test.whitebrick.com"]  | "schema_manager"
       | "test_the_daisy_blog" | ["test_debbie@test.whitebrick.com"] | "schema_reader"
       | "test_org_admins"     | ["test_debbie@test.whitebrick.com"] | "schema_administrator"
-    * def result = call read("schemas/schema-add-user.feature") schemaUsers
+    * def result = call read("schemas/schema-set-users-role.feature") schemaUsers

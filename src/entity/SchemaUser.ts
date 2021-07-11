@@ -1,4 +1,5 @@
 import { QueryResult } from "pg";
+import { Role, RoleLevel } from ".";
 
 export class SchemaUser {
   schemaId!: number;
@@ -9,12 +10,11 @@ export class SchemaUser {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
+  role!: Role;
   schemaName?: string;
   userEmail?: string;
   userFirstName?: string;
   userLastName?: string;
-  role?: string;
-  roleImpliedFrom?: string;
 
   public static parseResult(data: QueryResult | null): Array<SchemaUser> {
     if (!data) throw new Error("SchemaUser.parseResult: input is null");
@@ -41,9 +41,11 @@ export class SchemaUser {
     if (data.user_email) schemaUser.userEmail = data.user_email;
     if (data.user_first_name) schemaUser.userFirstName = data.user_first_name;
     if (data.user_last_name) schemaUser.userLastName = data.user_last_name;
-    if (data.role) schemaUser.role = data.role;
-    if (data.role_implied_from) {
-      schemaUser.roleImpliedFrom = data.role_implied_from;
+    if (data.role_name) {
+      schemaUser.role = new Role(data.role_name, "schema" as RoleLevel);
+      if (data.role_implied_from) {
+        schemaUser.role.impliedFrom = data.role_implied_from;
+      }
     }
     return schemaUser;
   }

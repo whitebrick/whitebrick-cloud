@@ -1,57 +1,66 @@
-export const DEFAULT_POLICY: Record<string, any>[] = [
+export const DEFAULT_POLICY: Record<string, Record<string, any>> = {
   // Organizations
-  {
-    userAction: "access_organization",
+  access_organization: {
     roleLevel: "organization",
-    deniedMessage: "access this organization",
+    description: "Access this Organization",
     permittedRoles: [
       "organization_external_user",
       "organization_user",
       "organization_administrator",
     ],
   },
-  {
-    userAction: "administer_organization",
+  administer_organization: {
     roleLevel: "organization",
-    deniedMessage: "administer this organization",
+    description: "Administer this Organization",
     permittedRoles: ["organization_administrator"],
   },
-  {
-    userAction: "edit_organization",
+  edit_organization: {
     roleLevel: "organization",
-    deniedMessage: "edit this Organization.",
+    description: "Edit this Organization",
     permittedRoles: ["organization_administrator"],
   },
-  {
-    userAction: "manage_access_to_organization",
+  manage_access_to_organization: {
     roleLevel: "organization",
-    deniedMessage: "manage access to this Organization.",
+    description: "Manage Access to this Organization",
     permittedRoles: ["organization_administrator"],
   },
   // Schemas
-  {
-    userAction: "alter_schema",
+  alter_schema: {
     roleLevel: "schema",
-    deniedMessage: "alter this Database.",
+    description: "Alter this Database",
     permittedRoles: ["schema_manager", "schema_administrator"],
   },
-  {
-    userAction: "manage_access_to_schema",
+  manage_access_to_schema: {
     roleLevel: "schema",
-    deniedMessage: "manage access to this Database.",
-    permittedRoles: ["schema_manager", "schema_administrator"],
+    description: "Manage Access to this Database",
+    permittedRoles: ["schema_administrator"],
   },
   // Tables
-  {
-    userAction: "alter_table",
+  alter_table: {
     roleLevel: "table",
-    deniedMessage: "alter this Table.",
+    description: "Alter this Table",
     permittedRoles: ["table_manager", "table_administrator"],
   },
-  {
-    userAction: "manage_access_to_table",
+  manage_access_to_table: {
     roleLevel: "table",
-    deniedMessage: "manage access to this Table.",
-    permittedRoles: ["table_manager", "table_administrator"],
+    description: "Manage Access to this Table",
+    permittedRoles: ["table_administrator"],
   },
-];
+  read_table_records: {
+    roleLevel: "table",
+    description: "Read Records from this Table",
+    permittedRoles: [
+      "table_reader",
+      "table_editor",
+      "table_manager",
+      "table_administrator",
+    ],
+    hasuraActions: ["select"],
+  },
+  read_and_write_table_records: {
+    roleLevel: "table",
+    description: "Read and Write Records to this Table",
+    permittedRoles: ["table_editor", "table_manager", "table_administrator"],
+    hasuraActions: ["select", "insert", "update", "delete"],
+  },
+};
