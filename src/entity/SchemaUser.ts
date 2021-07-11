@@ -29,10 +29,10 @@ export class SchemaUser {
     if (!data) throw new Error("SchemaUser.parse: input is null");
     const schemaUser = new SchemaUser();
     schemaUser.schemaId = data.schema_id;
-    schemaUser.userId = data.user_id;
-    schemaUser.roleId = data.role_id;
+    schemaUser.userId = parseInt(data.user_id);
+    schemaUser.roleId = parseInt(data.role_id);
     if (data.implied_from_role_id) {
-      schemaUser.impliedFromRoleId = data.implied_from_role_id;
+      schemaUser.impliedFromRoleId = parseInt(data.implied_from_role_id);
     }
     schemaUser.settings = data.settings;
     schemaUser.createdAt = data.created_at;

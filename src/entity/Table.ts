@@ -26,7 +26,7 @@ export class Table {
   public static parse(data: Record<string, any>): Table {
     if (!data) throw new Error("Table.parse: input is null");
     const table = new Table();
-    table.id = data.id;
+    table.id = parseInt(data.id);
     table.schemaId = data.schema_id;
     table.name = data.name;
     table.label = data.label;

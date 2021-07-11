@@ -31,8 +31,9 @@ export class OrganizationUser {
     organizationUser.organizationId = data.organization_id;
     organizationUser.userId = parseInt(data.user_id);
     organizationUser.roleId = parseInt(data.role_id);
-    if (data.implied_from_role_id)
+    if (data.implied_from_role_id) {
       organizationUser.impliedFromroleId = parseInt(data.implied_from_role_id);
+    }
     organizationUser.settings = data.settings;
     organizationUser.createdAt = data.created_at;
     organizationUser.updatedAt = data.updated_at;

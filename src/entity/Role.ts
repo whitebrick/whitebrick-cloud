@@ -237,7 +237,7 @@ export class Role {
   public static parse(data: Record<string, any>): Role {
     if (!data) throw new Error("Role.parse: input is null");
     const role = new Role(data.name);
-    role.id = data.id;
+    role.id = parseInt(data.id);
     role.name = data.name;
     role.label = data.label;
     role.createdAt = data.created_at;

@@ -29,11 +29,11 @@ export class TableUser {
   public static parse(data: Record<string, any>): TableUser {
     if (!data) throw new Error("TableUser.parse: input is null");
     const tableUser = new TableUser();
-    tableUser.tableId = data.table_id;
-    tableUser.userId = data.user_id;
-    tableUser.roleId = data.role_id;
+    tableUser.tableId = parseInt(data.table_id);
+    tableUser.userId = parseInt(data.user_id);
+    tableUser.roleId = parseInt(data.role_id);
     if (data.implied_from_role_id) {
-      tableUser.impliedFromroleId = data.implied_from_role_id;
+      tableUser.impliedFromroleId = parseInt(data.implied_from_role_id);
     }
     tableUser.settings = data.settings;
     tableUser.createdAt = data.created_at;

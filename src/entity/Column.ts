@@ -35,8 +35,8 @@ export class Column {
   public static parse(data: Record<string, any>): Column {
     if (!data) throw new Error("Column.parse: input is null");
     const column = new Column();
-    column.id = data.id;
-    column.tableId = data.table_id;
+    column.id = parseInt(data.id);
+    column.tableId = parseInt(data.table_id);
     column.name = data.name;
     column.label = data.label;
     column.type = data.type;

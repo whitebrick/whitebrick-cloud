@@ -23,7 +23,7 @@ export class Organization {
   public static parse(data: Record<string, any>): Organization {
     if (!data) throw new Error("Organization.parse: input is null");
     const organization = new Organization();
-    organization.id = data.id;
+    organization.id = parseInt(data.id);
     organization.name = data.name;
     organization.label = data.label;
     organization.createdAt = data.created_at;
