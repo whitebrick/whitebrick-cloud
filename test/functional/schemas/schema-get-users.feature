@@ -10,15 +10,17 @@ Feature:
       query ($schemaName: String!, $userEmails: [String]){
         wbSchemaUsers(schemaName: $schemaName, userEmails: $userEmails){
           userEmail
-          role
-          roleImpliedFrom
+          role{
+            name
+            impliedFrom
+          }
         }
       }
     """
     # Given def query = read("test.gql")
     And def variables = { schemaName: "#(schemaName)", userEmails: "#(userEmails)" }
-    And header X-Test-User-Email = "test_donna@test.whitebrick.com"
+    And header X-Test-User-Email = currentUserEmail
     And request { query: "#(query)", variables: "#(variables)" }
     When method POST
     Then status 200
-    Then match response.errors == "#notpresent"
+    

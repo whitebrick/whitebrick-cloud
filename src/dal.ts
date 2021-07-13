@@ -314,6 +314,9 @@ export class DAL {
     objectIdOrName: number | string,
     parentObjectName?: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `dal.roleAndIdForUserObject(${userId},${roleLevel},${objectIdOrName},${parentObjectName})`
+    );
     let objectId: number | undefined = undefined;
     let queryObjId: string = "";
     let sqlJoin: string = "";
@@ -374,7 +377,7 @@ export class DAL {
         break;
       case "table" as RoleLevel:
         sqlJoin = `
-         JOIN wb.table_users ON wb.roles.id=wb.table_users.role_i
+         JOIN wb.table_users ON wb.roles.id=wb.table_users.role_id
         `;
         sqlWhere = `
          WHERE wb.table_users.user_id=$1
@@ -398,7 +401,7 @@ export class DAL {
             AND wb.schemas.name=$3
           `;
           queryObjId = `
-            SELECT id as object_id
+            SELECT wb.tables.id as object_id
             FROM wb.tables
             JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
             WHERE wb.tables.name=$1 AND wb.schemas.name=$2
@@ -428,7 +431,7 @@ export class DAL {
     }
     const results = await this.executeQueries(queries);
     if (!results[0].success) return results[0];
-    if (!results[1].success) return results[1];
+    if (results[1] && !results[1].success) return results[1];
     const result: ServiceResult = {
       success: true,
       payload: {
@@ -1541,7 +1544,11 @@ export class DAL {
       updates.push("label=$" + params.length);
     }
     params.push(result.payload.id);
-    query += `${updates.join(", ")} WHERE id=$${params.length}`;
+    query += `
+      ${updates.join(", ")}
+      WHERE id=$${params.length}
+      RETURNING *
+    `;
     const queriesAndParams: Array<QueryParams> = [
       {
         query: query,
@@ -1559,7 +1566,12 @@ export class DAL {
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
     );
-    return results[results.length - 1];
+    if (newTableName && !results[1].success) return results[1];
+    if (results[0].success) {
+      results[0].payload = Table.parseResult(results[0].payload)[0];
+      results[0].payload.schemaName = schemaName;
+    }
+    return results[0];
   }
 
   /**
@@ -1710,7 +1722,9 @@ export class DAL {
     clearExisting?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `setTableUserRolesFromSchemaRoles(${schemaId}, <roleMap>, ${tableIds}, ${userIds}, ${clearExisting})`
+      `setTableUserRolesFromSchemaRoles(${schemaId}, ${JSON.stringify(
+        roleMap
+      )}, ${tableIds}, ${userIds}, ${clearExisting})`
     );
     let result = await this.rolesIdLookup();
     if (!result.success) return result;

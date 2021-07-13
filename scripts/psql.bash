@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 if [[ $(basename $(pwd)) == "scripts" ]]; then
-  echo "Run this script from the parent directory"
+  echo -e "\nRun this script from the ./scripts directory\n"
   exit 1
 fi
 export $(cat .env.development | sed 's/#.*//g' | xargs)

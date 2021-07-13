@@ -4,7 +4,7 @@ Feature:
     * url baseUrl
     * path endpointPath
 
-  Scenario: Add a user to a organization
+  Scenario: Set organization role
     Given text query = 
     """
       mutation ($organizationName: String!, $userEmails: [String]!, $roleName: String!){

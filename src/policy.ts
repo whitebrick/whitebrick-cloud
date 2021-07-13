@@ -28,12 +28,12 @@ export const DEFAULT_POLICY: Record<string, Record<string, any>> = {
   alter_schema: {
     roleLevel: "schema",
     description: "Alter this Database",
-    permittedRoles: ["schema_manager", "schema_administrator"],
+    permittedRoles: ["schema_manager", "schema_administrator", "schema_owner"],
   },
   manage_access_to_schema: {
     roleLevel: "schema",
     description: "Manage Access to this Database",
-    permittedRoles: ["schema_administrator"],
+    permittedRoles: ["schema_administrator", "schema_owner"],
   },
   // Tables
   alter_table: {

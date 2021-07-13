@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 if [[ $(basename $(pwd)) != "db" ]]; then
-  echo "Run this script from the ./db directory"
+  echo -e "\nRun this script from the ./scridbpts directory\n"
   exit 1
 fi
 export $(cat ../.env.development | sed 's/#.*//g' | xargs)

@@ -167,6 +167,7 @@ export class WhitebrickCloud {
     table: Table,
     deleteOnly?: boolean
   ): Promise<ServiceResult> {
+    log.debug(`deleteAndSetTablePermissions(${cU.id},${table},${deleteOnly})`);
     return await this.dal.deleteAndSetTablePermissions(table.id);
   }
 
@@ -178,7 +179,9 @@ export class WhitebrickCloud {
     object: Organization | Schema | Table
   ): Promise<ServiceResult> {
     log.debug(
-      `setRole(${userIds},${roleName},${roleLevel},${JSON.stringify(object)})`
+      `setRole(${cU.id},${userIds},${roleName},${roleLevel},${JSON.stringify(
+        object
+      )})`
     );
     if (!Role.isRole(roleName, roleLevel)) {
       return errResult({
@@ -928,6 +931,7 @@ export class WhitebrickCloud {
     log.debug(
       `createSchema(${cU.id},${name},${label},${organizationOwnerId},${organizationOwnerName})`
     );
+    if (cU.isSignedOut()) return cU.mustBeSignedIn();
     let result: ServiceResult = errResult();
     let userOwnerId: number | undefined = undefined;
     // run checks for organization owner
@@ -1045,6 +1049,12 @@ export class WhitebrickCloud {
     userEmails: string[],
     roleName: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `setSchemaUsersRole(${cU.id},${schemaName},${userEmails},${roleName})`
+    );
+    if (await cU.cant("manage_access_to_schema", schemaName)) {
+      return cU.denied();
+    }
     const schemaResult = await this.schemaByName(cU, schemaName);
     if (!schemaResult.success) return schemaResult;
     const usersResult = await this.usersByEmails(cU, userEmails);
@@ -1207,8 +1217,11 @@ export class WhitebrickCloud {
     create?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `addOrCreateTable(${schemaName},${tableName},${tableLabel},${create})`
+      `addOrCreateTable(${cU.id},${schemaName},${tableName},${tableLabel},${create})`
     );
+    if (await cU.cant("alter_schema", schemaName)) {
+      return cU.denied();
+    }
     if (!create) create = false;
     const tableResult = await this.dal.addOrCreateTable(
       schemaName,
@@ -1225,7 +1238,9 @@ export class WhitebrickCloud {
     result = await this.deleteAndSetTablePermissions(cU, tableResult.payload);
     if (!result.success) return result;
     tableResult.payload.schemaName = schemaName;
-    return await this.trackTableWithPermissions(cU, tableResult.payload);
+    result = await this.trackTableWithPermissions(cU, tableResult.payload);
+    if (!result.success) return result;
+    return tableResult;
   }
 
   public async removeOrDeleteTable(
@@ -1234,6 +1249,12 @@ export class WhitebrickCloud {
     tableName: string,
     del?: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `removeOrDeleteTable(${cU.id},${schemaName},${tableName},${del})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     if (!del) del = false;
     // 1. remove/delete columns
     let result = await this.dal.columns(schemaName, tableName);
@@ -1278,6 +1299,12 @@ export class WhitebrickCloud {
     newTableName?: string,
     newTableLabel?: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `updateTable(${cU.id},${schemaName},${tableName},${newTableName},${newTableLabel})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     let result: ServiceResult;
     const tableResult = await this.tableBySchemaNameTableName(
       cU,
@@ -1297,24 +1324,31 @@ export class WhitebrickCloud {
       result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
-    result = await this.dal.updateTable(
+    const updatedTableResult = await this.dal.updateTable(
       schemaName,
       tableName,
       newTableName,
       newTableLabel
     );
-    if (!result.success) return result;
+    if (!updatedTableResult.success) return updatedTableResult;
     if (newTableName) {
-      result = await this.trackTableWithPermissions(cU, tableResult.payload);
+      result = await this.trackTableWithPermissions(
+        cU,
+        updatedTableResult.payload
+      );
       if (!result.success) return result;
     }
-    return result;
+    return updatedTableResult;
   }
 
   public async addAllExistingTables(
     cU: CurrentUser,
     schemaName: string
   ): Promise<ServiceResult> {
+    log.debug(`addAllExistingTables(${cU.id},${schemaName})`);
+    if (await cU.cant("alter_schema", schemaName)) {
+      return cU.denied();
+    }
     let result = await this.dal.discoverTables(schemaName);
     if (!result.success) return result;
     const tableNames = result.payload;
@@ -1356,6 +1390,12 @@ export class WhitebrickCloud {
     schemaName: string,
     remove?: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `addOrRemoveAllExistingRelationships(${cU.id},${schemaName},${remove})`
+    );
+    if (await cU.cant("alter_schema", schemaName)) {
+      return cU.denied();
+    }
     let result = await this.dal.foreignKeysOrReferences(
       schemaName,
       "%",
@@ -1402,7 +1442,8 @@ export class WhitebrickCloud {
     cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
-    log.debug(`addDefaultTablePermissions(${JSON.stringify(table)})`);
+    log.debug(`addDefaultTablePermissions(${cU.id},${JSON.stringify(table)})`);
+    if (await cU.cant("alter_table", table.id)) return cU.denied();
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1433,7 +1474,10 @@ export class WhitebrickCloud {
     cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
-    log.debug(`addDefaultTablePermissions(${JSON.stringify(table)})`);
+    log.debug(
+      `removeDefaultTablePermissions(${cU.id},${JSON.stringify(table)})`
+    );
+    if (await cU.cant("alter_table", table.id)) return cU.denied();
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1465,6 +1509,12 @@ export class WhitebrickCloud {
     columnNames: string[],
     del?: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `createOrDeletePrimaryKey(${cU.id},${schemaName},${tableName},${columnNames},${del})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     if (!del) del = false;
     let result = await this.dal.primaryKeys(schemaName, tableName);
     if (!result.success) return result;
@@ -1500,6 +1550,12 @@ export class WhitebrickCloud {
     parentColumnNames: string[],
     create?: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `addOrCreateForeignKey(${cU.id},${schemaName},${tableName},${columnNames},${parentTableName},${parentColumnNames},${create})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     let operation: string = "CREATE";
     if (!create) operation = "ADD";
     return await this.setForeignKey(
@@ -1521,6 +1577,12 @@ export class WhitebrickCloud {
     parentTableName: string,
     del?: boolean
   ): Promise<ServiceResult> {
+    log.debug(
+      `removeOrDeleteForeignKey(${cU.id},${schemaName},${tableName},${columnNames},${parentTableName},${del})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     let operation: string = "DELETE";
     if (!del) operation = "REMOVE";
     return await this.setForeignKey(
@@ -1544,6 +1606,12 @@ export class WhitebrickCloud {
     parentColumnNames: string[],
     operation: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `setForeignKey(${cU.id},${schemaName},${tableName},${columnNames},${parentTableName},${parentColumnNames},${operation})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     let result = await this.dal.foreignKeysOrReferences(
       schemaName,
       tableName,
@@ -1614,7 +1682,10 @@ export class WhitebrickCloud {
     cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
-    log.debug(`trackTableWithPermissions(${JSON.stringify(table)})`);
+    log.debug(`trackTableWithPermissions(${cU.id}, ${JSON.stringify(table)})`);
+    if (await cU.cant("alter_table", table.id)) {
+      return cU.denied();
+    }
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1627,7 +1698,12 @@ export class WhitebrickCloud {
     cU: CurrentUser,
     table: Table
   ): Promise<ServiceResult> {
-    log.debug(`untrackTableWithPermissions(${JSON.stringify(table)})`);
+    log.debug(
+      `untrackTableWithPermissions(${cU.id}, ${JSON.stringify(table)})`
+    );
+    if (await cU.cant("alter_table", table.id)) {
+      return cU.denied();
+    }
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
@@ -1676,6 +1752,12 @@ export class WhitebrickCloud {
     userEmails: [string],
     roleName: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `setTableUsersRole(${cU.id},${schemaName},${tableName},${userEmails},${roleName})`
+    );
+    if (await cU.cant("manage_access_to_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     const tableResult = await this.tableBySchemaNameTableName(
       cU,
       schemaName,
@@ -1709,6 +1791,12 @@ export class WhitebrickCloud {
     schemaName: string,
     tableName: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `removeUsersFromTable(${cU.id},${userEmails},${schemaName},${tableName})`
+    );
+    if (await cU.cant("manage_access_to_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     const usersResult = await this.usersByEmails(cU, userEmails);
     if (!usersResult.success) return usersResult;
     // TBD do any checks against schema
@@ -1747,6 +1835,10 @@ export class WhitebrickCloud {
     tableName: string,
     settings: object
   ): Promise<ServiceResult> {
+    log.debug(
+      `saveTableUserSettings(${cU.id},${schemaName},${tableName},${settings})`
+    );
+    if (cU.isSignedOut()) return cU.mustBeSignedIn();
     const tableResult = await this.tableBySchemaNameTableName(
       cU,
       schemaName,
@@ -1808,8 +1900,11 @@ export class WhitebrickCloud {
     skipTracking?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `addOrCreateColumn(${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${skipTracking})`
+      `addOrCreateColumn(${cU.id},${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${skipTracking})`
     );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     if (!create) create = false;
     let result: ServiceResult = errResult();
     const tableResult = await this.tableBySchemaNameTableName(
@@ -1846,8 +1941,11 @@ export class WhitebrickCloud {
     skipTracking?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `removeOrDeleteColumn(${schemaName},${tableName},${columnName},${del})`
+      `removeOrDeleteColumn(${cU.id},${schemaName},${tableName},${columnName},${del},${skipTracking})`
     );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     if (!del) del = false;
     let result: ServiceResult = errResult();
     const tableResult = await this.tableBySchemaNameTableName(
@@ -1881,6 +1979,12 @@ export class WhitebrickCloud {
     newColumnLabel?: string,
     newType?: string
   ): Promise<ServiceResult> {
+    log.debug(
+      `updateColumn(${cU.id},${schemaName},${tableName},${columnName},${newColumnName},${newColumnLabel},${newType})`
+    );
+    if (await cU.cant("alter_table", tableName, schemaName)) {
+      return cU.denied();
+    }
     // TBD: if this is a fk
     let result: ServiceResult;
     const tableResult = await this.tableBySchemaNameTableName(

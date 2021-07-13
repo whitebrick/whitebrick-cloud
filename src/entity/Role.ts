@@ -1,5 +1,6 @@
 import { QueryResult } from "pg";
 import { DEFAULT_POLICY } from "../policy";
+import { log } from "../whitebrick-cloud";
 
 /**
  * SCHEMA
@@ -69,8 +70,10 @@ export class Role {
     switch (to) {
       case "table" as RoleLevel:
         toRoleDefinitions = Role.SYSROLES_TABLES;
+        break;
       case "schema" as RoleLevel:
         toRoleDefinitions = Role.SYSROLES_SCHEMAS;
+        break;
     }
     for (const toRoleName of Object.keys(toRoleDefinitions)) {
       if (toRoleDefinitions[toRoleName].impliedFrom) {
@@ -199,11 +202,11 @@ export class Role {
   public static hasuraTablePermissionChecksAndTypes(
     tableId: number
   ): Record<string, any>[] {
-    const hasuraPermissionsAndTypes: Record<string, any>[] = [];
-    for (const permissionKeysAndType of Role.tablePermissionKeysAndActions(
+    const hasuraPermissionsAndActions: Record<string, any>[] = [];
+    for (const permissionKeysAndAction of Role.tablePermissionKeysAndActions(
       tableId
     )) {
-      hasuraPermissionsAndTypes.push({
+      hasuraPermissionsAndActions.push({
         permissionCheck: {
           _exists: {
             _table: { schema: "wb", name: "table_permissions" },
@@ -211,7 +214,7 @@ export class Role {
               _and: [
                 {
                   table_permission_key: {
-                    _eq: permissionKeysAndType.permissionKey,
+                    _eq: permissionKeysAndAction.permissionKey,
                   },
                 },
                 { user_id: { _eq: "X-Hasura-User-Id" } },
@@ -219,10 +222,10 @@ export class Role {
             },
           },
         },
-        permissionType: permissionKeysAndType.type,
+        permissionType: permissionKeysAndAction.action,
       });
     }
-    return hasuraPermissionsAndTypes;
+    return hasuraPermissionsAndActions;
   }
 
   public static parseResult(data: QueryResult | null): Array<Role> {

@@ -4,8 +4,7 @@ Feature:
     * url baseUrl
     * path endpointPath
 
-  
-  Scenario: Add a user to a schema
+  Scenario: Set schema role
     Given text query = 
     """
       mutation ($schemaName: String!, $userEmails: [String]!, $roleName: String!){
@@ -14,8 +13,8 @@ Feature:
     """
     # Given def query = read("test.gql")
     And def variables = { schemaName: "#(schemaName)", userEmails: "#(userEmails)", roleName: "#(roleName)" }
-    And header X-Test-User-Email = "test_donna@test.whitebrick.com"
+    And header X-Test-User-Email = currentUserEmail
     And request { query: "#(query)", variables: "#(variables)" }
+    And header X-Test-User-Email = currentUserEmail
     When method POST
     Then status 200
-    Then match response.errors == "#notpresent"
