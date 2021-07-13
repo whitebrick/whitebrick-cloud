@@ -25,10 +25,15 @@ tests=(
   "permissions"
 )
 
-if [[ "$1" == "importDBs" ]]; then
-  tests=("import_dbs")
-elif [[ "$1" == "withImportDBs" ]]; then
-  tests+=("import_dbs")
+if [ $# -gt 0 ]; then
+  if [[ "$1" == "importDBs" ]]; then
+    tests=("import_dbs")
+  elif [[ "$1" == "withImportDBs" ]]; then
+    tests+=("import_dbs")
+  else
+    echo -e "Error: $1 argument not recognized."
+    exit 1;
+  fi
 fi
 
 for test in "${tests[@]}"

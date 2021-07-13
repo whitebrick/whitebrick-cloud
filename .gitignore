@@ -104,7 +104,8 @@ dist
 
 # Test
 test/karate*
-test/target*
+test/target/*
+test/functional/target/*
 
 # Hasura
 hasura/config.yaml
