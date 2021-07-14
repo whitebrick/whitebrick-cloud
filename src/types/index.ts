@@ -65,7 +65,8 @@ const resolvers: IResolvers = {
   },
   Mutation: {
     wbResetTestData: async (_, __, context) => {
-      const result = await context.wbCloud.resetTestData();
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.resetTestData(currentUser);
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },

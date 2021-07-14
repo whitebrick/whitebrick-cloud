@@ -29,6 +29,7 @@ Feature: Organizations
       | currentUserEmail                 | organizationName    | roleName                     | userEmails
       | "test_daisy@test.whitebrick.com" | "test_vandelay"     | "organization_user"          | ["test_debbie@test.whitebrick.com"]
     * def result = call read("organization-set-users-role.feature") organizationUsers
+    * print "========== EXPECTING ERROR =========="
     * match each result[*].response contains { errors: "#present" }
     * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"
 
@@ -36,7 +37,8 @@ Feature: Organizations
     * table organizationUsers
       | currentUserEmail                 | organizationName    | userEmails
       | "test_daisy@test.whitebrick.com" | "test_vandelay"     | ["test_donna@test.whitebrick.com"]
-    * def result = call read("organization-remove-user.feature") organizationUsers
+    * def result = call read("organization-remove-users.feature") organizationUsers
+    * print "========== EXPECTING ERROR =========="
     * match each result[*].response contains { errors: "#present" }
     * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"
 
@@ -45,7 +47,8 @@ Feature: Organizations
     * table organizationUsers
       | currentUserEmail                      | organizationName    | userEmails
       | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | ["test_daisy@test.whitebrick.com", "test_nick_north@test.whitebrick.com"]
-    * def result = call read("organization-remove-user.feature") organizationUsers
+    * def result = call read("organization-remove-users.feature") organizationUsers
+    * print "========== EXPECTING ERROR =========="
     * match each result[*].response contains { errors: "#present" }
     * match each result[*].response.errors[*].extensions.wbCode == "WB_ORGANIZATION_NO_ADMINS"
 
@@ -53,7 +56,7 @@ Feature: Organizations
     * table organizationUsers
       | currentUserEmail                      | organizationName    | userEmails
       | "test_nick_north@test.whitebrick.com" | "test_vandelay"     | ["test_donna@test.whitebrick.com", "test_daisy@test.whitebrick.com"]
-    * def result = call read("organization-remove-user.feature") organizationUsers
+    * def result = call read("organization-remove-users.feature") organizationUsers
     * match each result[*].response contains { errors: "#notpresent" }
 
   Scenario: Organization non-admins can not delete organizations
@@ -61,6 +64,7 @@ Feature: Organizations
       | currentUserEmail                 | name
       | "test_daisy@test.whitebrick.com" | "test_vandelay"
     * def result = call read("organization-delete.feature") organizations
+    * print "========== EXPECTING ERROR =========="
     * match each result[*].response contains { errors: "#present" }
     * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"
 

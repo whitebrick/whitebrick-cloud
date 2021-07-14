@@ -747,7 +747,7 @@ export class DAL {
   public async organizationUsers(
     name?: string,
     id?: number,
-    roles?: string[],
+    roleNames?: string[],
     userIds?: number[],
     withSettings?: boolean
   ): Promise<ServiceResult> {
@@ -761,9 +761,9 @@ export class DAL {
       sqlWhere = "WHERE wb.organizations.name=$1";
       params.push(name);
     }
-    if (roles) {
+    if (roleNames) {
       sqlWhere += " AND wb.roles.name=ANY($2)";
-      params.push(roles);
+      params.push(roleNames);
     }
     if (userIds) {
       sqlWhere += ` AND wb.organization_users.user_id=ANY($${
@@ -1080,15 +1080,20 @@ export class DAL {
 
   public async schemaUsers(
     schemaName: string,
+    roleNames?: string[],
     userIds?: number[],
     withSettings?: boolean
   ): Promise<ServiceResult> {
-    const params: (string | number[])[] = [schemaName];
+    const params: (string | string[] | number[])[] = [schemaName];
     let sqlSelect: string = "";
     let sqlWhere = "";
+    if (roleNames) {
+      params.push(roleNames);
+      sqlWhere = `AND wb.roles.name=ANY($${params.length})`;
+    }
     if (userIds) {
-      sqlWhere = "AND wb.schema_users.user_id=ANY($2)";
       params.push(userIds);
+      sqlWhere = `AND wb.schema_users.user_id=ANY($${params.length})`;
     }
     if (withSettings) {
       sqlSelect = "wb.organization_users.settings,";
@@ -1722,7 +1727,7 @@ export class DAL {
     clearExisting?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `setTableUserRolesFromSchemaRoles(${schemaId}, ${JSON.stringify(
+      `dal.setTableUserRolesFromSchemaRoles(${schemaId}, ${JSON.stringify(
         roleMap
       )}, ${tableIds}, ${userIds}, ${clearExisting})`
     );

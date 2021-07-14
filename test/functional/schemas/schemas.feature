@@ -32,5 +32,6 @@ Feature: Schemas
       | currentUserEmail                  | schemaName            | userEmails                              | roleName
       | "test_debbie@test.whitebrick.com" | "test_the_daisy_blog" | ["test_nick_north@test.whitebrick.com"] | "schema_reader"
     * def result = call read("schema-set-users-role.feature") schemaUsers
+    * print "========== EXPECTING ERROR =========="
     * match each result[*].response contains { errors: "#present" }
     * match each result[*].response.errors[*].extensions.wbCode == "WB_FORBIDDEN"

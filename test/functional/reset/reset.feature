@@ -13,6 +13,7 @@ Feature:
     }
     """
     And request { query: "#(query)" }
+    And header X-Test-User-Email = "test_donna@test.whitebrick.com"
     When method POST
     Then status 200
     Then print response.data

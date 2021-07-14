@@ -137,6 +137,11 @@ export const typeDefs = gql`
       userEmails: [String]!
       roleName: String!
     ): Boolean
+    wbRemoveTableUsers(
+      schemaName: String!
+      tableName: String!
+      userEmails: [String]!
+    ): Boolean
     wbSaveTableUserSettings(
       schemaName: String!
       tableName: String!
@@ -427,6 +432,21 @@ export const resolvers: IResolvers = {
         tableName,
         userEmails,
         roleName
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbRemoveTableUsers: async (
+      _,
+      { schemaName, tableName, userEmails },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.removeTableUsers(
+        currentUser,
+        schemaName,
+        tableName,
+        userEmails
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

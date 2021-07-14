@@ -15,6 +15,5 @@ Feature:
     And def variables = { schemaName: "#(schemaName)", userEmails: "#(userEmails)", roleName: "#(roleName)" }
     And header X-Test-User-Email = currentUserEmail
     And request { query: "#(query)", variables: "#(variables)" }
-    And header X-Test-User-Email = currentUserEmail
     When method POST
     Then status 200

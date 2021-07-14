@@ -14,6 +14,7 @@ Feature: Tables
       | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_tags"  | "Post Tags"
       | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_links" | "Post Links"
       | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "Post Extra"
+      | "test_donna@test.whitebrick.com" | "test_org_admins"     | "test_table" | "Test Table"
     * def result = call read("table-create.feature") tables
     * match each result[*].response contains { errors: "#notpresent" }
 

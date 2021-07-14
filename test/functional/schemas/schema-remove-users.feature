@@ -4,7 +4,7 @@ Feature:
     * url baseUrl
     * path endpointPath
 
-  Scenario: Remove a user from a schema
+  Scenario: Remove users from a schema
     Given text query = 
     """
       mutation ($schemaName: String!, $userEmails: [String]!){

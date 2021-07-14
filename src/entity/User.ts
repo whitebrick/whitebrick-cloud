@@ -1,9 +1,9 @@
 import { QueryResult } from "pg";
-import { userMessages } from "../environment";
+import { USER_MESSAGES } from "../environment";
 
 export class User {
   static SYS_ADMIN_ID: number = 1;
-  static PUBLIC_ID: number = 1;
+  static PUBLIC_ID: number = 2;
 
   id!: number;
   email!: string;

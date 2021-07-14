@@ -3,6 +3,7 @@ import { ServiceResult } from "../types";
 import { errResult, log, WhitebrickCloud } from "../whitebrick-cloud";
 import { RoleLevel, UserActionPermission } from "./Role";
 import { DEFAULT_POLICY } from "../policy";
+import { environment } from "../environment";
 
 export class CurrentUser {
   wbCloud!: WhitebrickCloud;
@@ -20,26 +21,30 @@ export class CurrentUser {
     table: {},
   };
 
-  constructor(wbCloud: WhitebrickCloud, user: User) {
-    this.wbCloud = wbCloud;
+  constructor(user: User, wbCloud?: WhitebrickCloud) {
+    if (wbCloud) this.wbCloud = wbCloud;
     this.user = user;
     this.id = user.id;
   }
 
-  public static getSysAdmin(wbCloud: WhitebrickCloud) {
-    return new CurrentUser(wbCloud, User.getSysAdminUser());
+  public static getSysAdmin() {
+    return new CurrentUser(User.getSysAdminUser());
   }
 
-  public static getPublic(wbCloud: WhitebrickCloud) {
-    return new CurrentUser(wbCloud, User.getPublicUser());
+  public static getPublic() {
+    return new CurrentUser(User.getPublicUser());
   }
 
   public isSignedIn() {
     return this.user.id !== User.PUBLIC_ID;
   }
 
-  public isSignedOut() {
+  public isntSignedIn() {
     return this.user.id == User.PUBLIC_ID;
+  }
+
+  public isSignedOut() {
+    return this.isntSignedIn();
   }
 
   public isPublic() {
@@ -50,15 +55,26 @@ export class CurrentUser {
     return this.user.id === User.SYS_ADMIN_ID;
   }
 
-  public isNotSysAdmin() {
+  public isntSysAdmin() {
     return !this.isSysAdmin;
+  }
+
+  public isTestUser() {
+    return (
+      this.user.email &&
+      this.user.email.toLowerCase().endsWith(environment.testUserEmailDomain)
+    );
+  }
+
+  public isntTestUser() {
+    return !this.isTestUser;
   }
 
   public idIs(otherId: number) {
     return this.user.id == otherId;
   }
 
-  public idIsNot(otherId: number) {
+  public idIsnt(otherId: number) {
     return !this.idIs(otherId);
   }
 
@@ -92,6 +108,31 @@ export class CurrentUser {
     return errResult({
       success: false,
       message: "You must be signed-in to perform this action.",
+      wbCode: "WB_FORBIDDEN",
+    });
+  }
+
+  public mustBeSysAdmin() {
+    return errResult({
+      success: false,
+      message: "You must be a System Administrator to perform this action.",
+      wbCode: "WB_FORBIDDEN",
+    });
+  }
+
+  public mustBeSysAdminOrTestUser() {
+    return errResult({
+      success: false,
+      message:
+        "You must be a System Administrator or Test User to perform this action.",
+      wbCode: "WB_FORBIDDEN",
+    });
+  }
+
+  public mustBeSelf() {
+    return errResult({
+      success: false,
+      message: "This action can only be performed on yourself as the user.",
       wbCode: "WB_FORBIDDEN",
     });
   }
@@ -196,6 +237,7 @@ export class CurrentUser {
       return alreadyChecked.permitted;
     }
     const roleResult = await this.wbCloud.roleAndIdForUserObject(
+      CurrentUser.getSysAdmin(),
       this.id,
       policy.roleLevel,
       objectIdOrName,
@@ -268,23 +310,23 @@ export class CurrentUser {
         `========== FOUND TEST USER: ${headersLowerCase["x-test-user-email"]}`
       );
       result = await context.wbCloud.userByEmail(
-        this,
+        CurrentUser.getSysAdmin(),
         headersLowerCase["x-test-user-email"]
       );
       if (result.success && result.payload && result.payload.id) {
-        return new CurrentUser(context.wbCloud, result.payload);
+        return new CurrentUser(result.payload, context.wbCloud);
       } else {
         log.error(
           `CurrentUser.fromContext: Couldn't find user for test email x-test-user-email=${headersLowerCase["x-test-user-email"]}`
         );
-        return new CurrentUser(context.wbCloud, User.getPublicUser());
+        return new CurrentUser(User.getPublicUser(), context.wbCloud);
       }
     } else if (
       headersLowerCase["x-hasura-role"] &&
       headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
     ) {
       log.debug("========== FOUND SYSADMIN USER");
-      return new CurrentUser(context.wbCloud, User.getSysAdminUser());
+      return CurrentUser.getSysAdmin();
     } else if (headersLowerCase["x-hasura-user-id"]) {
       log.debug(
         `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
@@ -294,12 +336,12 @@ export class CurrentUser {
         parseInt(headersLowerCase["x-hasura-user-id"])
       );
       if (result.success && result.payload && result.payload.id) {
-        return new CurrentUser(context.wbCloud, result.payload);
+        return new CurrentUser(result.payload, context.wbCloud);
       } else {
         log.error(
           `CurrentUser.fromContext: Couldn't find user for x-hasura-user-id=${headersLowerCase["x-hasura-user-id"]}`
         );
-        return new CurrentUser(context.wbCloud, User.getPublicUser());
+        return new CurrentUser(User.getPublicUser(), context.wbCloud);
       }
     } else {
       // TBD: support for public users
@@ -308,7 +350,7 @@ export class CurrentUser {
           context.headers
         )}`
       );
-      return new CurrentUser(context.wbCloud, User.getPublicUser());
+      return new CurrentUser(User.getPublicUser(), context.wbCloud);
     }
   }
 }

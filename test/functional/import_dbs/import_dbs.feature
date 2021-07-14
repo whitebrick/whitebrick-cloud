@@ -32,6 +32,7 @@ Feature: Import existing DBs
     * match proc.exitCode == 0
 
   Scenario: Add tables and relationships from existing DBs
+    * print "========== Adding all of the tables and relationships may take up to 15 minutes =========="
     * table schemas 
       | currentUserEmail                      | schemaName
       | "test_donna@test.whitebrick.com"      | "test_donnasdvd"

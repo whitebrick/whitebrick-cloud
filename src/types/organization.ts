@@ -38,7 +38,7 @@ export const typeDefs = gql`
     """
     wbOrganizationUsers(
       organizationName: String!
-      roles: [String]
+      roleNames: [String]
       userEmails: [String]
       withSettings: Boolean
     ): [OrganizationUser]
@@ -108,7 +108,7 @@ export const resolvers: IResolvers = {
     // Organization Users
     wbOrganizationUsers: async (
       _,
-      { organizationName, roles, userEmails, withSettings },
+      { organizationName, roleNames, userEmails, withSettings },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
@@ -116,7 +116,7 @@ export const resolvers: IResolvers = {
         currentUser,
         organizationName,
         undefined,
-        roles,
+        roleNames,
         userEmails,
         withSettings
       );

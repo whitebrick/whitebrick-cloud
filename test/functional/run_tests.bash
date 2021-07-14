@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+
+# This was originally implemented in karate using `call read("..` with tags
+# but was moved to bash because:
+# 1) karate gets slow after ~50 calls on OSX
+# 2) tags are not global and need to be manually propogated with calls
+
 if [[ $(basename $(pwd)) != "functional" ]]; then
   echo -e "\nRun this script from within the ./test/functional directory\n"
   exit 1

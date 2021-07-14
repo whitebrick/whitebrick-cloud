@@ -11,6 +11,7 @@ type Environment = {
   hasuraHost: string;
   hasuraAdminSecret: string;
   testIgnoreErrors: boolean;
+  testUserEmailDomain: string;
 };
 
 export const environment: Environment = {
@@ -30,10 +31,13 @@ export const environment: Environment = {
   hasuraHost: process.env.HASURA_HOST as string,
   hasuraAdminSecret: process.env.HASURA_ADMIN_SECRET as string,
   testIgnoreErrors: (process.env.TEST_IGNORE_ERRORS || false) as boolean,
+  testUserEmailDomain: (
+    (process.env.TEST_USER_EMAIL_DOMAIN || "") as string
+  ).toLocaleLowerCase(),
 };
 
 // wbErrorCode : [ message, apolloErrorCode? ]
-export const userMessages: Record<string, string[]> = {
+export const USER_MESSAGES: Record<string, string[]> = {
   // Users
   WB_USER_NOT_FOUND: ["User not found.", "BAD_USER_INPUT"],
   WB_USERS_NOT_FOUND: ["One or more users were not found."],
@@ -59,11 +63,16 @@ export const userMessages: Record<string, string[]> = {
     "Database name can not begin with 'pg_' or be in the reserved list.",
     "BAD_USER_INPUT",
   ],
-  WB_CANT_REMOVE_SCHEMA_USER_OWNER: [
-    "You can not remove the user_owner from a Schema",
+  WB_CANT_REMOVE_SCHEMA_USER_OWNER: ["You can not remove the DB User Owner"],
+  WB_CANT_REMOVE_SCHEMA_ADMIN: [
+    "You can not remove a DB Administrator from one or more individual tables.",
   ],
   // Schemas Users
   WB_SCHEMA_USERS_NOT_FOUND: ["One or more Schema Users not found."],
+  WB_SCHEMA_NO_ADMINS: [
+    "You can not remove all Administrators from a schema - you must leave at least one.",
+    "BAD_USER_INPUT",
+  ],
   // Tables
   WB_TABLE_NOT_FOUND: ["Table could not be found."],
   WB_TABLE_NAME_EXISTS: ["This Table name already exists", "BAD_USER_INPUT"],
@@ -78,5 +87,5 @@ export const userMessages: Record<string, string[]> = {
   WB_TABLE_USERS_NOT_FOUND: ["One or more Table Users not found."],
   // Roles
   ROLE_NOT_FOUND: ["This role could not be found."],
-  WB_FORBIDDEN: ["You do not permitted to perform this action.", "FORBIDDEN"],
+  WB_FORBIDDEN: ["You are not permitted to perform this action.", "FORBIDDEN"],
 };

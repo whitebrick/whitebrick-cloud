@@ -25,6 +25,16 @@ export const DEFAULT_POLICY: Record<string, Record<string, any>> = {
     permittedRoles: ["organization_administrator"],
   },
   // Schemas
+  read_schema: {
+    roleLevel: "schema",
+    description: "Read this Schema",
+    permittedRoles: [
+      "schema_reader",
+      "schema_manager",
+      "schema_administrator",
+      "schema_owner",
+    ],
+  },
   alter_schema: {
     roleLevel: "schema",
     description: "Alter this Database",
@@ -36,6 +46,16 @@ export const DEFAULT_POLICY: Record<string, Record<string, any>> = {
     permittedRoles: ["schema_administrator", "schema_owner"],
   },
   // Tables
+  read_table: {
+    roleLevel: "table",
+    description: "Read this Table",
+    permittedRoles: [
+      "table_reader",
+      "table_editor",
+      "table_manager",
+      "table_administrator",
+    ],
+  },
   alter_table: {
     roleLevel: "table",
     description: "Alter this Table",

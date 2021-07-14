@@ -41,6 +41,7 @@ export const typeDefs = gql`
     """
     wbSchemaUsers(
       schemaName: String!
+      roleNames: [String]
       userEmails: [String]
       withSettings: Boolean
     ): [SchemaUser]
@@ -94,13 +95,14 @@ export const resolvers: IResolvers = {
     // Schema Users
     wbSchemaUsers: async (
       _,
-      { schemaName, userEmails, withSettings },
+      { schemaName, roleNames, userEmails, withSettings },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.schemaUsers(
         currentUser,
         schemaName,
+        roleNames,
         userEmails,
         withSettings
       );
