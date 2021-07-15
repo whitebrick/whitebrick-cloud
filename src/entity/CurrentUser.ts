@@ -332,7 +332,7 @@ export class CurrentUser {
         `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
       );
       const result = await context.wbCloud.userById(
-        this,
+        CurrentUser.getSysAdmin(),
         parseInt(headersLowerCase["x-hasura-user-id"])
       );
       if (result.success && result.payload && result.payload.id) {
