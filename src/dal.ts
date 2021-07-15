@@ -636,7 +636,7 @@ export class DAL {
       params.push(userEmails);
     }
     if (organizationNames) {
-      sqlWhere += "AND wb.organizations.name=ANY($2)";
+      sqlWhere += " AND wb.organizations.name=ANY($2)";
       params.push(organizationNames);
     }
     if (withSettings) {
@@ -960,6 +960,7 @@ export class DAL {
   }
 
   public async schemasByOrganizationOwner(
+    currentUserId?: number,
     organizationId?: number,
     organizationName?: string
   ): Promise<ServiceResult> {
@@ -969,16 +970,25 @@ export class DAL {
       sqlWhere = "WHERE wb.organizations.id=$1";
       params.push(organizationId);
     } else if (organizationName) {
-      sqlWhere = "WHERE wb.organizations.name=$1";
+      sqlWhere = `WHERE wb.organizations.name=$1`;
       params.push(organizationName);
+    }
+    if (currentUserId) {
+      sqlWhere += `AND wb.schema_users.user_id=$2`;
+      params.push(currentUserId);
     }
     const result = await this.executeQuery({
       query: `
         SELECT
         wb.schemas.*,
+        wb.roles.name as role_name,
+        schema_user_implied_roles.name as role_implied_from,
         wb.organizations.name as organization_owner_name
         FROM wb.schemas
         JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
+        LEFT JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
+        JOIN wb.roles on wb.schema_users.role_id=wb.roles.id
+        LEFT JOIN wb.roles schema_user_implied_roles ON wb.schema_users.implied_from_role_id=schema_user_implied_roles.id
         ${sqlWhere}
       `,
       params: params,

@@ -35,7 +35,12 @@ export const typeDefs = gql`
     Schemas
     """
     wbMySchemas(withSettings: Boolean): [Schema]
-    wbMySchemaByName(name: String!, withSettings: Boolean): Schema
+    wbMySchemaByName(
+      name: String!
+      organizationName: String
+      withSettings: Boolean
+    ): Schema
+    wbSchemasByOrganizationOwner(organizationName: String!): [Schema]
     """
     Schema Users
     """
@@ -82,12 +87,27 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbMySchemaByName: async (_, { name, withSettings }, context) => {
+    wbMySchemaByName: async (
+      _,
+      { name, organizationName, withSettings },
+      context
+    ) => {
       const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.accessibleSchemaByName(
         currentUser,
         name,
+        organizationName,
         withSettings
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbSchemasByOrganizationOwner: async (_, { organizationName }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.schemasByOrganizationOwner(
+        currentUser,
+        undefined,
+        organizationName
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;

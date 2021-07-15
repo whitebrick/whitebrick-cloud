@@ -602,21 +602,29 @@ export class WhitebrickCloud {
       `accessibleOrganizationByName(${cU.id},${organizationName},${withSettings})`
     );
     if (cU.isntSignedIn()) return cU.mustBeSignedIn();
-    const result = await this.dal.organizationsByUsers(
+    let result = await this.dal.organizationsByUsers(
       [cU.id],
       undefined,
       [organizationName],
       withSettings
     );
-    if (result.success) {
-      result.payload = result.payload[0];
-      if (!result.payload) {
-        return errResult({
-          wbCode: "WB_ORGANIZATION_NOT_FOUND",
-          values: [organizationName],
-        });
-      }
+    if (!result.success) return result;
+    result.payload = result.payload[0];
+    if (!result.payload) {
+      // does this organization exist at all (regardless of access)
+      result = await this.organizationByName(
+        CurrentUser.getSysAdmin(),
+        organizationName
+      );
+      // return organization not found
+      if (!result.success) return result;
+      // otherwise return forbidden
+      return errResult({
+        wbCode: "WB_FORBIDDEN",
+        values: [organizationName],
+      });
     }
+
     return result;
   }
 
@@ -722,14 +730,19 @@ export class WhitebrickCloud {
     log.debug(
       `organizationUsers(${cU.id},${name},${id},${roleNames},${userEmails},${withSettings})`
     );
-    if (cU.isntSignedIn()) return cU.mustBeSignedIn();
+    let organizationRef: string | number = "";
     let result: ServiceResult = errResult();
     if (name) {
       result = await this.organizationByName(cU, name);
+      organizationRef = name;
     } else if (id) {
       result = await this.organizationById(cU, id);
+      organizationRef = id;
     }
     if (!result.success) return result;
+    if (await cU.cant("access_organization", organizationRef)) {
+      return cU.denied();
+    }
     if (!result.payload) {
       return errResult({
         wbCode: "WB_ORGANIZATION_NOT_FOUND",
@@ -939,7 +952,7 @@ export class WhitebrickCloud {
       result.payload = result.payload[0];
       if (!result.payload) {
         return errResult({
-          wbCode: "WB_ORGANIZATION_NOT_FOUND",
+          wbCode: "WB_SCHEMA_NOT_FOUND",
           values: [name],
         });
       }
@@ -984,8 +997,29 @@ export class WhitebrickCloud {
     log.debug(
       `schemasByOrganizationOwner(${cU.id},${organizationId},${organizationName})`
     );
-    if (cU.isntSignedIn()) return cU.mustBeSignedIn();
+    let result: ServiceResult = errResult();
+    let organizationRef: number | string = "";
+    // does this organization exist at all (regardless of access)
+    if (organizationId) {
+      result = await this.organizationById(
+        CurrentUser.getSysAdmin(),
+        organizationId
+      );
+      organizationRef = organizationId;
+    } else if (organizationName) {
+      organizationRef = organizationName;
+      result = await this.organizationByName(
+        CurrentUser.getSysAdmin(),
+        organizationName
+      );
+    }
+    // return organization not found
+    if (!result.success) return result;
+    if (await cU.cant("access_organization", organizationRef)) {
+      return cU.denied();
+    }
     return this.dal.schemasByOrganizationOwner(
+      cU.id,
       organizationId,
       organizationName
     );
@@ -1006,10 +1040,44 @@ export class WhitebrickCloud {
   public async accessibleSchemaByName(
     cU: CurrentUser,
     schemaName: string,
+    organizationName?: string,
     withSettings?: boolean
   ): Promise<ServiceResult> {
-    log.debug(`accessibleSchemaByName(${cU.id},${schemaName},${withSettings})`);
-    if (cU.isntSignedIn()) return cU.mustBeSignedIn();
+    log.debug(
+      `accessibleSchemaByName(${cU.id},${schemaName},${organizationName},${withSettings})`
+    );
+    const organizationResult: ServiceResult = errResult();
+    // if it's from an organization URL, check it exists
+    if (organizationName) {
+      const organizationResult = await this.organizationByName(
+        CurrentUser.getSysAdmin(),
+        organizationName
+      );
+      // returns organization not found
+      if (!organizationResult.success) return organizationResult;
+    }
+    // now check schema exists
+    const schemaResult = await this.schemaByName(
+      CurrentUser.getSysAdmin(),
+      schemaName
+    );
+    // returns schema not found
+    if (!schemaResult.success) return schemaResult;
+    // now if it's from an organization URL, check for correct owner
+    if (organizationName && organizationResult.success) {
+      if (
+        schemaResult.payload.organization_owner_id !=
+        organizationResult.payload.id
+      ) {
+        return errResult({
+          wbCode: "WB_SCHEMA_NOT_FOUND",
+          values: [
+            `${schemaName} not found for organization owner ${organizationName}.`,
+          ],
+        });
+      }
+    }
+    if (await cU.cant("read_schema", schemaName)) return cU.denied();
     const result = await this.dal.schemasByUsers(
       [cU.id],
       undefined,
@@ -1020,7 +1088,7 @@ export class WhitebrickCloud {
       result.payload = result.payload[0];
       if (!result.payload) {
         return errResult({
-          wbCode: "WB_SCHEMA_NOT_FOUND",
+          wbCode: "WB_FORBIDDEN",
           values: [schemaName],
         });
       }

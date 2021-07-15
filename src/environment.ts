@@ -43,6 +43,10 @@ export const USER_MESSAGES: Record<string, string[]> = {
   WB_USERS_NOT_FOUND: ["One or more users were not found."],
   // Organizations
   WB_ORGANIZATION_NOT_FOUND: ["Organization not found.", "BAD_USER_INPUT"],
+  WB_ORGANIZATION_URL_NOT_FOUND: [
+    "This Organization URL could not be found. Please Check the spelling otherwise contact your System Administrator.",
+    "BAD_USER_INPUT",
+  ],
   WB_ORGANIZATION_NAME_TAKEN: [
     "This Organization name has already been taken.",
     "BAD_USER_INPUT",
@@ -57,8 +61,20 @@ export const USER_MESSAGES: Record<string, string[]> = {
   ],
   WB_USER_NOT_IN_ORG: ["User must be in Organization"],
   WB_USER_NOT_SCHEMA_OWNER: ["The current user is not the owner."],
+  WB_ORGANIZATION_URL_FORBIDDEN: [
+    "Sorry you do not have access to this Organization. Please contact your System Administrator.",
+    "BAD_USER_INPUT",
+  ],
   // Schemas
-  WB_SCHEMA_NOT_FOUND: ["Database could not be found."],
+  WB_SCHEMA_NOT_FOUND: ["Database could not be found.", "BAD_USER_INPUT"],
+  WB_SCHEMA_URL_NOT_FOUND: [
+    "This Database URL could not be found. Please Check the spelling otherwise contact your System Administrator.",
+    "BAD_USER_INPUT",
+  ],
+  WB_SCHEMA_URL_FORBIDDEN: [
+    "Sorry you do not have access to this Database. Please contact your System Administrator.",
+    "BAD_USER_INPUT",
+  ],
   WB_BAD_SCHEMA_NAME: [
     "Database name can not begin with 'pg_' or be in the reserved list.",
     "BAD_USER_INPUT",
