@@ -15,9 +15,9 @@ ALTER SEQUENCE wb.organizations_id_seq RESTART WITH 101;
 CREATE TABLE IF NOT EXISTS wb.users(
   id BIGSERIAL PRIMARY KEY,
   auth_id TEXT UNIQUE,
-  email TEXT NOT NULL UNIQUE,
-  first_name TEXT NOT NULL,
-  last_name TEXT NOT NULL,
+  email TEXT UNIQUE,
+  first_name TEXT,
+  last_name TEXT,
   created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc'),
   updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc')
 );

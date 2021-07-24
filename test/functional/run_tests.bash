@@ -16,7 +16,7 @@ echo -e "Checking for karate..."
 which karate
 if [ $? -ne 0 ]; then
   echo -e "\nThe karate command could not be found\n"
-  exit $retVal
+  exit 1
 fi
 
 rm -Rf ./target

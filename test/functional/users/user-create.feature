@@ -7,8 +7,8 @@ Feature:
   Scenario: Create a user
     Given text query = 
     """
-      mutation ($email: String!, $firstName: String!, $lastName: String!){
-        wbCreateUser(email: $email, firstName: $firstName, lastName: $lastName) {
+      mutation ($authId: String, $email: String, $firstName: String, $lastName: String){
+        wbCreateUser(authId: $authId, email: $email, firstName: $firstName, lastName: $lastName) {
           email
           firstName
           lastName

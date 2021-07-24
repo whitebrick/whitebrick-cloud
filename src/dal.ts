@@ -488,7 +488,7 @@ export class DAL {
       params.push(ids);
     } else if (emails) {
       sqlWhere = "AND email=ANY($1)";
-      params.push(emails);
+      params.push(emails.map((v) => v.toLowerCase()));
     } else if (searchPattern) {
       sqlWhere = `
         AND email LIKE $1
@@ -512,17 +512,18 @@ export class DAL {
   }
 
   public async createUser(
-    email: string,
-    firstName: string,
-    lastName: string
+    authId?: string,
+    email?: string,
+    firstName?: string,
+    lastName?: string
   ): Promise<ServiceResult> {
     const result = await this.executeQuery({
       query: `
         INSERT INTO wb.users(
-          email, first_name, last_name
-        ) VALUES($1, $2, $3) RETURNING *
+          auth_id, email, first_name, last_name
+        ) VALUES($1, $2, $3, $4) RETURNING *
       `,
-      params: [email, firstName, lastName],
+      params: [authId, email, firstName, lastName],
     } as QueryParams);
     if (result.success) result.payload = User.parseResult(result.payload)[0];
     return result;
@@ -571,7 +572,7 @@ export class DAL {
     const result = await this.executeQuery({
       query: `
         DELETE FROM wb.users
-        WHERE email like 'test_%test.whitebrick.com'
+        WHERE email like 'test_%${environment.testUserEmailDomain}'
       `,
       params: [],
     } as QueryParams);

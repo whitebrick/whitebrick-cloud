@@ -47,7 +47,6 @@ const typeDefs = gql`
 
   type Mutation {
     wbResetTestData: Boolean!
-    wbAuth(userAuthId: String!): JSON!
   }
 `;
 
@@ -69,11 +68,6 @@ const resolvers: IResolvers = {
       const result = await context.wbCloud.resetTestData(currentUser);
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
-    },
-    wbAuth: async (_, { userAuthId }, context) => {
-      const result = await context.wbCloud.auth(userAuthId);
-      if (!result.success) throw context.wbCloud.err(result);
-      return result.payload;
     },
   },
 };

@@ -39,6 +39,7 @@ export const environment: Environment = {
 // wbErrorCode : [ message, apolloErrorCode? ]
 export const USER_MESSAGES: Record<string, string[]> = {
   // Users
+  WB_USER_EXISTS: ["This user already exists"],
   WB_USER_NOT_FOUND: ["User not found.", "BAD_USER_INPUT"],
   WB_USERS_NOT_FOUND: ["One or more users were not found."],
   // Organizations

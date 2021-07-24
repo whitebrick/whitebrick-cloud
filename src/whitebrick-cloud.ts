@@ -4,7 +4,7 @@ import { DAL } from "./dal";
 import { hasuraApi } from "./hasura-api";
 import { ConstraintId, schema, ServiceResult } from "./types";
 import v = require("voca");
-import { USER_MESSAGES } from "./environment";
+import { environment, USER_MESSAGES } from "./environment";
 
 import {
   Column,
@@ -141,6 +141,7 @@ export class WhitebrickCloud {
    */
 
   public async auth(userAuthId: string): Promise<ServiceResult> {
+    log.debug(`auth(${userAuthId})`);
     const result = await this.dal.userIdFromAuthId(userAuthId);
     if (!result.success) return result;
     const hasuraUserId: number = result.payload;
@@ -153,6 +154,40 @@ export class WhitebrickCloud {
         "X-Hasura-Authenticated-At": Date().toString(),
       },
     } as ServiceResult;
+  }
+
+  public async signUp(
+    userAuthId: string,
+    userObj: Record<string, any>
+  ): Promise<ServiceResult> {
+    log.debug(`signUp(${userAuthId},${JSON.stringify(userObj)})`);
+    let email: string | undefined = undefined;
+    let firstName: string | undefined = undefined;
+    let lastName: string | undefined = undefined;
+    // https://auth0.com/docs/rules/user-object-in-rules
+    if (userObj.email && userObj.email.length > 0) email = userObj.email;
+    if (userObj.given_name && userObj.given_name.length > 0) {
+      firstName = userObj.given_name;
+    }
+    if (userObj.family_name && userObj.family_name.length > 0) {
+      lastName = userObj.family_name;
+    }
+    if (!firstName && !lastName) {
+      if (userObj.name && userObj.name.length > 0) {
+        const split: string[] = userObj.name.split(" ");
+        firstName = split.shift();
+        lastName = split.join(" ");
+      } else if (userObj.nickname && userObj.nickname.length > 0) {
+        firstName = userObj.nickname;
+      }
+    }
+    return await this.createUser(
+      CurrentUser.getSysAdmin(),
+      userAuthId,
+      email,
+      firstName,
+      lastName
+    );
   }
 
   /**
@@ -466,15 +501,45 @@ export class WhitebrickCloud {
 
   public async createUser(
     cU: CurrentUser,
-    email: string,
-    firstName: string,
-    lastName: string
+    authId?: string,
+    email?: string,
+    firstName?: string,
+    lastName?: string
   ): Promise<ServiceResult> {
-    log.debug(`createUser(${cU.id},${email},${firstName},${lastName})`);
-    if (cU.isntSysAdmin() && cU.isntTestUser()) {
+    log.debug(
+      `createUser(${cU.id},${authId},${email},${firstName},${lastName})`
+    );
+    // a test user can only create anohter test user
+    if (
+      email &&
+      email.toLowerCase().endsWith(environment.testUserEmailDomain) &&
+      cU.isntTestUser() &&
+      cU.isntSysAdmin()
+    ) {
       return cU.mustBeSysAdminOrTestUser();
+    } else if (cU.isntSysAdmin()) {
+      return cU.mustBeSysAdmin();
     }
-    return this.dal.createUser(email, firstName, lastName);
+    let existingUserResult: ServiceResult = errResult();
+    let errValue: string = "";
+    if (authId) {
+      existingUserResult = await this.dal.userIdFromAuthId(authId);
+      errValue = authId;
+    } else if (email) {
+      existingUserResult = await this.userByEmail(
+        CurrentUser.getSysAdmin(),
+        email
+      );
+      errValue = email;
+    }
+    // We don't want to find any existing users
+    if (existingUserResult.success) {
+      return errResult({
+        wbCode: "WB_USER_EXISTS",
+        values: [errValue],
+      });
+    }
+    return this.dal.createUser(authId, email, firstName, lastName);
   }
 
   public async updateUser(
@@ -486,7 +551,7 @@ export class WhitebrickCloud {
   ): Promise<ServiceResult> {
     log.debug(`updateUser(${cU.id},${id},${email},${firstName},${lastName})`);
     if (cU.isntSysAdmin() && cU.idIsnt(id)) {
-      return cU.mustBeSelf();
+      return cU.mustBeSysAdminOrSelf();
     }
     return this.dal.updateUser(id, email, firstName, lastName);
   }

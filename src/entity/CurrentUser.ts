@@ -137,6 +137,15 @@ export class CurrentUser {
     });
   }
 
+  public mustBeSysAdminOrSelf() {
+    return errResult({
+      success: false,
+      message:
+        "You must be a System Administrator or yourself as the user to perform this action.",
+      wbCode: "WB_FORBIDDEN",
+    });
+  }
+
   // TBD move to ElastiCache
   private getObjectPermission(
     roleLevel: RoleLevel,

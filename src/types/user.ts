@@ -36,13 +36,15 @@ export const typeDefs = gql`
     """
     Users
     """
-    wbCreateUser(email: String!, firstName: String, lastName: String): User
-    wbUpdateUser(
-      id: ID!
+    wbSignUp(userAuthId: String!, userObj: JSON!): Boolean
+    wbAuth(userAuthId: String!): JSON
+    wbCreateUser(
+      authId: String
       email: String
       firstName: String
       lastName: String
     ): User
+    wbUpdateMyProfile(firstName: String, lastName: String): User
   }
 `;
 
@@ -72,11 +74,25 @@ export const resolvers: IResolvers = {
     },
   },
   Mutation: {
-    // Users
-    wbCreateUser: async (_, { email, firstName, lastName }, context) => {
+    wbSignUp: async (_, { userAuthId, userObj }, context) => {
+      const result = await context.wbCloud.signUp(userAuthId, userObj);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbAuth: async (_, { userAuthId }, context) => {
+      const result = await context.wbCloud.auth(userAuthId);
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbCreateUser: async (
+      _,
+      { authId, email, firstName, lastName },
+      context
+    ) => {
       const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.createUser(
         currentUser,
+        authId,
         email,
         firstName,
         lastName
@@ -84,12 +100,12 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbUpdateUser: async (_, { id, email, firstName, lastName }, context) => {
+    wbUpdateMyProfile: async (_, { firstName, lastName }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
       const result = await context.wbCloud.updateUser(
         currentUser,
-        id,
-        email,
+        currentUser.id,
+        undefined,
         firstName,
         lastName
       );
