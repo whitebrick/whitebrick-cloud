@@ -42,6 +42,9 @@ export const USER_MESSAGES: Record<string, string[]> = {
   WB_USER_EXISTS: ["This user already exists"],
   WB_USER_NOT_FOUND: ["User not found.", "BAD_USER_INPUT"],
   WB_USERS_NOT_FOUND: ["One or more users were not found."],
+  WB_PASSWORD_RESET_INSTRUCTIONS_SENT: [
+    "Password reset instructions have been sent to your E-mail.",
+  ],
   // Organizations
   WB_ORGANIZATION_NOT_FOUND: ["Organization not found.", "BAD_USER_INPUT"],
   WB_ORGANIZATION_URL_NOT_FOUND: [
@@ -67,6 +70,9 @@ export const USER_MESSAGES: Record<string, string[]> = {
     "BAD_USER_INPUT",
   ],
   // Schemas
+  WB_NO_SCHEMAS_FOUND: [
+    "You don’t have access to any Databases. Please contact you System Administrator for access to an existing Database or create a new Database below.",
+  ],
   WB_SCHEMA_NOT_FOUND: ["Database could not be found.", "BAD_USER_INPUT"],
   WB_SCHEMA_URL_NOT_FOUND: [
     "This Database URL could not be found. Please Check the spelling otherwise contact your System Administrator.",

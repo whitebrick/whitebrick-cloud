@@ -6,7 +6,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO test_the_daisy_blog.posts(id, author_id, title, body) VALUES
   (10, 3, 'What Harry Potter ate for Breakfast', 'Sausages, kippers, porridge, fried tomatoes.'),
-  (11, 3, 'How fast is the the Nimbus 2000', 'Sirius then gives him an upgraded broomstick—the esteemed Firebolt.'),
+  (11, 3, 'How fast is the the Nimbus 2000?', 'Sirius then gives him an upgraded broomstick—the esteemed Firebolt.'),
   (12, 1, 'Bitcoin Price Crashing', 'Bitcoins price plunged by nearly 30% after Chinese regulators annoucement.'),
   (13, 1, 'How many Big Macs can you buy with Bitcoin?', 'Lots.'),
   (14, 2, 'Running Linux on a Mac', 'Linux can be installed directly on Mac hardware, in a dual boot configuration with macOS.')
