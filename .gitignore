@@ -102,6 +102,9 @@ dist
 # TernJS port file
 .tern-port
 
+# OSX
+*.DS_Store
+
 # Test
 test/karate*
 test/target*
@@ -110,3 +113,4 @@ test/functional/target*
 # Hasura
 hasura/config.yaml
 scripts/update_staging_db.bash
+

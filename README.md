@@ -1,9 +1,18 @@
+[//]: # "START:COMMON_HEADER"
+
+![whitebrick logo](doc/whitebrick-logo-horizontal-white-sm.png)
+
 # whitebrick-cloud (backend)
 
 ### Open source Airtable alternative (No Code DB)
 
-- whitebrick jamstack client on [GitHub](https://github.com/whitebrick/whitebrick)
 - Hosted service at [whitebrick.com](https://whitebrick.com)
+
+[//]: # "END:COMMON_HEADER"
+
+#### You are viewing the
+
+[//]: # "END:COMMON_HEADER"
 
 ![whitebrick-cloud system diagram](doc/whitebrick-diagram.png)
 
