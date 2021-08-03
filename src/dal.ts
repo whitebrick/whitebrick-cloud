@@ -829,7 +829,8 @@ export class DAL {
   public async schemas(
     schemaIds?: number[],
     schemaNames?: string[],
-    schemaNamePattern?: string
+    schemaNamePattern?: string,
+    wbOnly?: boolean
   ): Promise<ServiceResult> {
     const pgParams: (string[] | number[] | string)[] = [
       Schema.SYS_SCHEMA_NAMES,
@@ -850,9 +851,25 @@ export class DAL {
       pgParams.push(schemaNamePattern);
       sqlWbWhere = "WHERE name LIKE $1";
       wbParams.push(schemaNamePattern);
+    } else {
+      return errResult({
+        message:
+          "dal.schemas: One of schemaIds, schemaNames or schemaNamePattern must be specified.",
+      } as ServiceResult);
     }
-    const results = await this.executeQueries([
+    const queries: QueryParams[] = [
       {
+        query: `
+          SELECT wb.schemas.*
+          FROM wb.schemas
+          ${sqlWbWhere}
+          ORDER BY name
+        `,
+        params: wbParams,
+      } as QueryParams,
+    ];
+    if (!wbOnly) {
+      queries.push({
         query: `
           SELECT information_schema.schemata.*
           FROM information_schema.schemata
@@ -861,27 +878,21 @@ export class DAL {
           ${sqlPgWhere}
         `,
         params: pgParams,
-      } as QueryParams,
-      {
-        query: `
-          SELECT wb.schemas.*
-          FROM wb.schemas
-          ${sqlWbWhere}
-        `,
-        params: wbParams,
-      } as QueryParams,
-    ]);
-    if (results[0].success && results[1].success) {
+      } as QueryParams);
+    }
+    const results = await this.executeQueries(queries);
+    if (!results[0].success) return results[0];
+    if (!wbOnly) {
+      if (!results[1].success) return results[1];
       if (results[0].payload.rows.length != results[1].payload.rows.length) {
         return errResult({
           message:
             "dal.schemas: wb.schemas out of sync with information_schema.schemata",
         } as ServiceResult);
-      } else {
-        results[1].payload = Schema.parseResult(results[1].payload);
       }
     }
-    return results[1];
+    results[0].payload = Schema.parseResult(results[0].payload);
+    return results[0];
   }
 
   public async schemasByUsers(
@@ -1035,16 +1046,14 @@ export class DAL {
     return result;
   }
 
-  public async createSchema(
+  public async addOrCreateSchema(
     name: string,
     label: string,
     organizationOwnerId?: number,
-    userOwnerId?: number
+    userOwnerId?: number,
+    create?: boolean
   ): Promise<ServiceResult> {
-    const results = await this.executeQueries([
-      {
-        query: `CREATE SCHEMA ${DAL.sanitize(name)}`,
-      } as QueryParams,
+    const queries: QueryParams[] = [
       {
         query: `
           INSERT INTO wb.schemas(
@@ -1053,12 +1062,17 @@ export class DAL {
         `,
         params: [name, label, organizationOwnerId, userOwnerId],
       } as QueryParams,
-    ]);
-    const insertResult: ServiceResult = results[results.length - 1];
-    if (insertResult.success) {
-      insertResult.payload = Schema.parseResult(insertResult.payload)[0];
+    ];
+    if (create) {
+      queries.push({
+        query: `CREATE SCHEMA ${DAL.sanitize(name)}`,
+      } as QueryParams);
     }
-    return insertResult;
+    const results = await this.executeQueries(queries);
+    if (!results[0].success) return results[0];
+    if (create && !results[1].success) return results[1];
+    results[0].payload = Schema.parseResult(results[0].payload)[0];
+    return results[0];
   }
 
   public async removeOrDeleteSchema(

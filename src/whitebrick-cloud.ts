@@ -1176,15 +1176,16 @@ export class WhitebrickCloud {
   }
 
   // If organizationOwner organization admins are implicitly granted schema admin roles
-  public async createSchema(
+  public async addOrCreateSchema(
     cU: CurrentUser,
     name: string,
     label: string,
     organizationOwnerId?: number,
-    organizationOwnerName?: string
+    organizationOwnerName?: string,
+    create?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `createSchema(${cU.id},${name},${label},${organizationOwnerId},${organizationOwnerName})`
+      `addOrCreateSchema(${cU.id},${name},${label},${organizationOwnerId},${organizationOwnerName}, ${create})`
     );
     if (cU.isntSignedIn()) return cU.mustBeSignedIn();
     let result: ServiceResult = errResult();
@@ -1276,6 +1277,19 @@ export class WhitebrickCloud {
     return await this.dal.removeOrDeleteSchema(schemaName, del);
   }
 
+  public async addDemoSchemasToNewUser(
+    cU: CurrentUser,
+    newUserId: number
+  ): Promise<ServiceResult> {
+    log.debug(`addDemoSchemasToNewUser(${cU.id},${newUserId})`);
+    let result = await this.dal.schemas(
+      undefined,
+      undefined,
+      Schema.DEMO_SCHEMA_PATTERN,
+      true
+    );
+    if (!result.success) return result;
+  }
   /**
    * ========== Schema Users ==========
    */

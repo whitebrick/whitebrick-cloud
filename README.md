@@ -2,35 +2,47 @@
 
 ![whitebrick logo](doc/whitebrick-logo-horizontal-white-sm.png)
 
-# whitebrick-cloud (backend)
+# whitebrick-cloud (back end)
 
-### Open source Airtable alternative (No Code DB)
+### Open Source Airtable Alternative (No Code DB)
 
-- Hosted service at [whitebrick.com](https://whitebrick.com)
+#### Whitebrick is a lightweight No-Code Database with two points of difference:
+
+1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for easy customization and hosting.
+2. The back end is a set of **Serverless support functions** for making DDL calls and configuring [Hasura GraphQL server](https://hasura.io/).
+
+##### Rather than reinventing the wheel Whitebrick stitches together the best-in-breed open source apps: [Hasura](https://hasura.io/) | [Gastsby](https://www.gatsbyjs.com/) | [AG Grid](https://ag-grid.com/) | [Apollo](https://www.apollographql.com/) | [Serverless](https://www.serverless.com/)
+
+---
+
+#### Current Project status as of August:
+
+- [x] DDL Table & Column CRUD
+- [x] Live editing with subscription
+- [x] Table-level RBAC
+- [ ] Joins
+- [ ] Column-level RBAC
+- [ ] Documentation
+
+Hosted demo and SaaS at [whitebrick.com](https://whitebrick.com)
+
+---
 
 [//]: # "END:COMMON_HEADER"
 
-#### You are viewing the
+### You are currently viewing the back end repository
 
-[//]: # "END:COMMON_HEADER"
+- The frontend repository can be found [here](https://github.com/whitebrick/whitebrick)
+
+[//]: # "START:COMMON_DESCRIPTION"
 
 ![whitebrick-cloud system diagram](doc/whitebrick-diagram.png)
 
-whitebrick-cloud is a serverless application that adds multi-tenant DDL and access control functions to [Hasura](https://github.com/hasura/graphql-engine).
-Jamstack clients interface with whitebrick-cloud through a remote schema stitched to the Hasura GraphQL API. The default Hasura client provides DDL functions out-of-the-box
-but achieves this by sending raw SQL over the wire which is not practical for multi-tenanted applications with varied access control.
-
-whitebrick-cloud uses the following technologies
-
-- [TypeScipt](https://github.com/microsoft/TypeScript) for typed JavaScript
-- [Apollo Server](https://github.com/apollographql/apollo-server) for GraphQL
-- [Axios](https://github.com/axios/axios) for HTTP
-- [node-postgres](https://node-postgres.com/) for DAL
-- [Serverless](https://github.com/serverless/serverless) for dev and deployment
-- [webpack](https://github.com/webpack/webpack) for bundling
-- [Karate](https://github.com/intuit/karate) for functional testing
+Whitebrick comprises a front end Jamstack client and back end Serverless application (whitebrick-cloud) that adds multi-tenant DDL and access control functions to the [Hasura GraphQL Server](https://github.com/hasura/graphql-engine). The Jamstack client uses [AG Grid](https://ag-grid.com/) as a spreadsheet-like UI that reads/writes table data directly from/to Hasura over GraphQL. Additional functions (eg DDL and access control) are provided by whitebrick-cloud and exposed through the Hasura endpoint using [Schema stitching](https://hasura.io/docs/latest/graphql/core/remote-schemas/index.html).
 
 ---
+
+[//]: # "END:COMMON_DESCRIPTION"
 
 ## Getting Started
 
@@ -69,13 +81,18 @@ whitebrick-cloud uses the following technologies
 
     Run `serverless offline start` to start the serverless listener in local/offline mode
 
-7.  #### Add Remote Schema
+7.  #### Track wb.table_permissions
+
+    From The Hasura console, use the top menu to navigate to the "Data" page, click to expand the default database on the left, then click the "wb" schema.
+    Click the "Track" button next to the "table_permissions" table.
+
+8.  #### Add Remote Schema
 
     From The Hasura console, use the top menu to navigate to the "Remote Schemas" page, click add and enter the endpoint displayed from (6) above.
     **NB: If you are running Hasura in a local container you will need to use the corresponding URL** eg `http://host.docker.internal:3000/graphql`.
     If you now navigate to the "API" page from the top menu, In the query "Explorer" you should now see queries beginning with `wb*`.
 
-8.  #### Run Functional Tests
+9.  #### Run Functional Tests
     Download [Karate](https://github.com/intuit/karate#getting-started) (the [stand-alone executable](https://github.com/intuit/karate/wiki/ZIP-Release) is all that is needed).
     Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test` directory and run the command `karate ./functional/run.feature`
 
