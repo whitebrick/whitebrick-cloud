@@ -56,12 +56,21 @@ export const typeDefs = gql`
     """
     Schemas
     """
-    wbCreateSchema(
+    wbAddOrCreateSchema(
       name: String!
       label: String!
-      organizationOwnerId: Int
       organizationOwnerName: String
+      userOwnerEmail: String
+      create: Boolean
     ): Schema
+    wbUpdateSchema(
+      name: String!
+      newSchemaName: String
+      newSchemaLabel: String
+      newOrganizationOwnerName: String
+      newUserOwnerEmail: String
+    ): Schema
+    wbRemoveOrDeleteSchema(name: String!, del: Boolean): Boolean!
     """
     Schema Users
     """
@@ -132,21 +141,58 @@ export const resolvers: IResolvers = {
   },
   Mutation: {
     // Schemas
-    wbCreateSchema: async (
+    wbAddOrCreateSchema: async (
       _,
-      { name, label, organizationOwnerId, organizationOwnerName },
+      { name, label, organizationOwnerName, userOwnerEmail, create },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.createSchema(
+      const result = await context.wbCloud.addOrCreateSchema(
         currentUser,
         name,
         label,
-        organizationOwnerId,
-        organizationOwnerName
+        undefined,
+        organizationOwnerName,
+        undefined,
+        userOwnerEmail,
+        create
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
+    },
+    wbUpdateSchema: async (
+      _,
+      {
+        name,
+        newSchemaName,
+        newSchemaLabel,
+        newOrganizationOwnerName,
+        newUserOwnerEmail,
+      },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.updateSchema(
+        currentUser,
+        name,
+        newSchemaName,
+        newSchemaLabel,
+        newOrganizationOwnerName,
+        undefined,
+        newUserOwnerEmail
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbRemoveOrDeleteSchema: async (_, { name, del }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.removeOrDeleteSchema(
+        currentUser,
+        name,
+        del
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
     },
     // Schema Users
     wbSetSchemaUsersRole: async (

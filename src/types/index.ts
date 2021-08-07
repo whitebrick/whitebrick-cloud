@@ -46,7 +46,7 @@ const typeDefs = gql`
   }
 
   type Mutation {
-    wbResetTestData: Boolean!
+    wbUtil(fn: String!, vals: JSON): JSON!
   }
 `;
 
@@ -63,11 +63,11 @@ const resolvers: IResolvers = {
     },
   },
   Mutation: {
-    wbResetTestData: async (_, __, context) => {
+    wbUtil: async (_, { fn, vals }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.resetTestData(currentUser);
+      const result = await context.wbCloud.util(currentUser, fn, vals);
       if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
+      return result;
     },
   },
 };

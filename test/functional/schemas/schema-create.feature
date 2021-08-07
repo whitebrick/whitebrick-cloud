@@ -9,7 +9,7 @@ Feature:
     Given text query = 
     """
       mutation ($name: String!, $label: String!, $organizationOwnerName: String){
-        wbCreateSchema(name: $name, label: $label, organizationOwnerName: $organizationOwnerName) {
+        wbAddOrCreateSchema(name: $name, label: $label, organizationOwnerName: $organizationOwnerName, create: true) {
           name,
           label
         }

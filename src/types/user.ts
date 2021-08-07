@@ -75,12 +75,18 @@ export const resolvers: IResolvers = {
   },
   Mutation: {
     wbSignUp: async (_, { userAuthId, userObj }, context) => {
-      const result = await context.wbCloud.signUp(userAuthId, userObj);
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.signUp(
+        currentUser,
+        userAuthId,
+        userObj
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbAuth: async (_, { userAuthId }, context) => {
-      const result = await context.wbCloud.auth(userAuthId);
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.auth(currentUser, userAuthId);
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

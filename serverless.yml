@@ -18,6 +18,8 @@ functions:
           path: graphql
           method: get
           cors: true
+  bg:
+    handler: src/whitebrick-cloud.bgHandler
 plugins:
   - serverless-dotenv-plugin
   - serverless-webpack

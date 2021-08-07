@@ -53,7 +53,7 @@ export class WhitebrickCloud {
       {}
     );
     let result: ServiceResult = errResult();
-    // if x-hasura-admin-secret is present and valid hasura sets role to admin
+    // if x-hasura-admin-secret hasura sets role to admin
     if (
       headersLowerCase["x-hasura-role"] &&
       headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
@@ -107,41 +107,15 @@ export class WhitebrickCloud {
   }
 
   /**
-   * ========== Test ==========
-   */
-
-  public async resetTestData(cU: CurrentUser): Promise<ServiceResult> {
-    log.debug(`resetTestData()`);
-    if (cU.isntSysAdmin() && cU.isntTestUser()) {
-      return cU.mustBeSysAdminOrTestUser();
-    }
-    let result = await this.schemas(
-      CurrentUser.getSysAdmin(),
-      undefined,
-      undefined,
-      "test_%"
-    );
-    if (!result.success) return result;
-    for (const schema of result.payload) {
-      result = await this.removeOrDeleteSchema(
-        CurrentUser.getSysAdmin(),
-        schema.name,
-        true
-      );
-      if (!result.success) return result;
-    }
-    result = await this.deleteTestOrganizations(CurrentUser.getSysAdmin());
-    if (!result.success) return result;
-    result = await this.deleteTestUsers();
-    return result;
-  }
-
-  /**
    * ========== Auth ==========
    */
 
-  public async auth(userAuthId: string): Promise<ServiceResult> {
+  public async auth(
+    cU: CurrentUser,
+    userAuthId: string
+  ): Promise<ServiceResult> {
     log.debug(`auth(${userAuthId})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     const result = await this.dal.userIdFromAuthId(userAuthId);
     if (!result.success) return result;
     const hasuraUserId: number = result.payload;
@@ -157,10 +131,12 @@ export class WhitebrickCloud {
   }
 
   public async signUp(
+    cU: CurrentUser,
     userAuthId: string,
     userObj: Record<string, any>
   ): Promise<ServiceResult> {
     log.debug(`signUp(${userAuthId},${JSON.stringify(userObj)})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     let email: string | undefined = undefined;
     let firstName: string | undefined = undefined;
     let lastName: string | undefined = undefined;
@@ -181,13 +157,18 @@ export class WhitebrickCloud {
         firstName = userObj.nickname;
       }
     }
-    return await this.createUser(
+    let result = await this.createUser(
       CurrentUser.getSysAdmin(),
       userAuthId,
       email,
       firstName,
       lastName
     );
+    if (!result.success) return result;
+    if (environment.demoDBPrefix) {
+      result = await this.assignDemoSchema(result.payload.id);
+    }
+    return result;
   }
 
   /**
@@ -213,7 +194,7 @@ export class WhitebrickCloud {
     log.debug(
       `roleAndIdForUserObject(${cU.id},${userId},${roleLevel},${objectIdOrName},${parentObjectName})`
     );
-    if (cU.isntSysAdmin()) return cU.denied();
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     return this.dal.roleAndIdForUserObject(
       userId,
       roleLevel,
@@ -1182,14 +1163,15 @@ export class WhitebrickCloud {
     label: string,
     organizationOwnerId?: number,
     organizationOwnerName?: string,
+    userOwnerId?: number,
+    userOwnerEmail?: string,
     create?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `addOrCreateSchema(${cU.id},${name},${label},${organizationOwnerId},${organizationOwnerName}, ${create})`
+      `addOrCreateSchema(${cU.id},${name},${label},${organizationOwnerId},${organizationOwnerName},${userOwnerId},${userOwnerEmail},${create})`
     );
     if (cU.isntSignedIn()) return cU.mustBeSignedIn();
     let result: ServiceResult = errResult();
-    let userOwnerId: number | undefined = undefined;
     // run checks for organization owner
     if (organizationOwnerId || organizationOwnerName) {
       if (!organizationOwnerId && organizationOwnerName) {
@@ -1206,18 +1188,28 @@ export class WhitebrickCloud {
           values: [cU.toString(), organizationOwnerId.toString()],
         }) as ServiceResult;
       }
-    } else {
+    } else if (userOwnerEmail) {
+      result = await this.userByEmail(cU, userOwnerEmail);
+      if (!result.success) return result;
+      userOwnerId = result.payload.id;
+    } else if (!userOwnerId) {
       userOwnerId = cU.id;
     }
-    // Check name
     if (name.startsWith("pg_") || Schema.SYS_SCHEMA_NAMES.includes(name)) {
       return errResult({ wbCode: "WB_BAD_SCHEMA_NAME" } as ServiceResult);
     }
-    const schemaResult = await this.dal.createSchema(
+    result = await this.schemaByName(cU, name);
+    if (result.success) {
+      return errResult({
+        wbCode: "WB_SCHEMA_NAME_EXISTS",
+      } as ServiceResult);
+    }
+    const schemaResult = await this.dal.addOrCreateSchema(
       name,
       label,
       organizationOwnerId,
-      userOwnerId
+      userOwnerId,
+      create
     );
     if (!schemaResult.success) return schemaResult;
     if (organizationOwnerId) {
@@ -1277,32 +1269,193 @@ export class WhitebrickCloud {
     return await this.dal.removeOrDeleteSchema(schemaName, del);
   }
 
-  public async addDemoSchemasToNewUser(
+  public async updateSchema(
     cU: CurrentUser,
-    newUserId: number
+    name: string,
+    newSchemaName?: string,
+    newSchemaLabel?: string,
+    newOrganizationOwnerName?: string,
+    newOrganizationOwnerId?: number,
+    newUserOwnerEmail?: string,
+    newUserOwnerId?: number
   ): Promise<ServiceResult> {
-    log.debug(`addDemoSchemasToNewUser(${cU.id},${newUserId})`);
+    log.debug(
+      `updateSchema(${cU.id},${name},${newSchemaName},${newSchemaLabel},${newOrganizationOwnerName},${newOrganizationOwnerId},${newUserOwnerEmail},${newUserOwnerId})`
+    );
+    if (await cU.cant("alter_schema", name)) return cU.denied();
+    let result: ServiceResult;
+    const schemaResult = await this.schemaByName(cU, name);
+    if (!schemaResult.success) return schemaResult;
+    let schemaTables = [];
+    if (newSchemaName) {
+      if (
+        newSchemaName.startsWith("pg_") ||
+        Schema.SYS_SCHEMA_NAMES.includes(newSchemaName)
+      ) {
+        return errResult({ wbCode: "WB_BAD_SCHEMA_NAME" } as ServiceResult);
+      }
+      result = await this.schemaByName(cU, newSchemaName);
+      if (result.success) {
+        return errResult({
+          wbCode: "WB_SCHEMA_NAME_EXISTS",
+        } as ServiceResult);
+      }
+      result = await this.tables(cU, name, false);
+      if (!result.success) return result;
+      schemaTables = result.payload;
+      for (const table of schemaTables) {
+        result = await this.untrackTableWithPermissions(cU, table);
+        if (!result.success) return result;
+      }
+    }
+    if (newOrganizationOwnerName) {
+      result = await this.organizationByName(cU, newOrganizationOwnerName);
+      if (!result.success) return result;
+      newOrganizationOwnerId = result.payload.id;
+    }
+    if (newUserOwnerEmail) {
+      result = await this.userByEmail(cU, newUserOwnerEmail);
+      if (!result.success) return result;
+      newUserOwnerId = result.payload.id;
+    }
+    // TBD checks so user doesn't lose permissions
+    const updatedSchemaResult = await this.dal.updateSchema(
+      schemaResult.payload,
+      newSchemaName,
+      newSchemaLabel,
+      newOrganizationOwnerId,
+      newUserOwnerId
+    );
+    if (!updatedSchemaResult.success) return updatedSchemaResult;
+    if (newSchemaName) {
+      for (const table of schemaTables) {
+        result = await this.trackTableWithPermissions(cU, table);
+        if (!result.success) return result;
+      }
+    }
+    if (newOrganizationOwnerId || newUserOwnerId) {
+      // if the old schema was owned by an org
+      if (schemaResult.payload.organization_owner_id) {
+        // Clear old implied admins
+        const impliedAdminsResult = await this.schemaUsers(
+          cU,
+          updatedSchemaResult.payload.name,
+          ["schema_administrator"],
+          undefined,
+          "organization_administrator"
+        );
+        if (!impliedAdminsResult.success) return impliedAdminsResult;
+        const oldImpliedAdminUserIds = impliedAdminsResult.payload.map(
+          (schemaUser: { user_id: number }) => schemaUser.user_id
+        );
+        result = await this.deleteRole(
+          cU,
+          oldImpliedAdminUserIds,
+          "schema" as RoleLevel,
+          schemaResult.payload.id
+        );
+        // otherwise old schema was owned by user
+      } else {
+        result = await this.deleteRole(
+          cU,
+          [schemaResult.payload.user_owner_id],
+          "schema" as RoleLevel,
+          schemaResult.payload.id
+        );
+      }
+      if (!result.success) return result;
+      if (newOrganizationOwnerId) {
+        // Every organization admin is implicitly also a schema admin
+        result = await this.dal.setSchemaUserRolesFromOrganizationRoles(
+          newOrganizationOwnerId,
+          Role.sysRoleMap("organization" as RoleLevel, "schema" as RoleLevel),
+          [schemaResult.payload.id]
+        );
+      } else if (newUserOwnerId) {
+        result = await this.setRole(
+          CurrentUser.getSysAdmin(),
+          [newUserOwnerId],
+          "schema_owner",
+          "schema" as RoleLevel,
+          schemaResult.payload
+        );
+      }
+      if (!result.success) return result;
+    }
+    return updatedSchemaResult;
+  }
+
+  public async assignDemoSchema(userId: number): Promise<ServiceResult> {
+    let result = await this.dal.nextUnassignedDemoSchema(
+      `${environment.demoDBPrefix}%`
+    );
+    if (!result.success) return result;
+    result = await this.updateSchema(
+      CurrentUser.getSysAdmin(),
+      result.payload.name,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      userId
+    );
+    if (!result.success) return result;
+    return this.deleteRole(
+      CurrentUser.getSysAdmin(),
+      [User.SYS_ADMIN_ID],
+      "schema" as RoleLevel,
+      result.payload.id
+    );
+  }
+
+  public async addNextDemoSchema(cU: CurrentUser): Promise<ServiceResult> {
+    log.debug(`addNextDemoSchema(${cU.id})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     let result = await this.dal.schemas(
       undefined,
       undefined,
-      Schema.DEMO_SCHEMA_PATTERN,
+      `${environment.demoDBPrefix}%`,
+      "name desc",
+      1,
       true
     );
     if (!result.success) return result;
+    if (result.payload.length !== 1) {
+      return errResult({
+        message: `addNextDemoSchema: can not find demo DB matching ${environment.demoDBPrefix}%`,
+      } as ServiceResult);
+    }
+    const split = result.payload[0].name.split("_demo");
+    const lastDemoNumber = parseInt(split[1]);
+    const schemaName = `${environment.demoDBPrefix}${lastDemoNumber + 1}`;
+    const schemaResult = await this.addOrCreateSchema(
+      cU,
+      schemaName,
+      environment.demoDBLabel,
+      undefined,
+      undefined,
+      cU.id
+    );
+    if (!schemaResult.success) return schemaResult;
+    result = await this.addAllExistingTables(cU, schemaName);
+    if (!result.success) return result;
+    return schemaResult;
   }
+
   /**
    * ========== Schema Users ==========
    */
-
   public async schemaUsers(
     cU: CurrentUser,
     schemaName: string,
     roleNames?: string[],
     userEmails?: string[],
+    impliedFromRoleName?: string,
     withSettings?: boolean
   ): Promise<ServiceResult> {
     log.debug(
-      `schemaUsers(${cU.id},${schemaName},${roleNames},${userEmails},${withSettings})`
+      `schemaUsers(${cU.id},${schemaName},${roleNames},${userEmails},${impliedFromRoleName},${withSettings})`
     );
     if (cU.isntSignedIn()) return cU.mustBeSignedIn();
     if (roleNames && !Role.areRoles(roleNames)) {
@@ -1322,7 +1475,19 @@ export class WhitebrickCloud {
         } as ServiceResult);
       }
     }
-    return this.dal.schemaUsers(schemaName, roleNames, userIds, withSettings);
+    let impliedFromRoleId: number | undefined = undefined;
+    if (impliedFromRoleName) {
+      const roleResult = await this.roleByName(cU, impliedFromRoleName);
+      if (!roleResult.success) return roleResult;
+      impliedFromRoleId = roleResult.payload.id;
+    }
+    return this.dal.schemaUsers(
+      schemaName,
+      roleNames,
+      userIds,
+      impliedFromRoleId,
+      withSettings
+    );
   }
 
   public async setSchemaUsersRole(
@@ -2257,7 +2422,7 @@ export class WhitebrickCloud {
       result = await this.untrackTableWithPermissions(cU, tableResult.payload);
       if (!result.success) return result;
     }
-    result = await this.dal.addOrCreateColumn(
+    const columnResult = await this.dal.addOrCreateColumn(
       schemaName,
       tableName,
       columnName,
@@ -2265,10 +2430,11 @@ export class WhitebrickCloud {
       create,
       columnType
     );
-    if (result.success && !skipTracking) {
+    if (columnResult.success && !skipTracking) {
       result = await this.trackTableWithPermissions(cU, tableResult.payload);
+      if (!result.success) return result;
     }
-    return result;
+    return columnResult;
   }
 
   // Must enter and exit with tracked table, regardless of if there are columns
@@ -2362,6 +2528,93 @@ export class WhitebrickCloud {
     }
     return result;
   }
+
+  public async addOrRemoveColumnSequence(
+    cU: CurrentUser,
+    schemaName: string,
+    tableName: string,
+    columnName: string,
+    nextSeqNumber?: number,
+    remove?: boolean
+  ): Promise<ServiceResult> {
+    let result = await this.schemaByName(cU, schemaName);
+    if (!result.success) return result;
+    const schema = result.payload;
+    result = await this.tableBySchemaNameTableName(cU, schemaName, tableName);
+    if (!result.success) return result;
+    const table = result.payload;
+    result = await this.dal.columnBySchemaNameTableNameColumnName(
+      schemaName,
+      tableName,
+      columnName
+    );
+    if (!result.success) return result;
+    const column = result.payload;
+
+    if (remove) {
+    } else {
+      result = await this.dal.addSequenceToColumn(
+        schema,
+        table,
+        column,
+        nextSeqNumber
+      );
+    }
+    return result;
+  }
+
+  /**
+   * ========== Util ==========
+   */
+
+  public async util(
+    cU: CurrentUser,
+    fn: string,
+    vals: object
+  ): Promise<ServiceResult> {
+    log.debug(`util(${cU.id},${fn},${JSON.stringify(vals)})`);
+    // defer access control to called methods
+    let result = errResult();
+    switch (fn) {
+      case "addNextDemoSchema":
+        result = await this.addNextDemoSchema(cU);
+        break;
+      case "resetTestData":
+        result = await this.resetTestData(cU);
+        break;
+    }
+    return result;
+  }
+
+  /**
+   * ========== Test ==========
+   */
+
+  public async resetTestData(cU: CurrentUser): Promise<ServiceResult> {
+    log.debug(`resetTestData()`);
+    if (cU.isntSysAdmin() && cU.isntTestUser()) {
+      return cU.mustBeSysAdminOrTestUser();
+    }
+    let result = await this.schemas(
+      CurrentUser.getSysAdmin(),
+      undefined,
+      undefined,
+      "test_%"
+    );
+    if (!result.success) return result;
+    for (const schema of result.payload) {
+      result = await this.removeOrDeleteSchema(
+        CurrentUser.getSysAdmin(),
+        schema.name,
+        true
+      );
+      if (!result.success) return result;
+    }
+    result = await this.deleteTestOrganizations(CurrentUser.getSysAdmin());
+    if (!result.success) return result;
+    result = await this.deleteTestUsers();
+    return result;
+  }
 }
 
 /**
@@ -2432,3 +2685,19 @@ export function apolloErr(result: ServiceResult): Error {
   if (result.wbCode) details.wbCode = result.wbCode;
   return new ApolloError(result.message, result.apolloErrorCode, details);
 }
+
+export const bgHandler = async (event: any = {}): Promise<any> => {
+  log.info("== bgHandler ==\nCall async event here...");
+  // Can be used to call async events without waiting for return, eg from elsewhere:
+  // import Lambda from "aws-sdk/clients/lambda";
+  // import AWS from "aws-sdk";
+  // const lambda = new Lambda({
+  //   endpoint: new AWS.Endpoint("http://localhost:3000"),
+  // });
+  // const params = {
+  //   FunctionName: "whitebrick-cloud-dev-bg",
+  //   InvocationType: "Event",
+  //   Payload: JSON.stringify({ hello: "World" }),
+  // };
+  // const r = await lambda.invoke(params).promise();
+};

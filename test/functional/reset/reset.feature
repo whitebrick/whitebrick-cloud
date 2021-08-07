@@ -8,8 +8,10 @@ Feature:
   Scenario: Reset test data
     Given text query = 
     """
-    mutation reset {
-      wbResetTestData
+    mutation resetTestData {
+      wbUtil(
+        fn: "resetTestData"
+      )
     }
     """
     And request { query: "#(query)" }
@@ -17,4 +19,4 @@ Feature:
     When method POST
     Then status 200
     Then print response.data
-    Then match response.data.wbResetTestData == true
+    Then match response.data.wbUtil.success == true

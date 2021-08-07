@@ -12,6 +12,8 @@ type Environment = {
   hasuraAdminSecret: string;
   testIgnoreErrors: boolean;
   testUserEmailDomain: string;
+  demoDBPrefix: string;
+  demoDBLabel: string;
 };
 
 export const environment: Environment = {
@@ -34,6 +36,8 @@ export const environment: Environment = {
   testUserEmailDomain: (
     (process.env.TEST_USER_EMAIL_DOMAIN || "") as string
   ).toLocaleLowerCase(),
+  demoDBPrefix: process.env.DEMO_DB_PREFIX as string,
+  demoDBLabel: process.env.DEMO_DB_LABEL as string,
 };
 
 // wbErrorCode : [ message, apolloErrorCode? ]
@@ -86,6 +90,7 @@ export const USER_MESSAGES: Record<string, string[]> = {
     "Database name can not begin with 'pg_' or be in the reserved list.",
     "BAD_USER_INPUT",
   ],
+  WB_SCHEMA_NAME_EXISTS: ["This Schema name already exists", "BAD_USER_INPUT"],
   WB_CANT_REMOVE_SCHEMA_USER_OWNER: ["You can not remove the DB User Owner"],
   WB_CANT_REMOVE_SCHEMA_ADMIN: [
     "You can not remove a DB Administrator from one or more individual tables.",

@@ -15,9 +15,11 @@ export class Column {
   tableId!: number;
   name!: string;
   label!: string;
-  type!: string;
   createdAt!: Date;
   updatedAt!: Date;
+  // pg data
+  type!: string;
+  default?: string;
   // not persisted
   isPrimaryKey!: boolean;
   foreignKeys!: [ConstraintId];
@@ -42,6 +44,7 @@ export class Column {
     column.type = data.type;
     column.createdAt = data.created_at;
     column.updatedAt = data.updated_at;
+    if (data.default) column.default = data.default;
     return column;
   }
 }

@@ -63,7 +63,7 @@ export class DAL {
         } as ServiceResult);
       }
       await client.query("COMMIT");
-    } catch (error) {
+    } catch (error: any) {
       await client.query("ROLLBACK");
       log.error(JSON.stringify(error));
       results.push(
@@ -830,6 +830,8 @@ export class DAL {
     schemaIds?: number[],
     schemaNames?: string[],
     schemaNamePattern?: string,
+    orderBy?: string,
+    limit?: number,
     wbOnly?: boolean
   ): Promise<ServiceResult> {
     const pgParams: (string[] | number[] | string)[] = [
@@ -857,18 +859,27 @@ export class DAL {
           "dal.schemas: One of schemaIds, schemaNames or schemaNamePattern must be specified.",
       } as ServiceResult);
     }
+    let sqlOrderBy = "ORDER BY name";
+    if (orderBy) {
+      const split = orderBy.split(" ");
+      sqlOrderBy = `ORDER BY ${DAL.sanitize(split[0])}`;
+      if (split.length == 2) sqlOrderBy += ` ${DAL.sanitize(split[1])}`;
+    }
+    let sqlLimit = "";
+    if (limit) sqlLimit = `LIMIT ${limit}`;
     const queries: QueryParams[] = [
       {
         query: `
           SELECT wb.schemas.*
           FROM wb.schemas
           ${sqlWbWhere}
-          ORDER BY name
+          ${sqlOrderBy}
+          ${sqlLimit}
         `,
         params: wbParams,
       } as QueryParams,
     ];
-    if (!wbOnly) {
+    if (!wbOnly && !limit) {
       queries.push({
         query: `
           SELECT information_schema.schemata.*
@@ -893,6 +904,49 @@ export class DAL {
     }
     results[0].payload = Schema.parseResult(results[0].payload);
     return results[0];
+  }
+
+  public async discoverSchemas(
+    schemaNamePattern?: string,
+    orderBy?: string,
+    limit?: number
+  ): Promise<ServiceResult> {
+    if (!schemaNamePattern) schemaNamePattern = "%";
+    if (!orderBy) orderBy = "schema_name";
+    let sqlLimit = "";
+    if (limit) sqlLimit = `LIMIT ${limit}`;
+    const result = await this.executeQuery({
+      query: `
+        SELECT information_schema.schemata.schema_name
+        FROM information_schema.schemata
+        WHERE schema_name NOT LIKE 'pg_%'
+        AND schema_name!=ANY($1)
+        AND schema_name LIKE '${schemaNamePattern}'
+        ORDER BY ${orderBy}
+        ${sqlLimit}
+      `,
+      params: [Schema.SYS_SCHEMA_NAMES],
+    } as QueryParams);
+    if (result.success) {
+      result.payload = result.payload.rows.map(
+        (row: { schema_name: string }) => row.schema_name
+      );
+    }
+    return result;
+  }
+
+  public async nextUnassignedDemoSchema(schemaNamePattern: string) {
+    const result = await this.executeQuery({
+      query: `
+        SELECT wb.schemas.*
+        FROM wb.schemas
+        JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
+        WHERE wb.schemas.name LIKE '${schemaNamePattern}'
+        AND wb.schema_users.user_id=${User.SYS_ADMIN_ID}
+      `,
+    } as QueryParams);
+    if (result.success) result.payload = Schema.parseResult(result.payload)[0];
+    return result;
   }
 
   public async schemasByUsers(
@@ -1053,6 +1107,7 @@ export class DAL {
     userOwnerId?: number,
     create?: boolean
   ): Promise<ServiceResult> {
+    name = DAL.sanitize(name);
     const queries: QueryParams[] = [
       {
         query: `
@@ -1065,13 +1120,77 @@ export class DAL {
     ];
     if (create) {
       queries.push({
-        query: `CREATE SCHEMA ${DAL.sanitize(name)}`,
+        query: `CREATE SCHEMA ${name}`,
       } as QueryParams);
     }
     const results = await this.executeQueries(queries);
     if (!results[0].success) return results[0];
     if (create && !results[1].success) return results[1];
     results[0].payload = Schema.parseResult(results[0].payload)[0];
+    return results[0];
+  }
+
+  public async updateSchema(
+    schema: Schema,
+    newSchemaName?: string,
+    newSchemaLabel?: string,
+    newOrganizationOwnerId?: number,
+    newUserOwnerId?: number
+  ): Promise<ServiceResult> {
+    log.debug(
+      `dal.updateSchema(${schema},${newSchemaName},${newSchemaLabel},${newOrganizationOwnerId},${newUserOwnerId})`
+    );
+    if (newSchemaName) newSchemaName = DAL.sanitize(newSchemaName);
+    let params = [];
+    let query = `
+      UPDATE wb.schemas SET
+    `;
+    let updates: string[] = [];
+    if (newSchemaName) {
+      params.push(newSchemaName);
+      updates.push("name=$" + params.length);
+    }
+    if (newSchemaLabel) {
+      params.push(newSchemaLabel);
+      updates.push("label=$" + params.length);
+    }
+    if (newOrganizationOwnerId) {
+      params.push(newOrganizationOwnerId);
+      updates.push("organization_owner_id=$" + params.length);
+      updates.push("organization_user_id=NULL");
+    }
+    if (newUserOwnerId) {
+      params.push(newUserOwnerId);
+      updates.push("user_owner_id=$" + params.length);
+      updates.push("organization_owner_id=NULL");
+    }
+    params.push(schema.id);
+    query += `
+      ${updates.join(", ")}
+      WHERE id=$${params.length}
+      RETURNING *
+    `;
+    const queriesAndParams: Array<QueryParams> = [
+      {
+        query: query,
+        params: params,
+      } as QueryParams,
+    ];
+    if (newSchemaName) {
+      queriesAndParams.push({
+        query: `
+          ALTER SCHEMA "${schema.name}"
+          RENAME TO ${newSchemaName}
+        `,
+      } as QueryParams);
+    }
+    const results: Array<ServiceResult> = await this.executeQueries(
+      queriesAndParams
+    );
+    if (newSchemaName && !results[1].success) return results[1];
+    if (results[0].success) {
+      results[0].payload = Schema.parseResult(results[0].payload)[0];
+    }
     return results[0];
   }
 
@@ -1107,9 +1226,10 @@ export class DAL {
     schemaName: string,
     roleNames?: string[],
     userIds?: number[],
+    impliedFromRoleId?: number,
     withSettings?: boolean
   ): Promise<ServiceResult> {
-    const params: (string | string[] | number[])[] = [schemaName];
+    const params: (string | string[] | number | number[])[] = [schemaName];
     let sqlSelect: string = "";
     let sqlWhere = "";
     if (roleNames) {
@@ -1119,6 +1239,10 @@ export class DAL {
     if (userIds) {
       params.push(userIds);
       sqlWhere = `AND wb.schema_users.user_id=ANY($${params.length})`;
+    }
+    if (impliedFromRoleId) {
+      params.push(impliedFromRoleId);
+      sqlWhere = `AND wb.schema_users.implied_from_role_id=${params.length}`;
     }
     if (withSettings) {
       sqlSelect = "wb.organization_users.settings,";
@@ -1668,13 +1792,13 @@ export class DAL {
   // if !userIds all schema_users
   public async setSchemaUserRolesFromOrganizationRoles(
     organizationId: number,
-    roleMap: Record<string, string>, // eg { schema_owner: "table_administrator" }
+    roleMap?: Record<string, string>, // eg { schema_owner: "table_administrator" }
     schemaIds?: number[],
     userIds?: number[],
-    clearExisting?: boolean
+    clearExistingImpliedFromRoleName?: string
   ): Promise<ServiceResult> {
     log.debug(
-      `dal.setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${schemaIds}, ${userIds}, ${clearExisting})`
+      `dal.setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${schemaIds}, ${userIds}, ${clearExistingImpliedFromRoleName})`
     );
     let result = await this.rolesIdLookup();
     if (!result.success) return result;
@@ -1694,7 +1818,11 @@ export class DAL {
     const rolesIdLookup = result.payload;
     const queryParams: QueryParams[] = [];
     const date = new Date();
-    if (clearExisting) {
+    if (clearExistingImpliedFromRoleName) {
+      const impliedFromRoleResult = await this.roleByName(
+        clearExistingImpliedFromRoleName
+      );
+      if (!impliedFromRoleResult.success) return impliedFromRoleResult;
       queryParams.push({
         query: `
           DELETE FROM wb.schema_users
@@ -1704,6 +1832,7 @@ export class DAL {
               WHERE wb.schemas.organization_owner_id=$1
               ${whereSchemasSql}
             )
+            AND wb.schema_users.implied_from_role_id=${impliedFromRoleResult.payload.id}
             ${whereSchemaUsersSql}
         `,
         params: [organizationId],
@@ -1716,27 +1845,29 @@ export class DAL {
         WHERE wb.schema_users.implied_from_role_id IS NOT NULL
       `;
     }
-    for (const organizationRole of Object.keys(roleMap)) {
-      queryParams.push({
-        query: `
-          INSERT INTO wb.schema_users(schema_id, user_id, role_id, implied_from_role_id, updated_at)
-          SELECT
-          wb.schemas.id,
-          user_id,
-          ${rolesIdLookup[roleMap[organizationRole]]},
-          ${rolesIdLookup[organizationRole]},
-          $1
-          FROM wb.organization_users
-          JOIN wb.schemas ON wb.schemas.organization_owner_id=wb.organization_users.organization_id
-          JOIN wb.users ON wb.organization_users.user_id=wb.users.id
-          WHERE wb.organization_users.organization_id=$2
-          AND wb.organization_users.role_id=$3
-          ${whereSchemasSql}
-          ${whereUsersSql}
-          ${onConflictSql}
-        `,
-        params: [date, organizationId, rolesIdLookup[organizationRole]],
-      } as QueryParams);
+    if (roleMap) {
+      for (const organizationRole of Object.keys(roleMap)) {
+        queryParams.push({
+          query: `
+            INSERT INTO wb.schema_users(schema_id, user_id, role_id, implied_from_role_id, updated_at)
+            SELECT
+            wb.schemas.id,
+            user_id,
+            ${rolesIdLookup[roleMap[organizationRole]]},
+            ${rolesIdLookup[organizationRole]},
+            $1
+            FROM wb.organization_users
+            JOIN wb.schemas ON wb.schemas.organization_owner_id=wb.organization_users.organization_id
+            JOIN wb.users ON wb.organization_users.user_id=wb.users.id
+            WHERE wb.organization_users.organization_id=$2
+            AND wb.organization_users.role_id=$3
+            ${whereSchemasSql}
+            ${whereUsersSql}
+            ${onConflictSql}
+          `,
+          params: [date, organizationId, rolesIdLookup[organizationRole]],
+        } as QueryParams);
+      }
     }
     const results = await this.executeQueries(queryParams);
     return results[results.length - 1];
@@ -1871,7 +2002,7 @@ export class DAL {
    * ========== Columns ==========
    */
 
-  public async columnBySchemaTableColumn(
+  public async columnBySchemaNameTableNameColumnName(
     schemaName: string,
     tableName: string,
     columnName: string
@@ -1895,7 +2026,9 @@ export class DAL {
     columnName?: string
   ): Promise<ServiceResult> {
     let query: string = `
-      SELECT wb.columns.*, information_schema.columns.data_type as type
+      SELECT wb.columns.*,
+      information_schema.columns.data_type as type,
+      information_schema.columns.column_default as default
       FROM wb.columns
       JOIN wb.tables ON wb.columns.table_id=wb.tables.id
       JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
@@ -1971,7 +2104,8 @@ export class DAL {
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
     );
-    return results[results.length - 1];
+    if (create && !results[1].success) return results[1];
+    return results[0];
   }
 
   public async updateColumn(
@@ -1987,7 +2121,7 @@ export class DAL {
     columnName = DAL.sanitize(columnName);
     const queriesAndParams: Array<QueryParams> = [];
     if (newColumnName || newColumnLabel) {
-      let result = await this.columnBySchemaTableColumn(
+      let result = await this.columnBySchemaNameTableNameColumnName(
         schemaName,
         tableName,
         columnName
@@ -2033,6 +2167,51 @@ export class DAL {
       queriesAndParams
     );
     return results[results.length - 1];
+  }
+
+  public async addSequenceToColumn(
+    schema: Schema,
+    table: Table,
+    column: Column,
+    nextSeqNumber?: number
+  ): Promise<ServiceResult> {
+    if (!nextSeqNumber) {
+      const nextSeqNumberResult = await this.executeQuery({
+        query: `
+          SELECT ${column.name} as max_val
+          FROM ${schema.name}.${table.name}
+          ORDER BY ${column.name} DESC
+          LIMIT 1
+        `,
+      } as QueryParams);
+      if (
+        nextSeqNumberResult.success &&
+        nextSeqNumberResult.payload.rows.length == 1
+      ) {
+        nextSeqNumber =
+          parseInt(nextSeqNumberResult.payload.rows[0].max_val) + 1;
+      }
+    }
+    if (!nextSeqNumber || nextSeqNumber < 1) nextSeqNumber = 1;
+    const sequencName = `wbseq_s${schema.id}_t${table.id}_c${column.id}`;
+    log.warn("nextSeqNumber" + nextSeqNumber);
+    const result = await this.executeQueries([
+      {
+        query: `CREATE SEQUENCE ${schema.name}.${sequencName};`,
+      },
+      {
+        query: `ALTER TABLE ${schema.name}.${table.name} ALTER COLUMN ${column.name} SET DEFAULT nextval('${schema.name}."${sequencName}"')`,
+      },
+      {
+        query: `ALTER SEQUENCE ${schema.name}.${sequencName} OWNED BY ${schema.name}.${table.name}.${column.name}`,
+      },
+      {
+        query: `SELECT setval('${schema.name}."${sequencName}"', ${
+          nextSeqNumber - 1
+        })`,
+      },
+    ]);
+    return result[result.length - 1];
   }
 
   public async removeOrDeleteColumn(

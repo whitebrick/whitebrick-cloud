@@ -9,8 +9,6 @@ export class Schema {
     "wb",
   ];
 
-  static DEMO_SCHEMA_PATTERN = "formula1_demo%";
-
   id!: number;
   name!: string;
   label!: string;

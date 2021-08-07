@@ -25,6 +25,7 @@ export const typeDefs = gql`
     name: String!
     label: String!
     type: String!
+    default: String
     isPrimaryKey: Boolean!
     foreignKeys: [ConstraintId]!
     referencedBy: [ConstraintId]!
@@ -93,13 +94,13 @@ export const typeDefs = gql`
       tableName: String!
       tableLabel: String!
       create: Boolean
-    ): Boolean!
+    ): Table!
     wbUpdateTable(
       schemaName: String!
       tableName: String!
       newTableName: String
       newTableLabel: String
-    ): Boolean!
+    ): Table!
     wbRemoveOrDeleteTable(
       schemaName: String!
       tableName: String!
@@ -171,6 +172,12 @@ export const typeDefs = gql`
       tableName: String!
       columnName: String!
       del: Boolean
+    ): Boolean!
+    wbAddColumnSequence(
+      schemaName: String!
+      tableName: String!
+      columnName: String!
+      nextSeqNumber: Int
     ): Boolean!
   }
 `;
@@ -250,7 +257,7 @@ export const resolvers: IResolvers = {
         create
       );
       if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
+      return result.payload;
     },
     wbUpdateTable: async (
       _,
@@ -266,7 +273,7 @@ export const resolvers: IResolvers = {
         newTableLabel
       );
       if (!result.success) throw context.wbCloud.err(result);
-      return result.success;
+      return result.payload;
     },
     wbRemoveOrDeleteTable: async (
       _,
@@ -415,6 +422,22 @@ export const resolvers: IResolvers = {
         tableName,
         columnName,
         del
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbAddColumnSequence: async (
+      _,
+      { schemaName, tableName, columnName, nextSeqNumber },
+      context
+    ) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.addOrRemoveColumnSequence(
+        currentUser,
+        schemaName,
+        tableName,
+        columnName,
+        nextSeqNumber
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
