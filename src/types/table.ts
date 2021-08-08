@@ -173,11 +173,12 @@ export const typeDefs = gql`
       columnName: String!
       del: Boolean
     ): Boolean!
-    wbAddColumnSequence(
+    wbAddOrRemoveColumnSequence(
       schemaName: String!
       tableName: String!
       columnName: String!
       nextSeqNumber: Int
+      remove: Boolean
     ): Boolean!
   }
 `;
@@ -426,9 +427,9 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbAddColumnSequence: async (
+    wbAddOrRemoveColumnSequence: async (
       _,
-      { schemaName, tableName, columnName, nextSeqNumber },
+      { schemaName, tableName, columnName, nextSeqNumber, remove },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
@@ -437,7 +438,8 @@ export const resolvers: IResolvers = {
         schemaName,
         tableName,
         columnName,
-        nextSeqNumber
+        nextSeqNumber,
+        remove
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

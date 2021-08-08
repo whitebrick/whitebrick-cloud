@@ -2214,6 +2214,32 @@ export class DAL {
     return result[result.length - 1];
   }
 
+  public async removeSequenceFromColumn(
+    schema: Schema,
+    table: Table,
+    column: Column
+  ): Promise<ServiceResult> {
+    if (!column.default) {
+      return errResult({
+        wbCode: "WB_NO_DEFAULT_ON_COLUMN",
+        values: [schema.name, table.name, column.name],
+      });
+    }
+    // eg column.default="nextval('test_the_daisy_blog.wbseq_s30826_t41209_c53600'::regclass)"
+    const sequencNameSplitA = column.default.split("wbseq_");
+    const sequencNameSplitB = sequencNameSplitA[1].split("::");
+    const sequencName = `wbseq_${sequencNameSplitB[0].slice(0, -1)}`;
+    const results = await this.executeQueries([
+      {
+        query: `ALTER TABLE ${schema.name}.${table.name} ALTER COLUMN ${column.name} DROP DEFAULT`,
+      },
+      {
+        query: `DROP SEQUENCE IF EXISTS ${schema.name}.${sequencName}`,
+      },
+    ]);
+    return results[0]; // query 2 will always succeed
+  }
+
   public async removeOrDeleteColumn(
     schemaName: string,
     tableName: string,

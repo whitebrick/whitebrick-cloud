@@ -108,9 +108,10 @@ export const USER_MESSAGES: Record<string, string[]> = {
   WB_COLUMN_NAME_EXISTS: ["This Column name already exists.", "BAD_USER_INPUT"],
   WB_PK_EXISTS: ["Remove existing primary key first.", "BAD_USER_INPUT"],
   WB_FK_EXISTS: [
-    "Remove existing foreign key on the column first.",
+    "Remove existing foreign key on the column first",
     "BAD_USER_INPUT",
   ],
+  WB_NO_DEFAULT_ON_COLUMN: ["This column does not have a default value set"],
   // Table Users,
   WB_TABLE_USERS_NOT_FOUND: ["One or more Table Users not found."],
   // Roles

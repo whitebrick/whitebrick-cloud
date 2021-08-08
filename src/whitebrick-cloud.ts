@@ -2552,6 +2552,7 @@ export class WhitebrickCloud {
     const column = result.payload;
 
     if (remove) {
+      result = await this.dal.removeSequenceFromColumn(schema, table, column);
     } else {
       result = await this.dal.addSequenceToColumn(
         schema,

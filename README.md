@@ -94,7 +94,7 @@ Whitebrick comprises a front end Jamstack client and back end Serverless applica
 
 9.  #### Run Functional Tests
     Download [Karate](https://github.com/intuit/karate#getting-started) (the [stand-alone executable](https://github.com/intuit/karate/wiki/ZIP-Release) is all that is needed).
-    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test` directory and run the command `karate ./functional/run.feature`
+    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test/functional` directory and run the command `bash run_tests.bash`
 
 ## Architecture
 
