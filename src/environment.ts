@@ -75,7 +75,7 @@ export const USER_MESSAGES: Record<string, string[]> = {
   ],
   // Schemas
   WB_NO_SCHEMAS_FOUND: [
-    "You don’t have access to any Databases. Please contact you System Administrator for access to an existing Database or create a new Database below.",
+    "You don’t have access to any Databases. Please contact your System Administrator for access to an existing Database or create a new Database below.",
   ],
   WB_SCHEMA_NOT_FOUND: ["Database could not be found.", "BAD_USER_INPUT"],
   WB_SCHEMA_URL_NOT_FOUND: [
