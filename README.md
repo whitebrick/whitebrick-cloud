@@ -1,6 +1,6 @@
 [//]: # "START:COMMON_HEADER"
 
-![whitebrick logo](doc/whitebrick-logo-horizontal-white-sm.png)
+![whitebrick logo](doc/whitebrick-logo-white-hz-sm.png)
 
 # whitebrick-cloud (back end) BETA
 
@@ -9,11 +9,11 @@
 #### Whitebrick is a lightweight No Code Database with three points of difference:
 
 1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for easy customization and hosting.
-2. The back end is a set of **Serverless functions** for making DDL calls to PostgreSQL and configuring [Hasura GraphQL server](https://hasura.io/).
-3. The PostgreSQL database schemas can be accessed directly with psql for data import/export and integration with other tools.
+2. The back end is a set of [Serverless functions](https://www.serverless.com/) for making DDL calls to [PostgreSQL](https://www.postgresql.org/) and configuring [Hasura GraphQL server](https://hasura.io/).
+3. The [PostgreSQL](https://www.postgresql.org/) database schemas can be accessed directly with **_psql_** for data import/export and integrations with other tools.
 
 ##### Rather than reinventing the wheel Whitebrick stitches together the best-in-breed open source apps:
-[Hasura](https://hasura.io/) | [Gastsby](https://www.gatsbyjs.com/) | [AG Grid](https://ag-grid.com/) | [Apollo](https://www.apollographql.com/) | [Serverless](https://www.serverless.com/)
+[Hasura](https://hasura.io/) | [Gastsby](https://www.gatsbyjs.com/) | [PostgreSQL](https://www.postgresql.org/) | [AG Grid](https://ag-grid.com/) | [Apollo](https://www.apollographql.com/) | [Serverless](https://www.serverless.com/)
 
 ---
 
@@ -27,6 +27,7 @@ _!!! This is BETA software - use at your own risk !!!_
 - [ ] Joins
 - [ ] Column-level RBAC
 - [ ] Documentation
+- [ ] UI styling and themes
 
 Hosted demo and SaaS at [whitebrick.com](https://whitebrick.com)
 
@@ -55,6 +56,15 @@ Whitebrick comprises a front end Gatsby Jamstack client and back end Serverless 
 [//]: # "END:COMMON_DESCRIPTION"
 
 ## Getting Started
+
+### Deploying on a Cloud Service
+- AWS CloudFormation Stack - we're currently tidying this up for release, email us for early copy
+- Heroku TBD
+- Azure TBD
+- DigitalOcean TBD
+
+
+### Deploying Locally
 
 1.  #### Configure Postgres
 
