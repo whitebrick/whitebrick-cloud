@@ -225,7 +225,7 @@ export class CurrentUser {
   ): Promise<boolean> {
     if (this.isSysAdmin()) return true;
     const policy = DEFAULT_POLICY[userAction];
-    log.debug(
+    log.info(
       `currentUser.can(${userAction},${objectIdOrName}) policy:${JSON.stringify(
         policy
       )}`
@@ -284,7 +284,7 @@ export class CurrentUser {
     }
     this.setObjectPermission(uAP);
     this.recordActionHistory(uAP);
-    log.debug(
+    log.info(
       `role: ${JSON.stringify(roleResult.payload)} permitted: ${permitted}`
     );
     return permitted;
@@ -315,7 +315,7 @@ export class CurrentUser {
       // process.env.NODE_ENV == "development" &&
       headersLowerCase["x-test-user-email"]
     ) {
-      log.debug(
+      log.info(
         `========== FOUND TEST USER: ${headersLowerCase["x-test-user-email"]}`
       );
       result = await context.wbCloud.userByEmail(
@@ -334,10 +334,10 @@ export class CurrentUser {
       headersLowerCase["x-hasura-role"] &&
       headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
     ) {
-      log.debug("========== FOUND SYSADMIN USER");
+      log.info("========== FOUND SYSADMIN USER");
       return CurrentUser.getSysAdmin();
     } else if (headersLowerCase["x-hasura-user-id"]) {
-      log.debug(
+      log.info(
         `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
       );
       const result = await context.wbCloud.userById(
@@ -354,7 +354,7 @@ export class CurrentUser {
       }
     } else {
       // TBD: support for public users
-      log.debug(
+      log.info(
         `CurrentUser.fromContext: Could not find headers for Admin, Test or User in: ${JSON.stringify(
           context.headers
         )}`

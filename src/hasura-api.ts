@@ -51,7 +51,7 @@ class HasuraApi {
   private async post(type: string, args: Record<string, any>) {
     let result: ServiceResult = errResult();
     try {
-      log.debug(`hasuraApi.post: type: ${type}`, args);
+      log.info(`hasuraApi.post: type: ${type}`, args);
       const response = await this.http.post<any, AxiosResponse>(
         "/v1/metadata",
         {
@@ -63,7 +63,7 @@ class HasuraApi {
         success: true,
         payload: response,
       } as ServiceResult;
-    } catch (error) {
+    } catch (error: any) {
       if (error.response && error.response.data) {
         if (!HasuraApi.errIgnore().includes(error.response.data.code)) {
           log.error(
@@ -83,6 +83,27 @@ class HasuraApi {
           message: error.message,
         }) as ServiceResult;
       }
+    }
+    log.info(`hasuraApi.post: result: ${JSON.stringify(result)}`);
+    return result;
+  }
+
+  public async healthCheck() {
+    let result: ServiceResult = errResult();
+    try {
+      log.info("hasuraApi.healthCheck()");
+      const response = await this.http.get<any, AxiosResponse>("/healthz");
+      result = {
+        success: true,
+        payload: {
+          status: response.status,
+          statusText: response.statusText,
+        },
+      } as ServiceResult;
+    } catch (error: any) {
+      result = errResult({
+        message: error.message,
+      }) as ServiceResult;
     }
     return result;
   }
@@ -145,7 +166,7 @@ class HasuraApi {
     columnName: string, // author_id
     parentTableName: string // authors
   ) {
-    log.debug(
+    log.info(
       `hasuraApi.createObjectRelationship(${schemaName}, ${tableName}, ${columnName}, ${parentTableName})`
     );
     const result = await this.post("pg_create_object_relationship", {
@@ -179,7 +200,7 @@ class HasuraApi {
     childTableName: string, // posts
     childColumnNames: string[] // author_id
   ) {
-    log.debug(
+    log.info(
       `hasuraApi.createArrayRelationship(${schemaName}, ${tableName}, ${childTableName}, ${childColumnNames})`
     );
     const result = await this.post("pg_create_array_relationship", {

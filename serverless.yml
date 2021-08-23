@@ -2,6 +2,7 @@ service: whitebrick-cloud
 provider:
   name: aws
   runtime: nodejs12.x
+  timeout: 300
   region: us-east-1
   profile: wb
   environment:
@@ -18,8 +19,8 @@ functions:
           path: graphql
           method: get
           cors: true
-  bg:
-    handler: src/whitebrick-cloud.bgHandler
+  # bg:
+  #   handler: src/whitebrick-cloud.bgHandler
 plugins:
   - serverless-dotenv-plugin
   - serverless-webpack

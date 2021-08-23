@@ -34,9 +34,13 @@ export type QueryParams = {
 export type ConstraintId = {
   constraintName: string;
   tableName: string;
+  tableLabel: string;
   columnName: string;
+  columnLabel: string;
   relTableName?: string;
+  relTableLabel?: string;
   relColumnName?: string;
+  relColumnLabel?: string;
 };
 
 const typeDefs = gql`
@@ -53,7 +57,10 @@ const typeDefs = gql`
 const resolvers: IResolvers = {
   Query: {
     wbHealthCheck: async (_, __, context) => {
+      const hasuraHealthCheck = await context.wbCloud.hasuraHealthCheck();
+      log.info(hasuraHealthCheck);
       return {
+        hasuraHealthCheck: hasuraHealthCheck,
         headers: context.headers,
         multiValueHeaders: context.headers,
       };

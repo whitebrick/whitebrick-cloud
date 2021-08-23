@@ -36,9 +36,13 @@ export const typeDefs = gql`
   type ConstraintId {
     constraintName: String!
     tableName: String!
+    tableLabel: String!
     columnName: String!
+    columnLabel: String!
     relTableName: String
+    relTableLabel: String
     relColumnName: String
+    relColumnLabel: String
   }
 
   type TableUser {
@@ -107,6 +111,7 @@ export const typeDefs = gql`
       del: Boolean
     ): Boolean!
     wbAddAllExistingTables(schemaName: String!): Boolean!
+    wbAddExistingTable(schemaName: String!, tableName: String!): Boolean!
     wbAddAllExistingRelationships(schemaName: String!): Boolean!
     wbCreateOrDeletePrimaryKey(
       schemaName: String!
@@ -237,7 +242,12 @@ export const resolvers: IResolvers = {
     },
     // Columns
     wbColumns: async (_, { schemaName, tableName }, context) => {
-      const result = await context.wbCloud.columns(schemaName, tableName);
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.columns(
+        currentUser,
+        schemaName,
+        tableName
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
@@ -296,6 +306,16 @@ export const resolvers: IResolvers = {
       const result = await context.wbCloud.addAllExistingTables(
         currentUser,
         schemaName
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbAddExistingTable: async (_, { schemaName, tableName }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.addExistingTable(
+        currentUser,
+        schemaName,
+        tableName
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

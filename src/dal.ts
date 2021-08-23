@@ -49,7 +49,7 @@ export class DAL {
     try {
       await client.query("BEGIN");
       for (const queryParams of queriesAndParams) {
-        log.debug(
+        log.info(
           `dal.executeQuery QueryParams: ${queryParams.query}`,
           `    [ ${queryParams.params ? queryParams.params.join(", ") : ""} ]`
         );
@@ -150,7 +150,7 @@ export class DAL {
     objectId: number,
     keepImpliedFrom?: boolean
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.setRole(${userIds},${roleName},${roleLevel},${objectId},${keepImpliedFrom})`
     );
     const roleResult = await this.roleByName(roleName);
@@ -314,7 +314,7 @@ export class DAL {
     objectIdOrName: number | string,
     parentObjectName?: string
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.roleAndIdForUserObject(${userId},${roleLevel},${objectIdOrName},${parentObjectName})`
     );
     let objectId: number | undefined = undefined;
@@ -893,15 +893,15 @@ export class DAL {
     }
     const results = await this.executeQueries(queries);
     if (!results[0].success) return results[0];
-    if (!wbOnly) {
-      if (!results[1].success) return results[1];
-      if (results[0].payload.rows.length != results[1].payload.rows.length) {
-        return errResult({
-          message:
-            "dal.schemas: wb.schemas out of sync with information_schema.schemata",
-        } as ServiceResult);
-      }
-    }
+    // if (!wbOnly) {
+    //   if (!results[1].success) return results[1];
+    //   if (results[0].payload.rows.length != results[1].payload.rows.length) {
+    //     return errResult({
+    //       message:
+    //         "dal.schemas: wb.schemas out of sync with information_schema.schemata",
+    //     } as ServiceResult);
+    //   }
+    // }
     results[0].payload = Schema.parseResult(results[0].payload);
     return results[0];
   }
@@ -1137,7 +1137,7 @@ export class DAL {
     newOrganizationOwnerId?: number,
     newUserOwnerId?: number
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.updateSchema(${schema},${newSchemaName},${newSchemaLabel},${newOrganizationOwnerId},${newUserOwnerId})`
     );
     if (newSchemaName) newSchemaName = DAL.sanitize(newSchemaName);
@@ -1441,11 +1441,16 @@ export class DAL {
         fk.column_name       AS fk_column,
         fk.constraint_name   AS fk_name,
         map.update_rule      AS fk_on_update,
-        map.delete_rule      AS fk_on_delete
+        map.delete_rule      AS fk_on_delete,
+        -- add labels
+        tables_ref.label     AS ref_table_label,
+        columns_ref.label    AS ref_column_label,
+        tables_fk.label      AS fk_table_label,
+        columns_fk.label     AS fk_column_label
         -- lists fk constraints AND maps them to pk constraints
         FROM information_schema.referential_constraints AS map
         -- join unique constraints (e.g. PKs constraints) to ref columns info
-        INNER JOIN information_schema.key_column_usage AS ref
+        JOIN information_schema.key_column_usage AS ref
         ON  ref.constraint_catalog = map.unique_constraint_catalog
         AND ref.constraint_schema = map.unique_constraint_schema
         AND ref.constraint_name = map.unique_constraint_name
@@ -1455,11 +1460,17 @@ export class DAL {
         AND refd.constraint_schema = ref.constraint_schema
         AND refd.constraint_name = ref.constraint_name
         -- join fk columns to the correct ref columns using ordinal positions
-        INNER JOIN information_schema.key_column_usage AS fk
+        JOIN information_schema.key_column_usage AS fk
         ON  fk.constraint_catalog = map.constraint_catalog
         AND fk.constraint_schema = map.constraint_schema
         AND fk.constraint_name = map.constraint_name
         AND fk.position_in_unique_constraint = ref.ordinal_position --IMPORTANT!
+        -- add labels
+        JOIN wb.schemas ON schemas.name=ref.table_schema
+        JOIN wb.tables tables_ref ON (tables_ref.schema_id=wb.schemas.id AND tables_ref.name=ref.table_name)
+        JOIN wb.columns columns_ref ON (columns_ref.table_id=tables_ref.id AND columns_ref.name=ref.column_name)
+        JOIN wb.tables tables_fk ON (tables_fk.schema_id=wb.schemas.id AND tables_fk.name=fk.table_name )
+        JOIN wb.columns columns_fk ON (columns_fk.table_id=tables_fk.id AND columns_fk.name=fk.column_name)
         WHERE ref.table_schema='${schemaName}'
         AND fk.table_schema='${schemaName}'
         ${sqlWhere}
@@ -1471,9 +1482,13 @@ export class DAL {
       const constraint: ConstraintId = {
         constraintName: row.fk_name,
         tableName: row.fk_table,
+        tableLabel: row.fk_table_label,
         columnName: row.fk_column,
+        columnLabel: row.fk_column_label,
         relTableName: row.ref_table,
+        relTableLabel: row.ref_table_label,
         relColumnName: row.ref_column,
+        relColumnLabel: row.ref_column_label,
       };
       constraints.push(constraint);
     }
@@ -1556,7 +1571,7 @@ export class DAL {
     parentTableName: string,
     parentColumnNames: string[]
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.createForeignKey(${schemaName},${tableName},${columnNames},${parentTableName},${parentColumnNames})`
     );
     schemaName = DAL.sanitize(schemaName);
@@ -1614,7 +1629,7 @@ export class DAL {
     tableLabel: string,
     create: boolean
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.addOrCreateTable ${schemaName} ${tableName} ${tableLabel} ${create}`
     );
     schemaName = DAL.sanitize(schemaName);
@@ -1797,7 +1812,7 @@ export class DAL {
     userIds?: number[],
     clearExistingImpliedFromRoleName?: string
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.setSchemaUserRolesFromOrganizationRoles(${organizationId}, <roleMap>, ${schemaIds}, ${userIds}, ${clearExistingImpliedFromRoleName})`
     );
     let result = await this.rolesIdLookup();
@@ -1882,7 +1897,7 @@ export class DAL {
     userIds?: number[],
     clearExisting?: boolean
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.setTableUserRolesFromSchemaRoles(${schemaId}, ${JSON.stringify(
         roleMap
       )}, ${tableIds}, ${userIds}, ${clearExisting})`
@@ -2076,7 +2091,7 @@ export class DAL {
     create: boolean,
     columnPGType?: string
   ): Promise<ServiceResult> {
-    log.debug(
+    log.info(
       `dal.addOrCreateColumn ${schemaName} ${tableName} ${columnName} ${columnLabel} ${columnPGType} ${create}`
     );
     schemaName = DAL.sanitize(schemaName);
@@ -2197,7 +2212,7 @@ export class DAL {
     log.warn("nextSeqNumber" + nextSeqNumber);
     const result = await this.executeQueries([
       {
-        query: `CREATE SEQUENCE ${schema.name}.${sequencName};`,
+        query: `CREATE SEQUENCE ${schema.name}.${sequencName}`,
       },
       {
         query: `ALTER TABLE ${schema.name}.${table.name} ALTER COLUMN ${column.name} SET DEFAULT nextval('${schema.name}."${sequencName}"')`,
