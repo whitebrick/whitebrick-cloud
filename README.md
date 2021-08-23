@@ -2,20 +2,24 @@
 
 ![whitebrick logo](doc/whitebrick-logo-horizontal-white-sm.png)
 
-# whitebrick-cloud (back end)
+# whitebrick-cloud (back end) BETA
 
 ### Open Source Airtable Alternative (No Code DB)
 
-#### Whitebrick is a lightweight No-Code Database with two points of difference:
+#### Whitebrick is a lightweight No Code Database with three points of difference:
 
 1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for easy customization and hosting.
-2. The back end is a set of **Serverless support functions** for making DDL calls and configuring [Hasura GraphQL server](https://hasura.io/).
+2. The back end is a set of **Serverless functions** for making DDL calls to PostgreSQL and configuring [Hasura GraphQL server](https://hasura.io/).
+3. The PostgreSQL database schemas can be accessed directly with psql for data import/export and integration with other tools.
 
-##### Rather than reinventing the wheel Whitebrick stitches together the best-in-breed open source apps: [Hasura](https://hasura.io/) | [Gastsby](https://www.gatsbyjs.com/) | [AG Grid](https://ag-grid.com/) | [Apollo](https://www.apollographql.com/) | [Serverless](https://www.serverless.com/)
+##### Rather than reinventing the wheel Whitebrick stitches together the best-in-breed open source apps:
+[Hasura](https://hasura.io/) | [Gastsby](https://www.gatsbyjs.com/) | [AG Grid](https://ag-grid.com/) | [Apollo](https://www.apollographql.com/) | [Serverless](https://www.serverless.com/)
 
 ---
 
 #### Current Project status as of August:
+
+_!!! This is BETA software - use at your own risk !!!_
 
 - [x] DDL Table & Column CRUD
 - [x] Live editing with subscription
@@ -25,6 +29,12 @@
 - [ ] Documentation
 
 Hosted demo and SaaS at [whitebrick.com](https://whitebrick.com)
+
+---
+
+#### License
+
+Whitebrick is [licensed](LICENSE) under the Apache License v2.0 however the component apps use a variety of different licenses. We are working on a simple guide to outline the license information and options depending on your use case - TBA.
 
 ---
 
@@ -38,7 +48,7 @@ Hosted demo and SaaS at [whitebrick.com](https://whitebrick.com)
 
 ![whitebrick-cloud system diagram](doc/whitebrick-diagram.png)
 
-Whitebrick comprises a front end Jamstack client and back end Serverless application (whitebrick-cloud) that adds multi-tenant DDL and access control functions to the [Hasura GraphQL Server](https://github.com/hasura/graphql-engine). The Jamstack client uses [AG Grid](https://ag-grid.com/) as a spreadsheet-like UI that reads/writes table data directly from/to Hasura over GraphQL. Additional functions (eg DDL and access control) are provided by whitebrick-cloud and exposed through the Hasura endpoint using [Schema stitching](https://hasura.io/docs/latest/graphql/core/remote-schemas/index.html).
+Whitebrick comprises a front end Gatsby Jamstack client and back end Serverless application (whitebrick-cloud) that adds multi-tenant DDL and access control functions to a [PostgreSQL Database](https://www.postgresql.org/) via the [Hasura GraphQL Server](https://github.com/hasura/graphql-engine). The Jamstack client uses [AG Grid](https://ag-grid.com/) as a spreadsheet-like UI that reads/writes table data directly from/to Hasura over GraphQL. Additional functions (eg DDL and access control) are provided by whitebrick-cloud and exposed through the Hasura endpoint using [Schema stitching](https://hasura.io/docs/latest/graphql/core/remote-schemas/index.html).
 
 ---
 
