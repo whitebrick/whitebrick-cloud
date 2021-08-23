@@ -1,5 +1,4 @@
 type Environment = {
-  secretMessage: string;
   dbName: string;
   dbHost: string;
   dbPort: number;
@@ -17,7 +16,6 @@ type Environment = {
 };
 
 export const environment: Environment = {
-  secretMessage: process.env.SECRET_MESSAGE as string,
   dbName: process.env.DB_NAME as string,
   dbHost: process.env.DB_HOST as string,
   dbPort: parseInt(process.env.DB_PORT || "") as number,
