@@ -1,8 +1,8 @@
-[//]: # "START:COMMON_HEADER"
-
 ![whitebrick logo](doc/whitebrick-logo-white-hz-sm.png)
 
 # whitebrick-cloud (back end) BETA
+
+[//]: # "START:COMMON_HEADER"
 
 ### Open Source Airtable Alternative (No Code DB)
 
