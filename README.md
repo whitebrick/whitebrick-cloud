@@ -13,6 +13,7 @@
 3. The [PostgreSQL](https://www.postgresql.org/) database schemas can be accessed directly with **_psql_** for data import/export and integrations with other tools.
 
 ##### Rather than reinventing the wheel Whitebrick stitches together the best-in-breed open source apps:
+
 [Hasura](https://hasura.io/) | [Gastsby](https://www.gatsbyjs.com/) | [PostgreSQL](https://www.postgresql.org/) | [AG Grid](https://ag-grid.com/) | [Apollo](https://www.apollographql.com/) | [Serverless](https://www.serverless.com/)
 
 ---
@@ -60,11 +61,11 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 ## Getting Started
 
 ### Deploying on a Cloud Service
+
 - AWS CloudFormation Stack - we're currently tidying this up for release, email us for early copy
 - Heroku TBD
 - Azure TBD
 - DigitalOcean TBD
-
 
 ### Running Locally
 
@@ -90,7 +91,7 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 
 4.  #### Configure .env File
 
-    Copy `./dot_env_example.txt` to `./.env.development` and complete with database connection parameters from (1) above.
+    Copy `./.env.example` to `./.env.development` and complete with database connection parameters from (1) above.
 
 5.  #### Create wb Schema
 
