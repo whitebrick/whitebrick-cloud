@@ -7,7 +7,8 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "watch": "tsc -w -p tsconfig.build.json",
     "lint": "eslint ./src --ext .ts",
-    "prettier-format": "prettier --config .prettierrc './src/**/*.ts' --write"
+    "format": "prettier --config .prettierrc './src/**/*.ts' --write",
+    "postinstall": "husky install .github/husky"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,8 @@
   },
   "homepage": "https://github.com/whitebrick/whitebrick-cloud#readme",
   "dependencies": {
+    "@commitlint/cli": "^13.1.0",
+    "@commitlint/config-conventional": "^13.1.0",
     "apollo-server-lambda": "^2.22.2",
     "aws-sdk": "^2.962.0",
     "axios": "^0.21.1",
@@ -28,6 +31,7 @@
     "graphql-constraint-directive": "^2.1.1",
     "graphql-tools": "^7.0.4",
     "graphql-type-json": "^0.3.2",
+    "husky": "^7.0.2",
     "lodash": "^4.17.21",
     "pg": "^8.6.0",
     "pg-format": "^1.0.4",
