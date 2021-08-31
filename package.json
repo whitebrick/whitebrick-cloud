@@ -8,7 +8,8 @@
     "watch": "tsc -w -p tsconfig.build.json",
     "lint": "eslint ./src --ext .ts",
     "format": "prettier --config .prettierrc './src/**/*.ts' --write",
-    "postinstall": "husky install .github/husky"
+    "postinstall": "husky install .github/husky",
+    "prepare": "husky install"
   },
   "repository": {
     "type": "git",
@@ -31,7 +32,6 @@
     "graphql-constraint-directive": "^2.1.1",
     "graphql-tools": "^7.0.4",
     "graphql-type-json": "^0.3.2",
-    "husky": "^7.0.2",
     "lodash": "^4.17.21",
     "pg": "^8.6.0",
     "pg-format": "^1.0.4",
@@ -50,6 +50,8 @@
     "eslint": "^7.26.0",
     "eslint-config-prettier": "^8.3.0",
     "eslint-plugin-prettier": "^3.4.0",
+    "husky": "^7.0.2",
+    "lint-staged": "^11.1.2",
     "prettier": "2.3.0",
     "serverless-dotenv-plugin": "^3.9.0",
     "serverless-offline": "^5.12.1",
@@ -57,5 +59,13 @@
     "ts-loader": "^8.1.0",
     "webpack": "^5.33.2",
     "webpack-node-externals": "^2.5.2"
+  },
+  "lint-staged": {
+    "*.ts": "eslint --ignore-path .eslintignore --cache --fix"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
   }
 }
