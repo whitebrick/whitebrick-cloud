@@ -13,6 +13,9 @@ type Environment = {
   testUserEmailDomain: string;
   demoDBPrefix: string;
   demoDBLabel: string;
+  localBgFunctionUrl: string;
+  lambdaBgFunctionName: string;
+  awsRegion: string;
 };
 
 export const environment: Environment = {
@@ -36,6 +39,9 @@ export const environment: Environment = {
   ).toLocaleLowerCase(),
   demoDBPrefix: process.env.DEMO_DB_PREFIX as string,
   demoDBLabel: process.env.DEMO_DB_LABEL as string,
+  localBgFunctionUrl: process.env.LOCAL_BG_FUNCTION_URL as string,
+  lambdaBgFunctionName: process.env.LAMBDA_BG_FUNCTION_NAME as string,
+  awsRegion: process.env.WB_AWS_REGION as string,
 };
 
 // wbErrorCode : [ message, apolloErrorCode? ]
@@ -102,8 +108,8 @@ export const USER_MESSAGES: Record<string, string[]> = {
   // Tables
   WB_TABLE_NOT_FOUND: ["Table could not be found."],
   WB_TABLE_NAME_EXISTS: ["This Table name already exists", "BAD_USER_INPUT"],
-  COLUMN_NOT_FOUND: ["Column could not be found"],
   WB_COLUMN_NAME_EXISTS: ["This Column name already exists.", "BAD_USER_INPUT"],
+  WB_COLUMN_NOT_FOUND: ["This Column does not exist.", "BAD_USER_INPUT"],
   WB_PK_EXISTS: ["Remove existing primary key first.", "BAD_USER_INPUT"],
   WB_FK_EXISTS: [
     "Remove existing foreign key on the column first",

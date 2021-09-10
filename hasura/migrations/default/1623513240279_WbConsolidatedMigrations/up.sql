@@ -133,3 +133,18 @@ CREATE TABLE IF NOT EXISTS wb.custom_role_column_permissions(
   updated_at timestamp without time zone DEFAULT timezone('utc'::text, now()),
   PRIMARY KEY (role_id, column_id)
 );
+
+CREATE TABLE IF NOT EXISTS wb.bg_queue(
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGSERIAL REFERENCES wb.users(id) NOT NULL,
+  schema_id BIGSERIAL REFERENCES wb.schemas(id) NOT NULL,
+  status TEXT NOT NULL,
+  key TEXT NOT NULL,
+  data jsonb,
+  created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc'),
+  updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (now() at time zone 'utc')
+);
+
+CREATE INDEX idx_wb_bg_queue_status ON wb.bg_queue(status);
+CREATE INDEX idx_wb_bg_queue_key ON wb.bg_queue(key);
+ALTER SEQUENCE wb.bg_queue_id_seq RESTART WITH 60001;

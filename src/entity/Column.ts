@@ -20,6 +20,7 @@ export class Column {
   // pg data
   type!: string;
   default?: string;
+  isNullable?: boolean;
   // not persisted
   isPrimaryKey!: boolean;
   foreignKeys!: [ConstraintId];
@@ -45,6 +46,7 @@ export class Column {
     column.createdAt = data.created_at;
     column.updatedAt = data.updated_at;
     if (data.default) column.default = data.default;
+    if (data.is_nullable) column.isNullable = data.is_nullable != "NO";
     return column;
   }
 }

@@ -1,6 +1,9 @@
 import { gql, IResolvers } from "apollo-server-lambda";
 import { CurrentUser } from "../entity";
 import { log } from "../whitebrick-cloud";
+import Lambda from "aws-sdk/clients/lambda";
+import AWS from "aws-sdk";
+import { environment } from "../environment";
 
 export const typeDefs = gql`
   type Schema {
@@ -71,6 +74,8 @@ export const typeDefs = gql`
       newUserOwnerEmail: String
     ): Schema
     wbRemoveOrDeleteSchema(name: String!, del: Boolean): Boolean!
+    wbImportSchema(schemaName: String!): Boolean!
+    wbRemoveSchema(schemaName: String!): Boolean!
     """
     Schema Users
     """
@@ -190,6 +195,24 @@ export const resolvers: IResolvers = {
         currentUser,
         name,
         del
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbImportSchema: async (_, { schemaName }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.importSchema(
+        currentUser,
+        schemaName
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
+    wbRemoveSchema: async (_, { schemaName }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.removeSchema(
+        currentUser,
+        schemaName
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

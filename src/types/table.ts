@@ -26,6 +26,7 @@ export const typeDefs = gql`
     label: String!
     type: String!
     default: String
+    isNullable: Boolean
     isPrimaryKey: Boolean!
     foreignKeys: [ConstraintId]!
     referencedBy: [ConstraintId]!
@@ -163,6 +164,7 @@ export const typeDefs = gql`
       columnLabel: String!
       create: Boolean
       columnType: String
+      sync: Boolean
     ): Boolean!
     wbUpdateColumn(
       schemaName: String!
@@ -171,12 +173,14 @@ export const typeDefs = gql`
       newColumnName: String
       newColumnLabel: String
       newType: String
+      sync: Boolean
     ): Boolean!
     wbRemoveOrDeleteColumn(
       schemaName: String!
       tableName: String!
       columnName: String!
       del: Boolean
+      sync: Boolean
     ): Boolean!
     wbAddOrRemoveColumnSequence(
       schemaName: String!
@@ -390,7 +394,15 @@ export const resolvers: IResolvers = {
     // Columns
     wbAddOrCreateColumn: async (
       _,
-      { schemaName, tableName, columnName, columnLabel, create, columnType },
+      {
+        schemaName,
+        tableName,
+        columnName,
+        columnLabel,
+        create,
+        columnType,
+        sync,
+      },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
@@ -401,7 +413,8 @@ export const resolvers: IResolvers = {
         columnName,
         columnLabel,
         create,
-        columnType
+        columnType,
+        sync
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
@@ -415,6 +428,7 @@ export const resolvers: IResolvers = {
         newColumnName,
         newColumnLabel,
         newType,
+        sync,
       },
       context
     ) => {
@@ -426,14 +440,15 @@ export const resolvers: IResolvers = {
         columnName,
         newColumnName,
         newColumnLabel,
-        newType
+        newType,
+        sync
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
     wbRemoveOrDeleteColumn: async (
       _,
-      { schemaName, tableName, columnName, del },
+      { schemaName, tableName, columnName, del, sync },
       context
     ) => {
       const currentUser = await CurrentUser.fromContext(context);
@@ -442,7 +457,8 @@ export const resolvers: IResolvers = {
         schemaName,
         tableName,
         columnName,
-        del
+        del,
+        sync
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

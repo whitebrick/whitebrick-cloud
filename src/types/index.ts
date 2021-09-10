@@ -14,6 +14,7 @@ import {
 import { makeExecutableSchema } from "graphql-tools";
 import { CurrentUser } from "../entity";
 import { log } from "../whitebrick-cloud";
+const isPortReachable = require("is-port-reachable");
 
 export type ServiceResult =
   | { success: true; payload: any; message?: string }
@@ -57,15 +58,17 @@ const typeDefs = gql`
 const resolvers: IResolvers = {
   Query: {
     wbHealthCheck: async (_, __, context) => {
-      const hasuraHealthCheck = await context.wbCloud.hasuraHealthCheck();
-      log.info(hasuraHealthCheck);
       return {
-        hasuraHealthCheck: hasuraHealthCheck,
+        googlePortReachable: await isPortReachable(80, { host: "google.com" }),
+        hasuraHealthCheck: await context.wbCloud.hasuraHealthCheck(),
+        dbSelect: await context.wbCloud.dbHealthCheck(),
         headers: context.headers,
         multiValueHeaders: context.headers,
       };
     },
     wbCloudContext: async (_, __, context) => {
+      // const result = await context.wbCloud.assignDemoSchema(21875);
+      // if (!result.success) return result;
       return context.wbCloud.cloudContext();
     },
   },

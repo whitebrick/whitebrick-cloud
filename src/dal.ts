@@ -49,8 +49,10 @@ export class DAL {
     try {
       await client.query("BEGIN");
       for (const queryParams of queriesAndParams) {
+        let logTxt = queryParams.query;
+        if (logTxt.startsWith("--SKIPLOG")) logTxt = logTxt.substring(0, 30);
         log.info(
-          `dal.executeQuery QueryParams: ${queryParams.query}`,
+          `dal.executeQuery QueryParams: ${logTxt}`,
           `    [ ${queryParams.params ? queryParams.params.join(", ") : ""} ]`
         );
         const response = await client.query(
@@ -81,6 +83,76 @@ export class DAL {
   // used for DDL identifiers (eg CREATE TABLE sanitize(tableName))
   public static sanitize(str: string): string {
     return str.replace(/[^\w%]+/g, "");
+  }
+
+  public async healthCheck(): Promise<ServiceResult> {
+    return await this.discoverSchemas("%", "schema_name", 1);
+  }
+
+  /**
+   * ========== BG QUEUE ==========
+   */
+
+  public async bgQueueSelect(
+    columns: string[],
+    schemaId: number,
+    status: string,
+    limit?: number
+  ): Promise<ServiceResult> {
+    let query = `
+      SELECT ${columns.join(",")}
+      FROM wb.bg_queue
+      WHERE schema_id=$1
+      AND status=$2
+      ORDER BY id
+    `;
+    if (limit) query += ` LIMIT ${limit}`;
+    return await this.executeQuery({
+      query: query,
+      params: [schemaId, status],
+    } as QueryParams);
+  }
+
+  public async bgQueueInsert(
+    userId: number,
+    schemaId: number,
+    status: string,
+    key: string,
+    data?: object | null
+  ): Promise<ServiceResult> {
+    if (!data) data = null;
+    const result = await this.executeQuery({
+      query: `
+        INSERT INTO wb.bg_queue(
+          user_id, schema_id, status, key, data
+        ) VALUES($1, $2, $3, $4, $5) RETURNING *
+      `,
+      params: [userId, schemaId, status, key, data],
+    } as QueryParams);
+    return result;
+  }
+
+  public async bgQueueUpdateStatus(
+    newStatus: string,
+    id?: number,
+    schemaId?: number,
+    currentStatus?: string,
+    data?: Record<string, any>
+  ): Promise<ServiceResult> {
+    let query = `
+      UPDATE wb.bg_queue
+      SET status=$1, updated_at=$2
+      WHERE
+    `;
+    const whereSql: string[] = [];
+    if (id) whereSql.push(`id=${id}`);
+    if (schemaId) whereSql.push(`schema_id=${schemaId}`);
+    if (currentStatus) whereSql.push(`status='${currentStatus}'`);
+    const result = await this.executeQuery({
+      query: (query += whereSql.join(" AND ")),
+      params: [newStatus, new Date()],
+    } as QueryParams);
+    return result;
   }
 
   /**
@@ -940,9 +1012,10 @@ export class DAL {
       query: `
         SELECT wb.schemas.*
         FROM wb.schemas
-        JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
         WHERE wb.schemas.name LIKE '${schemaNamePattern}'
-        AND wb.schema_users.user_id=${User.SYS_ADMIN_ID}
+        AND wb.schemas.user_owner_id=${User.SYS_ADMIN_ID}
+        ORDER BY name
+        LIMIT 1
       `,
     } as QueryParams);
     if (result.success) result.payload = Schema.parseResult(result.payload)[0];
@@ -1196,7 +1269,7 @@ export class DAL {
 
   public async removeOrDeleteSchema(
     schemaName: string,
-    del: boolean
+    del?: boolean
   ): Promise<ServiceResult> {
     const queriesAndParams: Array<QueryParams> = [
       {
@@ -1362,16 +1435,20 @@ export class DAL {
     const params: (string | number[] | string[])[] = [schemaName];
     let sqlSelect: string = "";
     let sqlWhere: string = "";
-    if (userIds) {
-      sqlWhere = "AND wb.users.id=ANY($2)";
+    let onlyAdminUser: boolean = false;
+    if (userIds && userIds.length == 1 && userIds[0] == User.SYS_ADMIN_ID) {
+      onlyAdminUser = true;
+    }
+    if (userIds && !onlyAdminUser) {
       params.push(userIds);
+      sqlWhere = `AND wb.users.id=ANY($${params.length}) `;
     } else if (userEmails) {
-      sqlWhere = "AND wb.users.email=ANY($2)";
       params.push(userEmails);
+      sqlWhere = `AND wb.users.email=ANY($${params.length}) `;
     }
     if (tableNames) {
-      sqlWhere += "AND wb.tables.name=ANY($3)";
       params.push(tableNames);
+      sqlWhere += `AND wb.tables.name=ANY($${params.length})`;
     }
     if (withSettings) {
       sqlSelect += ", wb.table_users.settings as settings";
@@ -1430,7 +1507,7 @@ export class DAL {
         break;
     }
     const result = await this.executeQuery({
-      query: `
+      query: `--SKIPLOG foreignKeysOrReferences
         SELECT
         -- unique reference info
         ref.table_name       AS ref_table,
@@ -2027,7 +2104,7 @@ export class DAL {
       result.payload = result.payload[0];
       if (!result.payload) {
         return errResult({
-          wbCode: "COLUMN_NOT_FOUND",
+          wbCode: "WB_COLUMN_NOT_FOUND",
           values: [schemaName, tableName, columnName],
         });
       }
@@ -2043,7 +2120,8 @@ export class DAL {
     let query: string = `
       SELECT wb.columns.*,
       information_schema.columns.data_type as type,
-      information_schema.columns.column_default as default
+      information_schema.columns.column_default as default,
+      information_schema.columns.is_nullable as is_nullable
       FROM wb.columns
       JOIN wb.tables ON wb.columns.table_id=wb.tables.id
       JOIN wb.schemas ON wb.tables.schema_id=wb.schemas.id
@@ -2068,16 +2146,23 @@ export class DAL {
 
   public async discoverColumns(
     schemaName: string,
-    tableName: string
+    tableName: string,
+    columnName?: string
   ): Promise<ServiceResult> {
+    let query = `
+      SELECT column_name as name, data_type as type
+      FROM information_schema.columns
+      WHERE table_schema=$1
+      AND table_name=$2
+    `;
+    let params = [schemaName, tableName];
+    if (columnName) {
+      query += " AND column_name=$3";
+      params.push(columnName);
+    }
     const result = await this.executeQuery({
-      query: `
-        SELECT column_name as name, data_type as type
-        FROM information_schema.columns
-        WHERE table_schema=$1
-        AND table_name=$2
-      `,
-      params: [schemaName, tableName],
+      query: query,
+      params: params,
     } as QueryParams);
     if (result.success) result.payload = Column.parseResult(result.payload);
     return result;
@@ -2119,7 +2204,7 @@ export class DAL {
     const results: Array<ServiceResult> = await this.executeQueries(
       queriesAndParams
     );
-    if (create && !results[1].success) return results[1];
+    if (create && results[1] && !results[1].success) return results[1];
     return results[0];
   }
 

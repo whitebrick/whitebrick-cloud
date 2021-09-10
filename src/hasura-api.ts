@@ -84,7 +84,7 @@ class HasuraApi {
         }) as ServiceResult;
       }
     }
-    log.info(`hasuraApi.post: result: ${JSON.stringify(result)}`);
+    //log.info(`hasuraApi.post: result: ${JSON.stringify(result)}`);
     return result;
   }
 
@@ -92,7 +92,9 @@ class HasuraApi {
     let result: ServiceResult = errResult();
     try {
       log.info("hasuraApi.healthCheck()");
-      const response = await this.http.get<any, AxiosResponse>("/healthz");
+      const response = await this.http.get<any, AxiosResponse>("/healthz", {
+        timeout: 3000,
+      });
       result = {
         success: true,
         payload: {
@@ -103,6 +105,7 @@ class HasuraApi {
     } catch (error: any) {
       result = errResult({
         message: error.message,
+        values: [JSON.stringify(error)],
       }) as ServiceResult;
     }
     return result;
