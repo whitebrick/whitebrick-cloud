@@ -9,11 +9,11 @@ provider:
     APP: "whitebrick-cloud"
   vpc:
     securityGroupIds:
-      - sg-09a08028a7c515d2e
-      - sg-053ffe14bbfbb9244
+      - SECURITY_GROUP_1
+      - SECURITY_GROUP_2
     subnetIds:
-      - subnet-00828b513cc5432de
-      - subnet-03a31853ae829c271
+      - SUBNET_1
+      - SUBNET_2
 functions:
   graphql:
     handler: src/whitebrick-cloud.graphqlHandler
