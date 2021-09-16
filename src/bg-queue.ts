@@ -155,6 +155,7 @@ export class BgQueue {
           cU,
           data.schemaName
         );
+        if (!result.success) break;
         // reset the roles now that new tables exist
         result = await this.wbCloud.deleteAndSetTablePermissions(
           cU,
@@ -171,6 +172,7 @@ export class BgQueue {
           data.schemaName,
           data.tableName
         );
+        if (!result.success) break;
         result = await this.wbCloud.addOrRemoveAllExistingRelationships(
           cU,
           data.schemaName,
@@ -190,11 +192,13 @@ export class BgQueue {
           data.schemaName,
           data.tableName
         );
+        if (!result.success) break;
         result = await this.wbCloud.addDefaultTablePermissions(
           cU,
           data.schemaName,
           data.tableName
         );
+        if (!result.success) break;
         result = await this.wbCloud.addOrRemoveAllExistingRelationships(
           cU,
           data.schemaName,
@@ -204,6 +208,7 @@ export class BgQueue {
       default:
         log.error(`== bgHandler ERROR: no case for event.fn ${key}`);
     }
+    log.info(`  bgQueue.bgRun - returning result=${result}`);
     return result;
   }
 }
