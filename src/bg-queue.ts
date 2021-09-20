@@ -26,7 +26,7 @@ export class BgQueue {
     userId: number,
     schemaId: number,
     key: string,
-    data: object
+    data?: object
   ): Promise<ServiceResult> {
     log.info(`bgQueue.queue(${key},${data})`);
     return await this.dal.bgQueueInsert(
@@ -204,6 +204,11 @@ export class BgQueue {
           data.schemaName,
           data.tableName
         );
+        break;
+      case "bgReloadRemoteSchemasAndMetadata":
+        result = await this.wbCloud.setRemoteSchemas(cU);
+        if (!result.success) break;
+        result = await this.wbCloud.reloadMetadata(cU);
         break;
       default:
         log.error(`== bgHandler ERROR: no case for event.fn ${key}`);

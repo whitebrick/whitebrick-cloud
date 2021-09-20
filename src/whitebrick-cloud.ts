@@ -42,97 +42,6 @@ export class WhitebrickCloud {
     return apolloErr(result);
   }
 
-  // only async for testing - for the most part static
-  public async uidFromHeaders(
-    headers: Record<string, string>
-  ): Promise<ServiceResult> {
-    //log.info("========== HEADERS: " + JSON.stringify(headers));
-    const headersLowerCase = Object.entries(headers).reduce(
-      (acc: Record<string, string>, [key, val]) => (
-        (acc[key.toLowerCase()] = val), acc
-      ),
-      {}
-    );
-    let result: ServiceResult = errResult();
-    // if x-hasura-admin-secret hasura sets role to admin
-    if (
-      headersLowerCase["x-hasura-role"] &&
-      headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
-    ) {
-      log.info("========== FOUND ADMIN USER");
-      return {
-        success: true,
-        payload: User.SYS_ADMIN_ID,
-      } as ServiceResult;
-    } else if (
-      process.env.NODE_ENV == "development" &&
-      headersLowerCase["x-test-user-id"]
-    ) {
-      result = await this.userByEmail(
-        CurrentUser.getSysAdmin(),
-        headersLowerCase["x-test-user-id"]
-      );
-      if (result.success) result.payload = result.payload.id;
-      log.info(
-        `========== FOUND TEST USER: ${headersLowerCase["x-test-user-id"]}`
-      );
-    } else if (headersLowerCase["x-hasura-user-id"]) {
-      result = {
-        success: true,
-        payload: parseInt(headersLowerCase["x-hasura-user-id"]),
-      } as ServiceResult;
-      log.info(
-        `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
-      );
-    } else {
-      result = errResult({
-        message: `uidFromHeaders: Could not find headers for Admin, Test or User in: ${JSON.stringify(
-          headers
-        )}`,
-      } as ServiceResult);
-    }
-    return result;
-  }
-
-  public cloudContext(): object {
-    return {
-      defaultColumnTypes: Column.COMMON_TYPES,
-      roles: {
-        organization: Role.SYSROLES_ORGANIZATIONS,
-        schema: Role.SYSROLES_SCHEMAS,
-        table: Role.SYSROLES_TABLES,
-      },
-      policy: DEFAULT_POLICY,
-      userMessages: USER_MESSAGES,
-    };
-  }
-
-  public async hasuraHealthCheck() {
-    let result = errResult();
-    try {
-      result = await hasuraApi.healthCheck();
-    } catch (error: any) {
-      result = errResult({
-        message: error.message,
-        values: [JSON.stringify(error)],
-      });
-    }
-    return result;
-  }
-
-  public async dbHealthCheck() {
-    let result = errResult();
-    try {
-      result = await this.dal.healthCheck();
-    } catch (error: any) {
-      result = errResult({
-        message: error.message,
-        values: [JSON.stringify(error)],
-      });
-    }
-    return result;
-  }
-
   /**
    * ========== Auth ==========
    */
@@ -2829,6 +2738,97 @@ export class WhitebrickCloud {
    * ========== Util ==========
    */
 
+  // only async for testing - for the most part static
+  public async uidFromHeaders(
+    headers: Record<string, string>
+  ): Promise<ServiceResult> {
+    //log.info("========== HEADERS: " + JSON.stringify(headers));
+    const headersLowerCase = Object.entries(headers).reduce(
+      (acc: Record<string, string>, [key, val]) => (
+        (acc[key.toLowerCase()] = val), acc
+      ),
+      {}
+    );
+    let result: ServiceResult = errResult();
+    // if x-hasura-admin-secret hasura sets role to admin
+    if (
+      headersLowerCase["x-hasura-role"] &&
+      headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
+    ) {
+      log.info("========== FOUND ADMIN USER");
+      return {
+        success: true,
+        payload: User.SYS_ADMIN_ID,
+      } as ServiceResult;
+    } else if (
+      process.env.NODE_ENV == "development" &&
+      headersLowerCase["x-test-user-id"]
+    ) {
+      result = await this.userByEmail(
+        CurrentUser.getSysAdmin(),
+        headersLowerCase["x-test-user-id"]
+      );
+      if (result.success) result.payload = result.payload.id;
+      log.info(
+        `========== FOUND TEST USER: ${headersLowerCase["x-test-user-id"]}`
+      );
+    } else if (headersLowerCase["x-hasura-user-id"]) {
+      result = {
+        success: true,
+        payload: parseInt(headersLowerCase["x-hasura-user-id"]),
+      } as ServiceResult;
+      log.info(
+        `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
+      );
+    } else {
+      result = errResult({
+        message: `uidFromHeaders: Could not find headers for Admin, Test or User in: ${JSON.stringify(
+          headers
+        )}`,
+      } as ServiceResult);
+    }
+    return result;
+  }
+
+  public cloudContext(): object {
+    return {
+      defaultColumnTypes: Column.COMMON_TYPES,
+      roles: {
+        organization: Role.SYSROLES_ORGANIZATIONS,
+        schema: Role.SYSROLES_SCHEMAS,
+        table: Role.SYSROLES_TABLES,
+      },
+      policy: DEFAULT_POLICY,
+      userMessages: USER_MESSAGES,
+    };
+  }
+
+  public async hasuraHealthCheck() {
+    let result = errResult();
+    try {
+      result = await hasuraApi.healthCheck();
+    } catch (error: any) {
+      result = errResult({
+        message: error.message,
+        values: [JSON.stringify(error)],
+      });
+    }
+    return result;
+  }
+
+  public async dbHealthCheck() {
+    let result = errResult();
+    try {
+      result = await this.dal.healthCheck();
+    } catch (error: any) {
+      result = errResult({
+        message: error.message,
+        values: [JSON.stringify(error)],
+      });
+    }
+    return result;
+  }
+
   public async util(
     cU: CurrentUser,
     fn: string,
@@ -2844,6 +2844,9 @@ export class WhitebrickCloud {
       case "resetTestData":
         result = await this.resetTestData(cU);
         break;
+      case "processDbRestore":
+        result = await this.processDbRestore(cU);
+        break;
       case "invokeBg":
         result = await this.bgQueue.process(vals.schemaId);
         break;
@@ -2851,6 +2854,44 @@ export class WhitebrickCloud {
         log.error(`Can not find fn ${fn}`);
     }
     return result;
+  }
+
+  public async processDbRestore(cU: CurrentUser): Promise<ServiceResult> {
+    log.info(`processDbRestore(${cU.id})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
+    let result = await this.bgQueue.queue(
+      cU.id,
+      Schema.WB_SYS_SCHEMA_ID,
+      "bgReloadRemoteSchemasAndMetadata"
+    );
+    if (!result.success) return result;
+    return await this.bgQueue.invoke(Schema.WB_SYS_SCHEMA_ID);
+  }
+
+  public async setRemoteSchemas(cU: CurrentUser): Promise<ServiceResult> {
+    log.info(`setRemoteSchemas(${cU.id})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
+    let result = errResult();
+    if (environment.wbRemoteSchemaName) {
+      result = await hasuraApi.setRemoteSchema(
+        environment.wbRemoteSchemaName,
+        environment.wbRemoteSchemaURL
+      );
+    }
+    if (!result.success) return result;
+    if (environment.wbaRemoteSchemaName) {
+      result = await hasuraApi.setRemoteSchema(
+        environment.wbaRemoteSchemaName,
+        environment.wbaRemoteSchemaURL
+      );
+    }
+    return result;
+  }
+
+  public async reloadMetadata(cU: CurrentUser): Promise<ServiceResult> {
+    log.info(`reloadMetadata(${cU.id})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
+    return await hasuraApi.reloadMetadata();
   }
 
   /**

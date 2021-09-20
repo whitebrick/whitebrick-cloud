@@ -1,6 +1,7 @@
 // https://altrim.io/posts/axios-http-client-using-typescript
 
 import axios, { AxiosInstance, AxiosResponse } from "axios";
+import { env } from "process";
 import { Column } from "./entity";
 import { environment } from "./environment";
 import { ServiceResult } from "./types";
@@ -85,29 +86,6 @@ class HasuraApi {
       }
     }
     //log.info(`hasuraApi.post: result: ${JSON.stringify(result)}`);
-    return result;
-  }
-
-  public async healthCheck() {
-    let result: ServiceResult = errResult();
-    try {
-      log.info("hasuraApi.healthCheck()");
-      const response = await this.http.get<any, AxiosResponse>("/healthz", {
-        timeout: 3000,
-      });
-      result = {
-        success: true,
-        payload: {
-          status: response.status,
-          statusText: response.statusText,
-        },
-      } as ServiceResult;
-    } catch (error: any) {
-      result = errResult({
-        message: error.message,
-        values: [JSON.stringify(error)],
-      }) as ServiceResult;
-    }
     return result;
   }
 
@@ -327,6 +305,64 @@ class HasuraApi {
       role: roleName,
     });
     return result;
+  }
+
+  /**
+   * Util
+   */
+
+  public async healthCheck() {
+    let result: ServiceResult = errResult();
+    try {
+      log.info("hasuraApi.healthCheck()");
+      const response = await this.http.get<any, AxiosResponse>("/healthz", {
+        timeout: 3000,
+      });
+      result = {
+        success: true,
+        payload: {
+          status: response.status,
+          statusText: response.statusText,
+        },
+      } as ServiceResult;
+    } catch (error: any) {
+      result = errResult({
+        message: error.message,
+        values: [JSON.stringify(error)],
+      }) as ServiceResult;
+    }
+    return result;
+  }
+
+  public async setRemoteSchema(
+    remoteSchemaName: string,
+    remoteSchemaURL: string
+  ) {
+    let result = await this.post("remove_remote_schema", {
+      name: remoteSchemaName,
+    });
+    if (!result.success && result.refCode && result.refCode == "not-exists") {
+      result = {
+        success: true,
+        payload: true,
+        message: `ignored: ${result.refCode}`,
+      } as ServiceResult;
+    }
+    if (!result.success) return result;
+    result = await this.post("add_remote_schema", {
+      name: remoteSchemaName,
+      definition: {
+        url: remoteSchemaURL,
+        headers: [],
+        forward_client_headers: true,
+        timeout_seconds: 1200,
+      },
+    });
+    return result;
+  }
+
+  public async reloadMetadata() {
+    return await this.post("reload_metadata", {});
   }
 }
 

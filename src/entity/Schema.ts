@@ -2,6 +2,7 @@ import { QueryResult } from "pg";
 import { Role, RoleLevel } from ".";
 
 export class Schema {
+  static WB_SYS_SCHEMA_ID: number = 1;
   static SYS_SCHEMA_NAMES: string[] = [
     "public",
     "information_schema",
