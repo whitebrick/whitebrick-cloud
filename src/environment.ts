@@ -16,8 +16,9 @@ type Environment = {
   localBgFunctionUrl: string;
   lambdaBgFunctionName: string;
   awsRegion: string;
-  wbRemoteSchemaName: string;
-  wbRemoteSchemaURL: string;
+  wbStagingRemoteSchemaName: string;
+  wbStagingRemoteSchemaURL: string;
+  wbProdRemoteSchemaName: string;
   wbaRemoteSchemaName: string;
   wbaRemoteSchemaURL: string;
 };
@@ -46,8 +47,10 @@ export const environment: Environment = {
   localBgFunctionUrl: process.env.LOCAL_BG_FUNCTION_URL as string,
   lambdaBgFunctionName: process.env.LAMBDA_BG_FUNCTION_NAME as string,
   awsRegion: process.env.WB_AWS_REGION as string,
-  wbRemoteSchemaName: process.env.WB_REMOTE_SCHEMA_NAME as string,
-  wbRemoteSchemaURL: process.env.WB_REMOTE_SCHEMA_URL as string,
+  wbStagingRemoteSchemaName: process.env
+    .WB_STAGING_REMOTE_SCHEMA_NAME as string,
+  wbStagingRemoteSchemaURL: process.env.WB_STAGING_REMOTE_SCHEMA_URL as string,
+  wbProdRemoteSchemaName: process.env.WB_PROD_REMOTE_SCHEMA_NAME as string,
   wbaRemoteSchemaName: process.env.WBA_REMOTE_SCHEMA_NAME as string,
   wbaRemoteSchemaURL: process.env.WBA_REMOTE_SCHEMA_URL as string,
 };

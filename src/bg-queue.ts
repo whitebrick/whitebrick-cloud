@@ -53,7 +53,7 @@ export class BgQueue {
             schemaId: schemaId,
           }),
         };
-        log.info(`Invoking lambda with params: ${params}`);
+        log.info(`Invoking lambda with params: ${JSON.stringify(params)}`);
         invokationResult = await lambda.invoke(params).promise();
       } else {
         log.info(`Posting to ${environment.localBgFunctionUrl}`);
@@ -205,8 +205,8 @@ export class BgQueue {
           data.tableName
         );
         break;
-      case "bgReloadRemoteSchemasAndMetadata":
-        result = await this.wbCloud.setRemoteSchemas(cU);
+      case "bgReplaceProdWithStagingRemoteSchema":
+        result = await this.wbCloud.replaceProdWithStagingRemoteSchema(cU);
         if (!result.success) break;
         result = await this.wbCloud.reloadMetadata(cU);
         break;

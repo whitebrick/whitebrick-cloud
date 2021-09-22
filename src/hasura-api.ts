@@ -336,8 +336,10 @@ class HasuraApi {
 
   public async setRemoteSchema(
     remoteSchemaName: string,
-    remoteSchemaURL: string
+    remoteSchemaURL: string,
+    removeRemoteSchemaName?: string
   ) {
+    if (!removeRemoteSchemaName) removeRemoteSchemaName = remoteSchemaName;
     let result = await this.post("remove_remote_schema", {
       name: remoteSchemaName,
     });

@@ -2862,21 +2862,26 @@ export class WhitebrickCloud {
     let result = await this.bgQueue.queue(
       cU.id,
       Schema.WB_SYS_SCHEMA_ID,
-      "bgReloadRemoteSchemasAndMetadata"
+      "bgReplaceProdWithStagingRemoteSchema"
     );
     if (!result.success) return result;
     return await this.bgQueue.invoke(Schema.WB_SYS_SCHEMA_ID);
   }
 
-  public async setRemoteSchemas(cU: CurrentUser): Promise<ServiceResult> {
-    log.info(`setRemoteSchemas(${cU.id})`);
+  public async replaceProdWithStagingRemoteSchema(
+    cU: CurrentUser
+  ): Promise<ServiceResult> {
+    log.info(`replaceProdWithStagingRemoteSchema(${cU.id})`);
     if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     let result = errResult();
-    if (environment.wbRemoteSchemaName) {
+    if (environment.wbStagingRemoteSchemaName) {
       result = await hasuraApi.setRemoteSchema(
-        environment.wbRemoteSchemaName,
-        environment.wbRemoteSchemaURL
+        environment.wbStagingRemoteSchemaName,
+        environment.wbStagingRemoteSchemaURL,
+        environment.wbProdRemoteSchemaName
       );
+    } else {
+      log.info(`environment.wbStagingRemoteSchemaName NOT FOUND`);
     }
     if (!result.success) return result;
     if (environment.wbaRemoteSchemaName) {
