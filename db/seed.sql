@@ -17,6 +17,7 @@ INSERT INTO wb.roles(name, custom, label) VALUES
   ('table_reader',               false, 'Table Reader')
 ON CONFLICT DO NOTHING;
 
+INSERT INTO wb.schemas(id, name, label, user_owner_id) VALUES (0, 'removed', 'SCHEMA_REMOVED', 1);
 INSERT INTO wb.schemas(id, name, label, user_owner_id) VALUES (1, 'wb', 'Whitebrick System Schema', 1);
 
 
