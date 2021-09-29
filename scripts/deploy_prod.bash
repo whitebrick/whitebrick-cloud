@@ -11,6 +11,5 @@ sed -i '' "s/SECURITY_GROUP_1/$SECURITY_GROUP_1/g" serverless.yml
 sed -i '' "s/SECURITY_GROUP_2/$SECURITY_GROUP_2/g" serverless.yml
 sed -i '' "s/SUBNET_1/$SUBNET_1/g" serverless.yml
 sed -i '' "s/SUBNET_2/$SUBNET_2/g" serverless.yml
-cat serverless.yml
-#NODE_ENV=prod SLS_DEBUG=* serverless deploy --stage prod
+NODE_ENV=prod SLS_DEBUG=* serverless deploy --stage prod
 mv serverless.yml.tmp serverless.yml
