@@ -17,6 +17,7 @@ import {
 } from "./entity";
 import { CurrentUser } from "./entity/CurrentUser";
 import { DEFAULT_POLICY } from "./policy";
+import { mailer } from "./mailer";
 
 export const graphqlHandler = new ApolloServer({
   schema,
@@ -1240,6 +1241,10 @@ export class WhitebrickCloud {
     }
     result = await this.dal.removeAllUsersFromSchema(schemaName);
     if (!result.success) return result;
+    result = await this.schemaByName(cU, schemaName);
+    if (!result.success) return result;
+    result = await this.bgQueue.removeAllForSchema(result.payload.id);
+    if (!result.success) return result;
     return await this.dal.removeOrDeleteSchema(schemaName, del);
   }
 
@@ -1580,18 +1585,18 @@ export class WhitebrickCloud {
   }
 
   // background job
-  public async removeSchema(
+  public async retrackSchema(
     cU: CurrentUser,
     schemaName: string
   ): Promise<ServiceResult> {
-    log.info(`removeSchema(${cU.id},${schemaName})`);
+    log.info(`retrackSchema(${cU.id},${schemaName})`);
     if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     const schemaResult = await this.schemaByName(cU, schemaName);
     if (!schemaResult.success) return schemaResult;
     let result = await this.bgQueue.queue(
       cU.id,
       schemaResult.payload.id,
-      "bgRemoveSchema",
+      "bgRetrackSchema",
       {
         schemaName: schemaName,
       }
@@ -2229,6 +2234,24 @@ export class WhitebrickCloud {
     return result;
   }
 
+  public async trackAllTables(
+    cU: CurrentUser,
+    schemaName: string
+  ): Promise<ServiceResult> {
+    log.info(`trackAllTables(${cU.id},${schemaName})`);
+    if (await cU.cant("alter_schema", schemaName)) {
+      return cU.denied();
+    }
+    const tablesResult = await this.tables(cU, schemaName);
+    if (!tablesResult.success) return tablesResult;
+    let result = errResult();
+    for (const table of tablesResult.payload) {
+      result = await hasuraApi.trackTable(schemaName, table.name);
+      if (!result.success) return result;
+    }
+    return result;
+  }
+
   public async trackTableWithPermissions(
     cU: CurrentUser,
     table: Table,
@@ -2287,6 +2310,24 @@ export class WhitebrickCloud {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
     return await hasuraApi.untrackTable(table.schemaName, table.name);
+  }
+
+  public async untrackAllTables(
+    cU: CurrentUser,
+    schemaName: string
+  ): Promise<ServiceResult> {
+    log.info(`untrackAllTables(${cU.id},${schemaName})`);
+    if (await cU.cant("alter_schema", schemaName)) {
+      return cU.denied();
+    }
+    const tablesResult = await this.tables(cU, schemaName);
+    if (!tablesResult.success) return tablesResult;
+    let result = errResult();
+    for (const table of tablesResult.payload) {
+      result = await hasuraApi.untrackTable(schemaName, table.name);
+      if (!result.success) return result;
+    }
+    return result;
   }
 
   public async untrackTableWithPermissions(
@@ -2829,6 +2870,19 @@ export class WhitebrickCloud {
     return result;
   }
 
+  public async listBgQueue(
+    cU: CurrentUser,
+    schemaName: string,
+    limit?: number
+  ) {
+    log.info(`listBgQueue(${cU.id},${schemaName},${limit})`);
+    if (schemaName == "wb" && cU.isntSysAdmin()) return cU.mustBeSysAdmin();
+    const schemaIdResult = await this.schemaByName(cU, schemaName);
+    if (!schemaIdResult.success) return schemaIdResult;
+    const lsResult = await this.bgQueue.ls(schemaIdResult.payload.id, limit);
+    return lsResult;
+  }
+
   public async util(
     cU: CurrentUser,
     fn: string,
@@ -2840,6 +2894,9 @@ export class WhitebrickCloud {
     switch (fn) {
       case "addDemoSchema":
         result = await this.addDemoSchema(cU, vals.schemaName as string);
+        break;
+      case "assignDemoSchema": // used for testing
+        result = await this.assignDemoSchema(vals.userId);
         break;
       case "resetTestData":
         result = await this.resetTestData(cU);
@@ -2883,7 +2940,6 @@ export class WhitebrickCloud {
     } else {
       log.info(`environment.wbStagingRemoteSchemaName NOT FOUND`);
     }
-    if (!result.success) return result;
     if (environment.wbaRemoteSchemaName) {
       result = await hasuraApi.setRemoteSchema(
         environment.wbaRemoteSchemaName,
@@ -2897,6 +2953,14 @@ export class WhitebrickCloud {
     log.info(`reloadMetadata(${cU.id})`);
     if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
     return await hasuraApi.reloadMetadata();
+  }
+
+  public async dropInconsistentMetadata(
+    cU: CurrentUser
+  ): Promise<ServiceResult> {
+    log.info(`dropInconsistentMetadata(${cU.id})`);
+    if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
+    return await hasuraApi.dropInconsistentMetadata();
   }
 
   /**

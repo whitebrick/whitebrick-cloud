@@ -5,6 +5,7 @@ import { errResult, log, WhitebrickCloud } from "./whitebrick-cloud";
 import { CurrentUser } from "./entity/CurrentUser";
 import Lambda from "aws-sdk/clients/lambda";
 import axios, { AxiosResponse } from "axios";
+import { mailer } from "./mailer";
 
 export class BgQueue {
   dal: DAL;
@@ -22,6 +23,19 @@ export class BgQueue {
     this.wbCloud = wbCloud;
   }
 
+  public async ls(schemaId: number, limit?: number): Promise<ServiceResult> {
+    log.info(`bgQueue.ls(${schemaId},${limit})`);
+    const result = await this.dal.bgQueueSelect(
+      ["id", "status", "key", "data", "created_at", "updated_at"],
+      schemaId,
+      undefined,
+      limit,
+      "updated_at DESC"
+    );
+    if (result.success) result.payload = result.payload.rows;
+    return result;
+  }
+
   public async queue(
     userId: number,
     schemaId: number,
@@ -36,6 +50,11 @@ export class BgQueue {
       key,
       data
     );
+  }
+
+  public async removeAllForSchema(schemaId: number): Promise<ServiceResult> {
+    log.info(`bgQueue.removeAllForSchema(${schemaId})`);
+    return await this.dal.bgQueueDelete(undefined, schemaId);
   }
 
   public async invoke(schemaId: number): Promise<ServiceResult> {
@@ -164,7 +183,28 @@ export class BgQueue {
         );
         break;
       case "bgRemoveSchema":
-        result = await this.wbCloud.removeOrDeleteSchema(cU, data.schemaName);
+        result = await this.wbCloud.removeOrDeleteSchema(
+          cU,
+          data.schemaName,
+          data.del
+        );
+        break;
+      case "bgRetrackSchema":
+        result = await this.wbCloud.addOrRemoveAllExistingRelationships(
+          cU,
+          data.schemaName,
+          undefined,
+          true
+        );
+        if (!result.success) break;
+        result = await this.wbCloud.untrackAllTables(cU, data.schemaName);
+        if (!result.success) break;
+        result = await this.wbCloud.trackAllTables(cU, data.schemaName);
+        if (!result.success) break;
+        result = await this.wbCloud.addOrRemoveAllExistingRelationships(
+          cU,
+          data.schemaName
+        );
         break;
       case "bgAddDefaultTablePermissions":
         result = await this.wbCloud.addDefaultTablePermissions(
@@ -187,6 +227,13 @@ export class BgQueue {
         );
         break;
       case "bgRemoveAndAddDefaultTablePermissions":
+        result = await this.wbCloud.addOrRemoveAllExistingRelationships(
+          cU,
+          data.schemaName,
+          data.tableName,
+          true
+        );
+        if (!result.success) break;
         result = await this.wbCloud.removeDefaultTablePermissions(
           cU,
           data.schemaName,
@@ -206,12 +253,34 @@ export class BgQueue {
         );
         break;
       case "bgReplaceProdWithStagingRemoteSchema":
+        result = await this.wbCloud.reloadMetadata(cU);
+        if (!result.success) break;
         result = await this.wbCloud.replaceProdWithStagingRemoteSchema(cU);
         if (!result.success) break;
-        result = await this.wbCloud.reloadMetadata(cU);
+        result = await this.wbCloud.dropInconsistentMetadata(cU);
         break;
       default:
-        log.error(`== bgHandler ERROR: no case for event.fn ${key}`);
+        log.error(`  bgQueue.bgRun - ERROR: no case for event.fn ${key}`);
+    }
+    if (!result.success) {
+      log.error(`  bgQueue.bgRun - ERROR result=${JSON.stringify(result)}`);
+      if (environment.lambdaBgFunctionName) {
+        await mailer.send(
+          [environment.mailerAlarmsAddress],
+          "[WBALARM] whitebrick-cloud: bgRun",
+          JSON.stringify(result)
+        );
+      }
+      await this.dal.bgQueueUpdateStatus(
+        BgQueue.BG_STATUS.error,
+        id,
+        undefined,
+        undefined,
+        {
+          data: data,
+          error: result,
+        }
+      );
     }
     log.info(`  bgQueue.bgRun - returning result=${result}`);
     return result;

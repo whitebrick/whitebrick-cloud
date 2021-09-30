@@ -3,7 +3,7 @@ if [[ $(basename $(pwd)) == "scripts" ]]; then
   echo -e "\nRun this script from the parent directory\n"
   exit 1
 fi
-echo -e "\nNote: If you stop the script before completion run the mv command below to restore your serverless.yml"
+echo -e "\NB: If you stop the script before completion run the mv command below to restore your serverless.yml"
 echo -e "    mv serverless.yml.tmp serverless.yml\n"
 export $(cat .env.prod | sed 's/ /-/g' | sed 's/#.*//g' | xargs)
 cp serverless.yml serverless.yml.tmp

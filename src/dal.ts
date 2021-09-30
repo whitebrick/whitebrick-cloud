@@ -50,7 +50,8 @@ export class DAL {
       await client.query("BEGIN");
       for (const queryParams of queriesAndParams) {
         let logTxt = queryParams.query;
-        if (logTxt.startsWith("--SKIPLOG")) logTxt = logTxt.substring(0, 30);
+        if (logTxt.startsWith("--SKIPLOG"))
+          logTxt = `${logTxt.substring(0, 30)}...`;
         log.info(
           `dal.executeQuery QueryParams: ${logTxt}`,
           `    [ ${queryParams.params ? queryParams.params.join(", ") : ""} ]`
@@ -96,20 +97,25 @@ export class DAL {
   public async bgQueueSelect(
     columns: string[],
     schemaId: number,
-    status: string,
-    limit?: number
+    status?: string,
+    limit?: number,
+    orderBy?: string
   ): Promise<ServiceResult> {
+    if (!limit) limit = 50;
+    if (!orderBy) orderBy = "id ASC";
+    let statusSql = "";
+    if (status) statusSql = `AND status='${status}'`;
     let query = `
       SELECT ${columns.join(",")}
       FROM wb.bg_queue
       WHERE schema_id=$1
-      AND status=$2
+      ${statusSql}
       ORDER BY id
+      LIMIT ${limit}
     `;
-    if (limit) query += ` LIMIT ${limit}`;
     return await this.executeQuery({
       query: query,
-      params: [schemaId, status],
+      params: [schemaId],
     } as QueryParams);
   }
 
@@ -151,6 +157,25 @@ export class DAL {
     const result = await this.executeQuery({
       query: (query += whereSql.join(" AND ")),
       params: [newStatus, new Date()],
+    } as QueryParams);
+    return result;
+  }
+
+  public async bgQueueDelete(
+    id?: number,
+    schemaId?: number
+  ): Promise<ServiceResult> {
+    let sqlWhere;
+    if (id) {
+      sqlWhere = `id=${id}`;
+    } else if (schemaId) {
+      sqlWhere = `schema_id=${schemaId}`;
+    }
+    const result = await this.executeQuery({
+      query: `
+        DELETE FROM wb.bg_queue
+        WHERE ${sqlWhere}
+      `,
     } as QueryParams);
     return result;
   }

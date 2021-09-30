@@ -60,6 +60,7 @@ class HasuraApi {
           args: args,
         }
       );
+      log.info("hasuraApi.post: response.data:", JSON.stringify(response.data));
       result = {
         success: true,
         payload: response,
@@ -85,7 +86,6 @@ class HasuraApi {
         }) as ServiceResult;
       }
     }
-    //log.info(`hasuraApi.post: result: ${JSON.stringify(result)}`);
     return result;
   }
 
@@ -339,9 +339,12 @@ class HasuraApi {
     remoteSchemaURL: string,
     removeRemoteSchemaName?: string
   ) {
+    log.info(
+      `hasuraApi.setRemoteSchema(${remoteSchemaName},${remoteSchemaURL},${removeRemoteSchemaName})`
+    );
     if (!removeRemoteSchemaName) removeRemoteSchemaName = remoteSchemaName;
     let result = await this.post("remove_remote_schema", {
-      name: remoteSchemaName,
+      name: removeRemoteSchemaName,
     });
     if (!result.success && result.refCode && result.refCode == "not-exists") {
       result = {
@@ -365,6 +368,10 @@ class HasuraApi {
 
   public async reloadMetadata() {
     return await this.post("reload_metadata", {});
+  }
+
+  public async dropInconsistentMetadata() {
+    return await this.post("drop_inconsistent_metadata", {});
   }
 }
 

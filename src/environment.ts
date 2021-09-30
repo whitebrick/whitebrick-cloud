@@ -16,6 +16,10 @@ type Environment = {
   localBgFunctionUrl: string;
   lambdaBgFunctionName: string;
   awsRegion: string;
+  awsSesAccessKey: string;
+  awsSesSecretAccessKey: string;
+  mailerFromAddress: string;
+  mailerAlarmsAddress: string;
   wbStagingRemoteSchemaName: string;
   wbStagingRemoteSchemaURL: string;
   wbProdRemoteSchemaName: string;
@@ -47,6 +51,10 @@ export const environment: Environment = {
   localBgFunctionUrl: process.env.LOCAL_BG_FUNCTION_URL as string,
   lambdaBgFunctionName: process.env.LAMBDA_BG_FUNCTION_NAME as string,
   awsRegion: process.env.WB_AWS_REGION as string,
+  awsSesAccessKey: process.env.WB_AWS_SES_ACCESS_KEY as string,
+  awsSesSecretAccessKey: process.env.WB_AWS_SES_SECRET_ACCESS_KEY as string,
+  mailerFromAddress: process.env.MAILER_FROM_ADDRESS as string,
+  mailerAlarmsAddress: process.env.MAILER_ALARMS_ADDRESS as string,
   wbStagingRemoteSchemaName: process.env
     .WB_STAGING_REMOTE_SCHEMA_NAME as string,
   wbStagingRemoteSchemaURL: process.env.WB_STAGING_REMOTE_SCHEMA_URL as string,

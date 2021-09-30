@@ -48,6 +48,7 @@ const typeDefs = gql`
   type Query {
     wbHealthCheck: JSON!
     wbCloudContext: JSON!
+    wbListBgQueue(schemaName: String!, limit: Int): JSON!
   }
 
   type Mutation {
@@ -67,9 +68,17 @@ const resolvers: IResolvers = {
       };
     },
     wbCloudContext: async (_, __, context) => {
-      // const result = await context.wbCloud.assignDemoSchema(21875);
-      // if (!result.success) return result;
       return context.wbCloud.cloudContext();
+    },
+    wbListBgQueue: async (_, { schemaName, limit }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.listBgQueue(
+        currentUser,
+        schemaName,
+        limit
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
     },
   },
   Mutation: {

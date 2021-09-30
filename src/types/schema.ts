@@ -1,5 +1,5 @@
 import { gql, IResolvers } from "apollo-server-lambda";
-import { CurrentUser } from "../entity";
+import { CurrentUser, Schema } from "../entity";
 import { log } from "../whitebrick-cloud";
 import Lambda from "aws-sdk/clients/lambda";
 import AWS from "aws-sdk";
@@ -73,9 +73,9 @@ export const typeDefs = gql`
       newOrganizationOwnerName: String
       newUserOwnerEmail: String
     ): Schema
-    wbRemoveOrDeleteSchema(name: String!, del: Boolean): Boolean!
+    wbRemoveOrDeleteSchema(name: String!, del: Boolean, sync: Boolean): Boolean!
     wbImportSchema(schemaName: String!): Boolean!
-    wbRemoveSchema(schemaName: String!): Boolean!
+    wbRetrackSchema(schemaName: String!): Boolean!
     """
     Schema Users
     """
@@ -189,13 +189,32 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },
-    wbRemoveOrDeleteSchema: async (_, { name, del }, context) => {
+    wbRemoveOrDeleteSchema: async (_, { name, del, sync }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.removeOrDeleteSchema(
+      const schemaResult = await context.wbCloud.schemaByName(
         currentUser,
-        name,
-        del
+        name
       );
+      let result;
+      if (sync) {
+        result = await context.wbCloud.removeOrDeleteSchema(
+          currentUser,
+          name,
+          del
+        );
+      } else {
+        result = await context.wbCloud.bgQueue.queue(
+          currentUser.id,
+          Schema.REMOVED_SCHEMA_ID,
+          "bgRemoveSchema",
+          {
+            schemaName: name,
+            del: del,
+          }
+        );
+        if (!result.success) throw context.wbCloud.err(result);
+        result = await context.wbCloud.bgQueue.invoke(Schema.REMOVED_SCHEMA_ID);
+      }
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
@@ -208,9 +227,9 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbRemoveSchema: async (_, { schemaName }, context) => {
+    wbRetrackSchema: async (_, { schemaName }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.removeSchema(
+      const result = await context.wbCloud.retrackSchema(
         currentUser,
         schemaName
       );
