@@ -20,20 +20,20 @@
 
 #### Current Project status as of August:
 
-We're currently fixing bugs and trying to get the Beta release stable. **NB: _This is Beta software - use at your own risk!_**
+We're currently fixing bugs and trying to get the Beta release stable. Please note this is Beta software so **use at your own risk**.
 
 Please use GitHub [Isues](https://github.com/whitebrick/whitebrick-cloud/issues) to report bugs and [Discussions](https://github.com/whitebrick/whitebrick-cloud/discussions) for questions and suggestions.
-
 
 - [x] DDL Table & Column CRUD
 - [x] Live editing with subscription
 - [x] Table-level RBAC
 - [x] Joins
+- [x] Background process queue 
 - [ ] Documentation
 - [ ] UI styling and themes
 - [ ] Direct pg reader/writer access
-- [ ] Validation
-- [ ] Bucket file download columns
+- [ ] Validations
+- [ ] Cloud file (bucket) download columns
 - [ ] Column-level RBAC
 
 Hosted demo at [whitebrick.com](https://whitebrick.com)
