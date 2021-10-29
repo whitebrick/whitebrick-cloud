@@ -20,20 +20,20 @@
 
 #### Current Project status as of August:
 
-We're currently fixing bugs and trying to get the Beta release stable. **NB: _This is Beta software - use at your own risk!_**
+We're currently fixing bugs and trying to get the Beta release stable. Please note this is Beta software so **use at your own risk**.
 
 Please use GitHub [Isues](https://github.com/whitebrick/whitebrick-cloud/issues) to report bugs and [Discussions](https://github.com/whitebrick/whitebrick-cloud/discussions) for questions and suggestions.
-
 
 - [x] DDL Table & Column CRUD
 - [x] Live editing with subscription
 - [x] Table-level RBAC
 - [x] Joins
+- [x] Background process queue 
 - [ ] Documentation
 - [ ] UI styling and themes
 - [ ] Direct pg reader/writer access
-- [ ] Validation
-- [ ] Bucket file download columns
+- [ ] Validations
+- [ ] Cloud file (bucket) download columns
 - [ ] Column-level RBAC
 
 Hosted demo at [whitebrick.com](https://whitebrick.com)
@@ -67,9 +67,7 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 ### Deploying on a Cloud Service
 
 - AWS CloudFormation Stack - we're currently tidying this up for release, email us for early copy
-- Heroku TBD
-- Azure TBD
-- DigitalOcean TBD
+- Heroku, Azure, DigitalOcean - all TBD but get in touch
 
 ### Running Locally
 
@@ -81,6 +79,9 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
     ```
     CREATE EXTENSION pgcrypto;
     ```
+    
+    Make sure your database can be accessed from psql before proceeding (you may need to enable username/password authentication in pg_hba.conf)
+    ie `$ psql -U <username> -h <host> -p <port> <db name>`
 
 2.  #### Run Hasura
 
@@ -88,6 +89,19 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
     or [Kubernetes](https://hasura.io/docs/latest/graphql/core/deployment/deployment-guides/kubernetes.html#deploy-kubernetes) and be sure to set a `HASURA_GRAPHQL_ADMIN_SECRET`.
     Launching Hasura will create data definitions and values in the `hdb_catalog` schema of the database.
     If Hasura does not launch check and debug your DB connection/permissions with psql.
+    
+    Our Docker file looks something like this:
+    ```
+    docker run -d -p 8080:8080 \
+       -e HASURA_GRAPHQL_DATABASE_URL=postgres://db_usr:db_pass@host.docker.internal:5432/hasura_db \
+       -e HASURA_GRAPHQL_ENABLE_CONSOLE=true \
+       -e HASURA_GRAPHQL_DEV_MODE=true \
+       -e HASURA_GRAPHQL_ADMIN_SECRET=secret \
+       -e HASURA_GRAPHQL_UNAUTHORIZED_ROLE=wbpublic \
+       hasura/graphql-engine:latest
+    ```
+    
+    Navigate to http://localhost:8080 and check the admin console is running (password is `HASURA_GRAPHQL_ADMIN_SECRET` from above)
 
 3.  #### Install Hasura CLI
 
@@ -97,16 +111,16 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 
     Copy `./.env.example` to `./.env.development` and complete with database connection parameters from (1) above.
 
-5.  #### Create wb Schema
+5.  #### Create the wb Schema
 
-    Change to the `./hasura` directory, copy `config-example.yaml` to `config.yaml` and complete with `admin_secret` from (2) above.
+    Change to the `./hasura` directory, copy `config-example.yaml` to `config.yaml` and complete with `HASURA_GRAPHQL_ADMIN_SECRET` from (2) above.
     This config is used for the Hasura CLI.
-    Now create the whitebrick-cloud schema "wb" by running `bash ./scripts/apply_latest_migration.bash`.
-    After the migration is complete, change to the `./db` directory and run `bash ./scripts/seed.bash` to insert the initial data.
+    Now create the whitebrick-cloud schema "wb" by running `$ bash ./scripts/apply_latest_migration.bash`.
+    After the migration is complete, change to the `./db` directory and run `$ bash ./scripts/seed.bash` to insert the initial data.
 
 6.  #### Run Serverless Listener
 
-    Run `serverless offline start` to start the serverless listener in local/offline mode
+    Run `$ bash scripts/start_dev.bash` to start the serverless listener in local/offline mode. By default this listens to http://localhost:3000/graphql
 
 7.  #### Track wb.table_permissions
 
@@ -115,13 +129,17 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 
 8.  #### Add Remote Schema
 
-    From The Hasura console, use the top menu to navigate to the "Remote Schemas" page, click add and enter the endpoint displayed from (6) above.
+    From The Hasura console, use the top menu to navigate to the "Remote Schemas" page, click add and enter the endpoint displayed from (6) above, check forward all headers and     set and long time-out of 1200 seconds.
     **NB: If you are running Hasura in a local container you will need to use the corresponding URL** eg `http://host.docker.internal:3000/graphql`.
-    If you now navigate to the "API" page from the top menu, In the query "Explorer" you should now see queries beginning with `wb*`.
+    If you now navigate to the "API" page from the top menu, In the query "Explorer" you should see queries beginning with `wb*`.
 
 9.  #### Run Functional Tests
     Download [Karate](https://github.com/intuit/karate#getting-started) (the [stand-alone executable](https://github.com/intuit/karate/wiki/ZIP-Release) is all that is needed).
-    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test/functional` directory and run the command `bash run_tests.bash`
+    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test/functional` directory and run       the command `$ bash run_tests.bash`
+    
+    This creates a few test users and a small test schema `test_the_daisy_blog`. Whitebrick is designed for incremental building-out of databases whereas this testing creates a           database all at once so it can take time to run - up to 10 minutes in some cases. If karate lags make sure Hasura and/or it's container has plenty of RAM.
+    
+    To then add additional test data (northwind, chinook and DVD databases) as a second step run `$ bash run_tests.bash importDBs` - this can take a additional 15 minutes. Or run `$ bash run_tests.bash withImportDBs` to run both in one hit.
 
 ## Architecture
 
@@ -132,6 +150,10 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 - ### HasuraApi
 
   Hasura needs to know about any DDL changes to update the GraphQL schema - for example, when a new table is added it must be _tracked_. This class is used to call the [Hasura Metadat API](https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/index.html) over HTTP.
+
+- ### BgQueue
+
+  API Gateway has a 30 second timeout so longer processes need to be executed in the background using the lambda invoke `event` type.
 
 - ### WhitebrickCloud
   This is the top-level API that makes calls to the DAL and HasuraAPI and is called by the GraphQL resolvers.
