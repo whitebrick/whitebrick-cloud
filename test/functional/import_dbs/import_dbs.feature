@@ -3,7 +3,7 @@ Feature: Import existing DBs
   Background:
     * url baseUrl
     * path endpointPath
-    * configure readTimeout = 600000
+    * configure readTimeout = 1200000
 
   Scenario: Create test schemas for imported DBs
     * table schemas 

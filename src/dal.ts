@@ -15,6 +15,8 @@ import {
 } from "./entity";
 import { ConstraintId, QueryParams, ServiceResult } from "./types";
 import { first } from "voca";
+import { result } from "lodash";
+import { BgQueue } from "./bg-queue";
 
 export class DAL {
   private pool: Pool;
@@ -666,14 +668,47 @@ export class DAL {
   }
 
   public async deleteTestUsers(): Promise<ServiceResult> {
-    const result = await this.executeQuery({
-      query: `
-        DELETE FROM wb.users
-        WHERE email like 'test_%${environment.testUserEmailDomain}'
-      `,
-      params: [],
-    } as QueryParams);
-    return result;
+    const userIdSql = `SELECT id FROM wb.users
+            WHERE email like 'test\\_%${environment.testUserEmailDomain}'`;
+    const results = await this.executeQueries([
+      {
+        query: `
+          UPDATE wb.schemas SET user_owner_id=1
+          WHERE user_owner_id IN (${userIdSql})
+        `,
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.schema_users
+          WHERE user_id IN (${userIdSql})
+        `,
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.organization_users
+          WHERE user_id IN (${userIdSql})
+        `,
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.table_users
+          WHERE user_id IN (${userIdSql})
+        `,
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.table_permissions
+          WHERE user_id IN (${userIdSql})
+        `,
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.users
+          WHERE email like 'test\\_%${environment.testUserEmailDomain}'
+        `,
+      } as QueryParams,
+    ]);
+    return results[result.length - 1];
   }
 
   /**
@@ -812,7 +847,7 @@ export class DAL {
   }
 
   public async deleteTestOrganizations(): Promise<ServiceResult> {
-    return await this.deleteOrganizations("test_%");
+    return await this.deleteOrganizations("test\\_%");
   }
 
   public async deleteOrganizations(
@@ -923,6 +958,21 @@ export class DAL {
    * ========== Schemas ==========
    */
 
+  static sqlScheamaStatusSelect: string = `
+    CASE
+      WHEN wb.bg_queue.id IS NOT NULL THEN '${Schema.STATUS.rebuilding}'
+      ELSE '${Schema.STATUS.ready}'
+    END status
+  `;
+
+  static sqlScheamaStatusJoin: string = `
+    LEFT JOIN wb.bg_queue ON (
+      wb.schemas.id=wb.bg_queue.schema_id
+      AND wb.bg_queue.status='Running'
+      AND wb.bg_queue.key IN ('${BgQueue.TABLE_BUSY_KEYS.join("','")}')
+    )
+  `;
+
   public async schemas(
     schemaIds?: number[],
     schemaNames?: string[],
@@ -967,8 +1017,10 @@ export class DAL {
     const queries: QueryParams[] = [
       {
         query: `
-          SELECT wb.schemas.*
+          SELECT wb.schemas.*,
+          ${DAL.sqlScheamaStatusSelect}
           FROM wb.schemas
+          ${DAL.sqlScheamaStatusJoin}
           ${sqlWbWhere}
           ${sqlOrderBy}
           ${sqlLimit}
@@ -1035,8 +1087,10 @@ export class DAL {
   public async nextUnassignedDemoSchema(schemaNamePattern: string) {
     const result = await this.executeQuery({
       query: `
-        SELECT wb.schemas.*
+        SELECT wb.schemas.*,
+        ${DAL.sqlScheamaStatusSelect}
         FROM wb.schemas
+        ${DAL.sqlScheamaStatusJoin}
         WHERE wb.schemas.name LIKE '${schemaNamePattern}'
         AND wb.schemas.user_owner_id=${User.SYS_ADMIN_ID}
         ORDER BY name
@@ -1074,12 +1128,14 @@ export class DAL {
       query: `
         SELECT
         wb.schemas.*,
+        ${DAL.sqlScheamaStatusSelect},
         wb.roles.name as role_name,
         implied_roles.name as role_implied_from,
         wb.organizations.name as organization_owner_name,
         user_owners.email as user_owner_email
         ${sqlSelect}
         FROM wb.schemas
+        ${DAL.sqlScheamaStatusJoin}
         JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
         JOIN wb.users ON wb.schema_users.user_id=wb.users.id
         JOIN wb.roles ON wb.schema_users.role_id=wb.roles.id
@@ -1111,9 +1167,11 @@ export class DAL {
       query: `
         SELECT
         wb.schemas.*,
+        ${DAL.sqlScheamaStatusSelect},
         wb.users.email as user_owner_email,
         'schema_owner' as role_name
         FROM wb.schemas
+        ${DAL.sqlScheamaStatusJoin}
         JOIN wb.users ON wb.schemas.user_owner_id=wb.users.id
         ${sqlWhere}
       `,
@@ -1145,10 +1203,12 @@ export class DAL {
       query: `
         SELECT
         wb.schemas.*,
+        ${DAL.sqlScheamaStatusSelect},
         wb.roles.name as role_name,
         schema_user_implied_roles.name as role_implied_from,
         wb.organizations.name as organization_owner_name
         FROM wb.schemas
+        ${DAL.sqlScheamaStatusJoin}
         JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
         LEFT JOIN wb.schema_users ON wb.schemas.id=wb.schema_users.schema_id
         JOIN wb.roles on wb.schema_users.role_id=wb.roles.id
@@ -1178,10 +1238,12 @@ export class DAL {
       query: `
         SELECT
         wb.schemas.*,
+        ${DAL.sqlScheamaStatusSelect},
         wb.organizations.name as organization_owner_name
         schema_user_roles.name as role_name,
         schema_user_implied_roles.name as role_implied_from,
         FROM wb.schemas
+        ${DAL.sqlScheamaStatusJoin}
         JOIN wb.organizations ON wb.schemas.organization_owner_id=wb.organizations.id
         JOIN wb.organization_users ON wb.organizations.id=wb.organization_users.organization_id
         JOIN wb.users ON wb.organization_users.user_id=wb.users.id
@@ -2199,14 +2261,19 @@ export class DAL {
     columnName: string,
     columnLabel: string,
     create: boolean,
-    columnPGType?: string
+    columnPGType?: string,
+    isNotNullable?: boolean
   ): Promise<ServiceResult> {
     log.info(
-      `dal.addOrCreateColumn ${schemaName} ${tableName} ${columnName} ${columnLabel} ${columnPGType} ${create}`
+      `dal.addOrCreateColumn ${schemaName} ${tableName} ${columnName} ${columnLabel} ${create} ${columnPGType} ${isNotNullable}`
     );
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
     columnName = DAL.sanitize(columnName);
+    if (!columnPGType) columnPGType = "TEXT";
+    let sqlNotNull = "";
+    // TBD type null placeholders
+    if (isNotNullable) sqlNotNull = "DEFAULT '' NOT NULL";
     let result = await this.tableBySchemaNameTableName(schemaName, tableName);
     if (!result.success) return result;
     const queriesAndParams: Array<QueryParams> = [
@@ -2222,7 +2289,7 @@ export class DAL {
       queriesAndParams.push({
         query: `
           ALTER TABLE "${schemaName}"."${tableName}"
-          ADD ${columnName} ${columnPGType}
+          ADD ${columnName} ${columnPGType} ${sqlNotNull}
         `,
       } as QueryParams);
     }
@@ -2239,7 +2306,8 @@ export class DAL {
     columnName: string,
     newColumnName?: string,
     newColumnLabel?: string,
-    newType?: string
+    newType?: string,
+    newIsNotNullable?: boolean
   ): Promise<ServiceResult> {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
@@ -2279,6 +2347,30 @@ export class DAL {
           ALTER COLUMN ${columnName} TYPE ${newType}
         `,
       } as QueryParams);
+    }
+    if (newIsNotNullable !== undefined) {
+      let sqlNewNotNull = "";
+      if (newIsNotNullable) {
+        queriesAndParams.push({
+          query: `
+            UPDATE "${schemaName}"."${tableName}"
+            SET ${columnName}='' WHERE ${columnName} IS NULL
+        `,
+        } as QueryParams);
+        queriesAndParams.push({
+          query: `
+            ALTER TABLE "${schemaName}"."${tableName}"
+            ALTER COLUMN ${columnName} SET NOT NULL
+        `,
+        } as QueryParams);
+      } else {
+        queriesAndParams.push({
+          query: `
+            ALTER TABLE "${schemaName}"."${tableName}"
+            ALTER COLUMN ${columnName} DROP NOT NULL
+        `,
+        } as QueryParams);
+      }
     }
     if (newColumnName) {
       queriesAndParams.push({

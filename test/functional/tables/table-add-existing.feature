@@ -3,7 +3,7 @@ Feature:
   Background:
     * url baseUrl
     * path endpointPath
-    * configure readTimeout = 600000
+    * configure readTimeout = 1200000
 
   Scenario: Add all existing tables
     Given text query = 

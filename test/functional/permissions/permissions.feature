@@ -3,7 +3,7 @@ Feature: Permissions
   Background:
     * url baseUrl
     * path endpointPath
-    * configure readTimeout = 600000
+    * configure readTimeout = 1200000
 
   Scenario: Adding new organization admin should implicitly assign schema admin and table admin to organization-owned schemas
     * karate.exec("bash report_permissions.bash")

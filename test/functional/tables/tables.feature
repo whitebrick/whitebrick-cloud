@@ -3,7 +3,7 @@ Feature: Tables
   Background:
     * url baseUrl
     * path endpointPath
-    * configure readTimeout = 600000
+    * configure readTimeout = 1200000
 
   Scenario: Create and track test tables in new DB
     * table tables 

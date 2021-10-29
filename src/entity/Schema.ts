@@ -11,6 +11,11 @@ export class Schema {
     "wb",
   ];
 
+  static STATUS: Record<string, string> = {
+    ready: "Ready",
+    rebuilding: "Rebuilding",
+  };
+
   id!: number;
   name!: string;
   label!: string;
@@ -19,6 +24,7 @@ export class Schema {
   createdAt!: Date;
   updatedAt!: Date;
   // not persisted
+  status?: string;
   role?: Role;
   organizationOwnerName?: string;
   userOwnerEmail?: string;
@@ -54,6 +60,7 @@ export class Schema {
         schema.role.impliedFrom = data.role_implied_from;
       }
     }
+    if (data.status) schema.status = data.status;
     return schema;
   }
 }

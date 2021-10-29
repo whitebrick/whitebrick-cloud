@@ -18,6 +18,15 @@ export class BgQueue {
     error: "Error",
   };
 
+  static TABLE_BUSY_KEYS: string[] = [
+    "bgImportSchema",
+    "bgRemoveSchema",
+    "bgRetrackSchema",
+    "bgAddDefaultTablePermissions",
+    "bgRemoveDefaultTablePermissions",
+    "bgRemoveAndAddDefaultTablePermissions",
+  ];
+
   constructor(wbCloud: WhitebrickCloud, dal: DAL) {
     this.dal = dal;
     this.wbCloud = wbCloud;

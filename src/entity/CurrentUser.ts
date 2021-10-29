@@ -36,11 +36,11 @@ export class CurrentUser {
   }
 
   public isSignedIn() {
-    return this.user.id !== User.PUBLIC_ID;
+    return this.user.id !== User.PUBLIC_USER_ID;
   }
 
   public isntSignedIn() {
-    return this.user.id == User.PUBLIC_ID;
+    return this.user.id == User.PUBLIC_USER_ID;
   }
 
   public isSignedOut() {
@@ -318,6 +318,9 @@ export class CurrentUser {
       log.info(
         `========== FOUND TEST USER: ${headersLowerCase["x-test-user-email"]}`
       );
+      if (headersLowerCase["x-test-user-email"] == User.SYS_ADMIN_EMAIL) {
+        return new CurrentUser(User.getSysAdminUser(), context.wbCloud);
+      }
       result = await context.wbCloud.userByEmail(
         CurrentUser.getSysAdmin(),
         headersLowerCase["x-test-user-email"]

@@ -1,5 +1,6 @@
 INSERT INTO wb.users(id, email, first_name, last_name) VALUES
-  (1, 'HASURA_ADMIN@example.com', 'HASURA_ADMIN', 'HASURA_ADMIN')
+  (1, 'sys_admin@example.com', 'SYS_ADMIN', 'SYS_ADMIN'),
+  (2, 'public_user@example.com', 'PUBLIC_USER', 'PUBLIC_USER')
 ON CONFLICT DO NOTHING;
 
 INSERT INTO wb.roles(name, custom, label) VALUES

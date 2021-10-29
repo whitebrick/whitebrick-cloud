@@ -26,7 +26,7 @@ export const typeDefs = gql`
     label: String!
     type: String!
     default: String
-    isNullable: Boolean
+    isNotNullable: Boolean
     isPrimaryKey: Boolean!
     foreignKeys: [ConstraintId]!
     referencedBy: [ConstraintId]!
@@ -164,6 +164,7 @@ export const typeDefs = gql`
       columnLabel: String!
       create: Boolean
       columnType: String
+      isNotNullable: Boolean
       sync: Boolean
     ): Boolean!
     wbUpdateColumn(
@@ -173,6 +174,7 @@ export const typeDefs = gql`
       newColumnName: String
       newColumnLabel: String
       newType: String
+      newIsNotNullable: Boolean
       sync: Boolean
     ): Boolean!
     wbRemoveOrDeleteColumn(
@@ -401,6 +403,7 @@ export const resolvers: IResolvers = {
         columnLabel,
         create,
         columnType,
+        isNotNullable,
         sync,
       },
       context
@@ -414,6 +417,7 @@ export const resolvers: IResolvers = {
         columnLabel,
         create,
         columnType,
+        isNotNullable,
         sync
       );
       if (!result.success) throw context.wbCloud.err(result);
@@ -428,6 +432,7 @@ export const resolvers: IResolvers = {
         newColumnName,
         newColumnLabel,
         newType,
+        newIsNotNullable,
         sync,
       },
       context
@@ -441,6 +446,7 @@ export const resolvers: IResolvers = {
         newColumnName,
         newColumnLabel,
         newType,
+        newIsNotNullable,
         sync
       );
       if (!result.success) throw context.wbCloud.err(result);

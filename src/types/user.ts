@@ -37,7 +37,7 @@ export const typeDefs = gql`
     Users
     """
     wbSignUp(userAuthId: String!, userObj: JSON!): Boolean
-    wbAuth(userAuthId: String!): JSON
+    wbAuth(userAuthId: String!, userObj: JSON!): JSON
     wbCreateUser(
       authId: String
       email: String
@@ -84,9 +84,13 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
-    wbAuth: async (_, { userAuthId }, context) => {
+    wbAuth: async (_, { userAuthId, userObj }, context) => {
       const currentUser = await CurrentUser.fromContext(context);
-      const result = await context.wbCloud.auth(currentUser, userAuthId);
+      const result = await context.wbCloud.auth(
+        currentUser,
+        userAuthId,
+        userObj
+      );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
     },

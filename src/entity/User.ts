@@ -2,8 +2,11 @@ import { QueryResult } from "pg";
 import { USER_MESSAGES } from "../environment";
 
 export class User {
+  // placeholders - should match db/seed.sql
   static SYS_ADMIN_ID: number = 1;
-  static PUBLIC_ID: number = 2;
+  static SYS_ADMIN_EMAIL: string = "sys_admin@example.com";
+  static PUBLIC_USER_ID: number = 2;
+  static PUBLIC_USER_EMAIL: string = "public_user@example.com";
 
   id!: number;
   email!: string;
@@ -48,7 +51,7 @@ export class User {
   public static getPublicUser(): User {
     const date: Date = new Date();
     const user: User = new User();
-    user.id = User.PUBLIC_ID;
+    user.id = User.PUBLIC_USER_ID;
     user.email = "PUBLIC@example.com";
     user.firstName = "Public User";
     user.lastName = "Public User";

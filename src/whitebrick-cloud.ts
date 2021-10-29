@@ -49,13 +49,21 @@ export class WhitebrickCloud {
 
   public async auth(
     cU: CurrentUser,
-    userAuthId: string
+    userAuthId: string,
+    userObj: Record<string, any>
   ): Promise<ServiceResult> {
     log.info(`auth(${userAuthId})`);
     if (cU.isntSysAdmin()) return cU.mustBeSysAdmin();
-    const result = await this.dal.userIdFromAuthId(userAuthId);
-    if (!result.success) return result;
-    const hasuraUserId: number = result.payload;
+    let hasuraUserId;
+    let result = await this.dal.userIdFromAuthId(userAuthId);
+    /* User doesn't exist, if coming from social connection try sign up */
+    if (result.success) {
+      hasuraUserId = result.payload;
+    } else {
+      result = await this.signUp(cU, userAuthId, userObj);
+      if (!result.success) return result;
+      hasuraUserId = result.payload.id;
+    }
     return {
       success: true,
       payload: {
@@ -103,7 +111,10 @@ export class WhitebrickCloud {
     );
     if (!result.success) return result;
     if (environment.demoDBPrefix) {
-      result = await this.assignDemoSchema(result.payload.id);
+      const demoResult = await this.assignDemoSchema(result.payload.id);
+      if (!demoResult.success) {
+        log.error(`ERROR assigning demo prefix ${JSON.stringify(demoResult)}`);
+      }
     }
     return result;
   }
@@ -162,9 +173,8 @@ export class WhitebrickCloud {
       tables = tablesResult.payload;
     }
     if (tables.length == 0) {
-      return errResult({
-        message: `tables.length==0 for deleteAndSetTablePermissions`,
-      });
+      log.info(`deleteAndSetTablePermissions tables.length==0 - nothing to do`);
+      return { success: true } as ServiceResult;
     }
     let result = errResult();
     for (const table of tables) {
@@ -1857,8 +1867,9 @@ export class WhitebrickCloud {
         v.titleCase(column.name.toString().replace(/_/g, " ")),
         false,
         undefined,
+        undefined,
         false,
-        true
+        true // skip tracking
       );
       if (!result.success) return result;
     }
@@ -2563,11 +2574,12 @@ export class WhitebrickCloud {
     columnLabel: string,
     create?: boolean,
     columnType?: string,
+    isNotNullable?: boolean,
     sync?: boolean,
     skipTracking?: boolean
   ): Promise<ServiceResult> {
     log.info(
-      `addOrCreateColumn(${cU.id},${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${sync},${skipTracking})`
+      `addOrCreateColumn(${cU.id},${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${isNotNullable},${sync},${skipTracking})`
     );
     if (await cU.cant("alter_table", tableName, schemaName)) {
       return cU.denied();
@@ -2579,7 +2591,7 @@ export class WhitebrickCloud {
         columnName
       );
     if (!checkColNotAlreadyAddedResult.success) {
-      // looking for the column to be not found
+      // expecting the column to be not found
       if (checkColNotAlreadyAddedResult.wbCode != "WB_COLUMN_NOT_FOUND") {
         return checkColNotAlreadyAddedResult;
       }
@@ -2622,7 +2634,8 @@ export class WhitebrickCloud {
       columnName,
       columnLabel,
       create,
-      columnType
+      columnType,
+      isNotNullable
     );
     if (columnResult.success && !skipTracking) {
       result = await this.trackTableWithPermissions(
@@ -2689,10 +2702,11 @@ export class WhitebrickCloud {
     newColumnName?: string,
     newColumnLabel?: string,
     newType?: string,
+    newIsNotNullable?: boolean,
     sync?: boolean
   ): Promise<ServiceResult> {
     log.info(
-      `updateColumn(${cU.id},${schemaName},${tableName},${columnName},${newColumnName},${newColumnLabel},${newType})`
+      `updateColumn(${cU.id},${schemaName},${tableName},${columnName},${newColumnName},${newColumnLabel},${newType},${newIsNotNullable})`
     );
     if (await cU.cant("alter_table", tableName, schemaName)) {
       return cU.denied();
@@ -2725,7 +2739,8 @@ export class WhitebrickCloud {
       columnName,
       newColumnName,
       newColumnLabel,
-      newType
+      newType,
+      newIsNotNullable
     );
     if (!result.success) return result;
     if (newColumnName || newType) {
@@ -2778,58 +2793,6 @@ export class WhitebrickCloud {
   /**
    * ========== Util ==========
    */
-
-  // only async for testing - for the most part static
-  public async uidFromHeaders(
-    headers: Record<string, string>
-  ): Promise<ServiceResult> {
-    //log.info("========== HEADERS: " + JSON.stringify(headers));
-    const headersLowerCase = Object.entries(headers).reduce(
-      (acc: Record<string, string>, [key, val]) => (
-        (acc[key.toLowerCase()] = val), acc
-      ),
-      {}
-    );
-    let result: ServiceResult = errResult();
-    // if x-hasura-admin-secret hasura sets role to admin
-    if (
-      headersLowerCase["x-hasura-role"] &&
-      headersLowerCase["x-hasura-role"].toLowerCase() == "admin"
-    ) {
-      log.info("========== FOUND ADMIN USER");
-      return {
-        success: true,
-        payload: User.SYS_ADMIN_ID,
-      } as ServiceResult;
-    } else if (
-      process.env.NODE_ENV == "development" &&
-      headersLowerCase["x-test-user-id"]
-    ) {
-      result = await this.userByEmail(
-        CurrentUser.getSysAdmin(),
-        headersLowerCase["x-test-user-id"]
-      );
-      if (result.success) result.payload = result.payload.id;
-      log.info(
-        `========== FOUND TEST USER: ${headersLowerCase["x-test-user-id"]}`
-      );
-    } else if (headersLowerCase["x-hasura-user-id"]) {
-      result = {
-        success: true,
-        payload: parseInt(headersLowerCase["x-hasura-user-id"]),
-      } as ServiceResult;
-      log.info(
-        `========== FOUND USER: ${headersLowerCase["x-hasura-user-id"]}`
-      );
-    } else {
-      result = errResult({
-        message: `uidFromHeaders: Could not find headers for Admin, Test or User in: ${JSON.stringify(
-          headers
-        )}`,
-      } as ServiceResult);
-    }
-    return result;
-  }
 
   public cloudContext(): object {
     return {
@@ -2910,6 +2873,9 @@ export class WhitebrickCloud {
       default:
         log.error(`Can not find fn ${fn}`);
     }
+    if (result.success && result.payload && result.payload._types) {
+      result.payload._types = "(pruned by WhitebrickCloud)";
+    }
     return result;
   }
 
@@ -2968,7 +2934,7 @@ export class WhitebrickCloud {
    */
 
   public async resetTestData(cU: CurrentUser): Promise<ServiceResult> {
-    log.info(`resetTestData()`);
+    log.info(`resetTestData(${cU.id})`);
     if (cU.isntSysAdmin() && cU.isntTestUser()) {
       return cU.mustBeSysAdminOrTestUser();
     }
@@ -2976,7 +2942,7 @@ export class WhitebrickCloud {
       CurrentUser.getSysAdmin(),
       undefined,
       undefined,
-      "test_%"
+      "test\\_%"
     );
     if (!result.success) return result;
     for (const schema of result.payload) {

@@ -18,6 +18,7 @@ export const typeDefs = gql`
     role: Role
     createdAt: String!
     updatedAt: String!
+    status: String
   }
 
   type SchemaUser {
