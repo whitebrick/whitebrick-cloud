@@ -8,7 +8,7 @@
 
 #### Whitebrick is a lightweight No Code Database with three points of difference:
 
-1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for easy customization and hosting.
+1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for dead easy customization and deployment.
 2. The back end is a set of [Serverless functions](https://www.serverless.com/) for making DDL calls to [PostgreSQL](https://www.postgresql.org/) and configuring [Hasura GraphQL server](https://hasura.io/).
 3. The [PostgreSQL](https://www.postgresql.org/) database schemas can be accessed directly with **_psql_** for data import/export and integrations with other tools.
 
@@ -18,22 +18,22 @@
 
 ---
 
-#### Current Project status as of August:
+#### Current Project status as of November:
 
-We're currently fixing bugs and trying to get the Beta release stable. Please note this is Beta software so **use at your own risk**.
+We're currently fixing bugs and trying to get the Beta release stable.
 
-Please use GitHub [Isues](https://github.com/whitebrick/whitebrick-cloud/issues) to report bugs and [Discussions](https://github.com/whitebrick/whitebrick-cloud/discussions) for questions and suggestions.
+Please use GitHub [Isues](https://github.com/whitebrick/whitebrick-cloud/issues) to report bugs and [Discussions](https://github.com/whitebrick/whitebrick-cloud/discussions) for questions, features and suggestions.
 
 - [x] DDL Table & Column CRUD
 - [x] Live editing with subscription
 - [x] Table-level RBAC
 - [x] Joins
 - [x] Background process queue 
-- [ ] Documentation
+- [ ] Background process UI
 - [ ] UI styling and themes
-- [ ] Direct pg reader/writer access
+- [ ] Psql reader/writer access
 - [ ] Validations
-- [ ] Cloud file (bucket) download columns
+- [ ] Bucket file download columns
 - [ ] Column-level RBAC
 
 Hosted demo at [whitebrick.com](https://whitebrick.com)
@@ -51,6 +51,7 @@ Whitebrick is [licensed](LICENSE) under the Apache License v2.0 however the depe
 ### You are currently viewing the back end repository (whitebrick-cloud)
 
 - The front end repository can be found [here](https://github.com/whitebrick/whitebrick)
+- Documentation can be found [here](https://hello.whitebrick.com/docs)
 
 [//]: # "START:COMMON_DESCRIPTION"
 
@@ -141,23 +142,10 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
     
     To then add additional test data (northwind, chinook and DVD databases) as a second step run `$ bash run_tests.bash importDBs` - this can take a additional 15 minutes. Or run `$ bash run_tests.bash withImportDBs` to run both in one hit.
 
-## Architecture
+---
 
-- ### DAL
+- [Web](https://whitebrick.com/)
+- [Documentation](https://hello.whitebrick.com/docs)
+- [Discord](https://discord.gg/FPvjPCYt)
+- [Medium](https://towardsdatascience.com/towards-a-modern-lims-dynamic-tables-no-code-databases-and-serverless-validations-8dea03416105)
 
-  With the bulk of persistence performed through Hasura, the DAL class is used for supplemental system-wide data persistence (tenants, users, roles, etc) and DDL (creating and altering schemas, tables, columns etc). This implementation has been purposely chosen as a lightweight alternative to ORM.
-
-- ### HasuraApi
-
-  Hasura needs to know about any DDL changes to update the GraphQL schema - for example, when a new table is added it must be _tracked_. This class is used to call the [Hasura Metadat API](https://hasura.io/docs/latest/graphql/core/api-reference/metadata-api/index.html) over HTTP.
-
-- ### BgQueue
-
-  API Gateway has a 30 second timeout so longer processes need to be executed in the background using the lambda invoke `event` type.
-
-- ### WhitebrickCloud
-  This is the top-level API that makes calls to the DAL and HasuraAPI and is called by the GraphQL resolvers.
-
-## DB Schema
-
-![whitebrick-cloud DB ERD](doc/whitebrick-db-erd.png)
