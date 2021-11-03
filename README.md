@@ -67,8 +67,8 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 
 ### Deploying on a Cloud Service
 
-- AWS CloudFormation Stack - we're currently tidying this up for release, email us for early copy
-- Heroku, Azure, DigitalOcean - all TBD but get in touch
+- AWS CloudFormation Stack - in progree
+- Heroku, Azure, DigitalOcean - TBD
 
 ### Running Locally
 
@@ -125,12 +125,12 @@ Whitebrick comprises a front end [Gatsby](https://www.gatsbyjs.com/) Jamstack cl
 
 7.  #### Track wb.table_permissions
 
-    From The Hasura console, use the top menu to navigate to the "Data" page, click to expand the default database on the left, then click the "wb" schema.
+    From the Hasura console, use the top menu to navigate to the "Data" page, click to expand the default database on the left, then click the "wb" schema.
     Click the "Track" button next to the "table_permissions" table.
 
 8.  #### Add Remote Schema
 
-    From The Hasura console, use the top menu to navigate to the "Remote Schemas" page, click add and enter the endpoint displayed from (6) above, check forward all headers and     set and long time-out of 1200 seconds.
+    From the Hasura console, use the top menu to navigate to the "Remote Schemas" page, click add and enter the endpoint displayed from (6) above, check forward all headers and     set and long time-out of 1200 seconds.
     **NB: If you are running Hasura in a local container you will need to use the corresponding URL** eg `http://host.docker.internal:3000/graphql`.
     If you now navigate to the "API" page from the top menu, In the query "Explorer" you should see queries beginning with `wb*`.
 
