@@ -24,6 +24,7 @@ read_txt() {
   gsed -i 's/`/BACKTICK/g' temp.md
   gsed -i "s/'/SINGLEQUOTE/g" temp.md
   gsed -i 's/"/DOUBLEQUOTE/g' temp.md
+  gsed -i 's/ /WHITESPACE/g' temp.md
   local cmd="gsed -n '/START:$1/,/END:$1/{/START:$1/!{/END:$1/!p}}' temp.md"
   eval "$cmd"
 }
@@ -56,4 +57,5 @@ cp $FROM_IMAGES $TO_IMAGES
 gsed -i 's/BACKTICK/`/g' $TO_FILE
 gsed -i "s/SINGLEQUOTE/'/g" $TO_FILE
 gsed -i 's/DOUBLEQUOTE/"/g' $TO_FILE
+gsed -i 's/WHITESPACE/ /g' $TO_FILE
 rm temp.md
