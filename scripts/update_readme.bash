@@ -19,9 +19,6 @@ PARTIALS=(
   "BACKEND_SETUP"
 )
 
-# copy images
-cp $FROM_IMAGES $TO_IMAGES
-
 read_txt() {
   cat $2 > temp.md
   gsed -i 's/`/BACKTICK/g' temp.md
@@ -52,6 +49,9 @@ for i in "${PARTIALS[@]}"
 do
   update_txt "$i" "$FROM_FILES" "$TO_FILE"
 done
+
+# copy images
+cp $FROM_IMAGES $TO_IMAGES
 
 gsed -i 's/BACKTICK/`/g' $TO_FILE
 gsed -i "s/SINGLEQUOTE/'/g" $TO_FILE

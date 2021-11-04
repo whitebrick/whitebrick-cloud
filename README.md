@@ -6,7 +6,11 @@
 
 ### Open Source Airtable Alternative (No Code DB)
 
-#### Whitebrick is a lightweight No Code Database with three points of difference:
+| ![Screenshot](doc/whitebrick-landing-screenshot-1.png) | ![Screenshot](doc/whitebrick-landing-screenshot-2.png) | ![Screenshot](doc/whitebrick-landing-screenshot-3.png) | ![Screenshot](doc/whitebrick-landing-screenshot-4.png) |
+| :----------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------: |
+|                <sub>Add a record</sub>                 |               <sub>Crete a column</sub>                |                 <sub>Create a DB</sub>                 |                <sub>Manage access</sub>                |
+
+#### Whitebrick is a lightweight No Code Database with 3 points of difference:
 
 1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for dead easy customization and deployment.
 2. The back end is a set of [Serverless functions](https://www.serverless.com/) for making DDL calls to [PostgreSQL](https://www.postgresql.org/) and configuring [Hasura GraphQL server](https://hasura.io/).
