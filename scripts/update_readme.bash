@@ -16,15 +16,17 @@ TO_IMAGES="doc/"
 PARTIALS=(
   "LICENSING"
   "SUMMARY"
+  "TECHNICAL_OVERVIEW"
   "BACKEND_SETUP"
 )
 
 read_txt() {
   cat $2 > temp.md
-  gsed -i 's/`/BACKTICK/g' temp.md
-  gsed -i "s/'/SINGLEQUOTE/g" temp.md
-  gsed -i 's/"/DOUBLEQUOTE/g' temp.md
-  gsed -i 's/ /WHITESPACE/g' temp.md
+  gsed -i 's/`/__BT__/g' temp.md
+  gsed -i "s/'/__SQ__/g" temp.md
+  gsed -i 's/"/__DQ__/g' temp.md
+  gsed -i 's/ /__WS__/g' temp.md
+  gsed -i 's/&/__AM__/g' temp.md
   local cmd="gsed -n '/START:$1/,/END:$1/{/START:$1/!{/END:$1/!p}}' temp.md"
   eval "$cmd"
 }
@@ -54,8 +56,9 @@ done
 # copy images
 cp $FROM_IMAGES $TO_IMAGES
 
-gsed -i 's/BACKTICK/`/g' $TO_FILE
-gsed -i "s/SINGLEQUOTE/'/g" $TO_FILE
-gsed -i 's/DOUBLEQUOTE/"/g' $TO_FILE
-gsed -i 's/WHITESPACE/ /g' $TO_FILE
+gsed -i 's/__BT__/`/g' $TO_FILE
+gsed -i "s/__SQ__/'/g" $TO_FILE
+gsed -i 's/__DQ__/"/g' $TO_FILE
+gsed -i 's/__WS__/ /g' $TO_FILE
+gsed -i 's/__AM__/\&/g' $TO_FILE
 rm temp.md
