@@ -10,8 +10,8 @@ fi
 
 FROM_FILES="../whitebrick-web/docs/docs/*.md"
 TO_FILE="README.md"
-FROM_IMAGES="../whitebrick-web/docs/assets/whitebrick-*.png"
-TO_IMAGES="doc/"
+#FROM_IMAGES="../whitebrick-web/docs/assets/whitebrick-*.png"
+#TO_IMAGES="doc/"
 
 PARTIALS=(
   "LICENSING"
@@ -54,7 +54,7 @@ do
 done
 
 # copy images
-cp $FROM_IMAGES $TO_IMAGES
+# cp $FROM_IMAGES $TO_IMAGES
 
 gsed -i 's/__BT__/`/g' $TO_FILE
 gsed -i "s/__SQ__/'/g" $TO_FILE

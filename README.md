@@ -1,4 +1,4 @@
-![whitebrick logo](doc/whitebrick-logo-white-hz-sm.png)
+![whitebrick logo](https://hello.whitebrick.com/assets/whitebrick-logo-white-hz-sm.png)
 
 # whitebrick-cloud (back end) BETA
 
@@ -6,15 +6,15 @@
 
 ### Open Source Airtable Alternative (No Code DB)
 
-| ![Screenshot](doc/whitebrick-landing-screenshot-1.png) | ![Screenshot](doc/whitebrick-landing-screenshot-2.png) | ![Screenshot](doc/whitebrick-landing-screenshot-3.png) | ![Screenshot](doc/whitebrick-landing-screenshot-4.png) |
-| :----------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------: | :----------------------------------------------------: |
-|               <sub>Adding a record</sub>               |              <sub>Creating a column</sub>              |                <sub>Creating a DB</sub>                |               <sub>Managing access</sub>               |
+| ![Screenshot](https://hello.whitebrick.com/assets/whitebrick-landing-screenshot-1.png) | ![Screenshot](https://hello.whitebrick.com/assets/whitebrick-landing-screenshot-2.png) | ![Screenshot](https://hello.whitebrick.com/assets/whitebrick-landing-screenshot-3.png) | ![Screenshot](https://hello.whitebrick.com/assets/whitebrick-landing-screenshot-4.png) |
+| :------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------: |
+|                               <sub>Adding a record</sub>                               |                              <sub>Creating a column</sub>                              |                                <sub>Creating a DB</sub>                                |                               <sub>Managing access</sub>                               |
 
 #### Whitebrick is a lightweight No Code Database with 3 points of difference:
 
 1. The front end uses a [Gatsby static Jamstack](https://www.gatsbyjs.com/) client for dead easy customization and deployment.
 2. The back end is a set of [Serverless functions](https://www.serverless.com/) for making DDL calls to [PostgreSQL](https://www.postgresql.org/) and configuring [Hasura GraphQL server](https://hasura.io/).
-3. The [PostgreSQL](https://www.postgresql.org/) database schemas can be accessed directly with **_psql_** for data import/export and integrations with other tools.
+3. The [PostgreSQL](https://www.postgresql.org/) database schemas can be accessed directly with psql for data import/export and integrations with other tools.
 
 ##### Rather than reinventing the wheel Whitebrick stitches together the best-in-breed open source apps:
 
@@ -22,7 +22,7 @@
 
 ---
 
-#### Current Project status as of November:
+#### Current Project status as of December:
 
 We're currently fixing bugs and trying to get the Beta release stable.
 
@@ -65,7 +65,7 @@ Whitebrick is [licensed](https://github.com/whitebrick/whitebrick-cloud/blob/mai
 - The front end repository can be found [here](https://github.com/whitebrick/whitebrick)
 - Documentation can be found [here](https://hello.whitebrick.com/docs)
 
-![whitebrick-cloud system diagram](doc/whitebrick-diagram.png)
+![whitebrick-cloud system diagram](https://hello.whitebrick.com/assets/whitebrick-diagram.png)
 
 <!-- START:SUMMARY ================================================== -->
 
