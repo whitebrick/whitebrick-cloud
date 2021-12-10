@@ -22,9 +22,9 @@ export class BgQueue {
     "bgImportSchema",
     "bgRemoveSchema",
     "bgRetrackSchema",
-    "bgAddDefaultTablePermissions",
-    "bgRemoveDefaultTablePermissions",
-    "bgRemoveAndAddDefaultTablePermissions",
+    "bgTrackAndAddDefaultTablePermissions",
+    "bgTrackAndRemoveDefaultTablePermissions",
+    "bgTrackAndRemoveAndAddDefaultTablePermissions",
   ];
 
   constructor(wbCloud: WhitebrickCloud, dal: DAL) {
@@ -215,7 +215,15 @@ export class BgQueue {
           data.schemaName
         );
         break;
-      case "bgAddDefaultTablePermissions":
+      case "bgTrackAndAddDefaultTablePermissions":
+        result = await this.wbCloud.tableBySchemaNameTableName(
+          cU,
+          data.schemaName,
+          data.tableName
+        );
+        if (!result.success) break;
+        result = await this.wbCloud.trackTable(cU, result.payload);
+        if (!result.success) break;
         result = await this.wbCloud.addDefaultTablePermissions(
           cU,
           data.schemaName,
@@ -228,14 +236,30 @@ export class BgQueue {
           data.tableName
         );
         break;
-      case "bgRemoveDefaultTablePermissions":
+      case "bgTrackAndRemoveDefaultTablePermissions":
+        result = await this.wbCloud.tableBySchemaNameTableName(
+          cU,
+          data.schemaName,
+          data.tableName
+        );
+        if (!result.success) break;
+        result = await this.wbCloud.trackTable(cU, result.payload);
+        if (!result.success) break;
         result = await this.wbCloud.removeDefaultTablePermissions(
           cU,
           data.schemaName,
           data.tableName
         );
         break;
-      case "bgRemoveAndAddDefaultTablePermissions":
+      case "bgTrackAndRemoveAndAddDefaultTablePermissions":
+        result = await this.wbCloud.tableBySchemaNameTableName(
+          cU,
+          data.schemaName,
+          data.tableName
+        );
+        if (!result.success) break;
+        result = await this.wbCloud.trackTable(cU, result.payload);
+        if (!result.success) break;
         result = await this.wbCloud.addOrRemoveAllExistingRelationships(
           cU,
           data.schemaName,

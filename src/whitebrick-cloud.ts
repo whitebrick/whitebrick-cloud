@@ -2280,9 +2280,10 @@ export class WhitebrickCloud {
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
-    let result = await this.trackTable(cU, table);
-    if (!result.success) return result;
+    let result = errResult();
     if (sync) {
+      result = await this.trackTable(cU, table);
+      if (!result.success) return result;
       if (resetPermissions) {
         result = await this.removeDefaultTablePermissions(
           cU,
@@ -2297,8 +2298,9 @@ export class WhitebrickCloud {
         table.name
       );
     } else {
-      let fn = "bgAddDefaultTablePermissions";
-      if (resetPermissions) fn = "bgRemoveAndAddDefaultTablePermissions";
+      let fn = "bgTrackAndAddDefaultTablePermissions";
+      if (resetPermissions)
+        fn = "bgTrackAndRemoveAndAddDefaultTablePermissions";
       result = await this.bgQueue.queue(cU.id, table.schemaId, fn, {
         schemaName: table.schemaName,
         tableName: table.name,
@@ -2355,9 +2357,10 @@ export class WhitebrickCloud {
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
-    let result = await this.untrackTable(cU, table);
-    if (!result.success) return result;
+    let result = errResult();
     if (sync) {
+      result = await this.untrackTable(cU, table);
+      if (!result.success) return result;
       result = await this.removeDefaultTablePermissions(
         cU,
         table.schemaName,
@@ -2367,7 +2370,7 @@ export class WhitebrickCloud {
       result = await this.bgQueue.queue(
         cU.id,
         table.schemaId,
-        "bgRemoveDefaultTablePermissions",
+        "bgTrackAndRemoveDefaultTablePermissions",
         {
           schemaName: table.schemaName,
           tableName: table.name,
@@ -2866,6 +2869,20 @@ export class WhitebrickCloud {
         break;
       case "processDbRestore":
         result = await this.processDbRestore(cU);
+        break;
+      case "resetTablePermissions":
+        result = await this.tableBySchemaNameTableName(
+          cU,
+          vals.schemaName,
+          vals.tableName
+        );
+        if (result.success) {
+          result = await this.trackTableWithPermissions(
+            cU,
+            result.payload,
+            true
+          );
+        }
         break;
       case "invokeBg":
         result = await this.bgQueue.process(vals.schemaId);
