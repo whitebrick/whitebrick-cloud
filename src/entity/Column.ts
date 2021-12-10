@@ -4,7 +4,7 @@ import { ConstraintId, ServiceResult } from "../types";
 export class Column {
   static COMMON_TYPES: Record<string, string> = {
     Text: "text",
-    Number: "integer",
+    Numeric: "numeric",
     Decimal: "decimal",
     Boolean: "boolean",
     Date: "date",
