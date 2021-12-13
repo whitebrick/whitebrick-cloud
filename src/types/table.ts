@@ -100,6 +100,7 @@ export const typeDefs = gql`
       tableLabel: String!
       create: Boolean
     ): Table!
+    wbInitTableData(schemaName: String!, tableName: String!): Boolean!
     wbUpdateTable(
       schemaName: String!
       tableName: String!
@@ -135,6 +136,11 @@ export const typeDefs = gql`
       parentTableName: String!
       del: Boolean
     ): Boolean!
+    wbRetrackTable(
+      schemaName: String!
+      tableName: String!
+      sync: Boolean
+    ): Boolean!
     """
     Table Users
     """
@@ -165,6 +171,7 @@ export const typeDefs = gql`
       create: Boolean
       columnType: String
       isNotNullable: Boolean
+      skipTracking: Boolean
       sync: Boolean
     ): Boolean!
     wbUpdateColumn(
@@ -175,6 +182,7 @@ export const typeDefs = gql`
       newColumnLabel: String
       newType: String
       newIsNotNullable: Boolean
+      skipTracking: Boolean
       sync: Boolean
     ): Boolean!
     wbRemoveOrDeleteColumn(
@@ -272,6 +280,16 @@ export const resolvers: IResolvers = {
         tableName,
         tableLabel,
         create
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.payload;
+    },
+    wbInitTableData: async (_, { schemaName, tableName }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.initTableData(
+        currentUser,
+        schemaName,
+        tableName
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.payload;
@@ -393,6 +411,17 @@ export const resolvers: IResolvers = {
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;
     },
+    wbRetrackTable: async (_, { schemaName, tableName, sync }, context) => {
+      const currentUser = await CurrentUser.fromContext(context);
+      const result = await context.wbCloud.retrackTableWithPermissions(
+        currentUser,
+        schemaName,
+        tableName,
+        sync
+      );
+      if (!result.success) throw context.wbCloud.err(result);
+      return result.success;
+    },
     // Columns
     wbAddOrCreateColumn: async (
       _,
@@ -404,6 +433,7 @@ export const resolvers: IResolvers = {
         create,
         columnType,
         isNotNullable,
+        skipTracking,
         sync,
       },
       context
@@ -418,6 +448,7 @@ export const resolvers: IResolvers = {
         create,
         columnType,
         isNotNullable,
+        skipTracking,
         sync
       );
       if (!result.success) throw context.wbCloud.err(result);
@@ -433,6 +464,7 @@ export const resolvers: IResolvers = {
         newColumnLabel,
         newType,
         newIsNotNullable,
+        skipTracking,
         sync,
       },
       context
@@ -447,6 +479,7 @@ export const resolvers: IResolvers = {
         newColumnLabel,
         newType,
         newIsNotNullable,
+        skipTracking,
         sync
       );
       if (!result.success) throw context.wbCloud.err(result);

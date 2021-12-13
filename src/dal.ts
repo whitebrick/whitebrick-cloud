@@ -1907,6 +1907,47 @@ export class DAL {
     return results[0];
   }
 
+  public async tableIsEmpty(
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    const result = await this.executeQuery({
+      query: `
+        SELECT CASE
+          WHEN EXISTS(SELECT 1 FROM ${schemaName}.${tableName})
+          THEN 0
+          ELSE 1
+        END AS is_empty;
+      `,
+    } as QueryParams);
+    if (result.success) {
+      result.payload = result.payload.rows[0].is_empty == 1;
+    }
+    return result;
+  }
+
+  public async insert(
+    schemaName: string,
+    tableName: string,
+    records: Record<string, any>[]
+  ): Promise<ServiceResult> {
+    log.info(`****${JSON.stringify(records)}`);
+    const queryParams: QueryParams[] = [];
+    for (const record of records) {
+      queryParams.push({
+        query: `
+          INSERT INTO ${schemaName}.${tableName}(
+            ${Object.keys(record).join(", ")}
+          ) VALUES (
+            ${Object.values(record).join(", ")}
+          );
+        `,
+      } as QueryParams);
+    }
+    const result = await this.executeQueries(queryParams);
+    return result[result.length - 1];
+  }
+
   /**
    * ========== Table Users ==========
    */
@@ -2237,7 +2278,7 @@ export class DAL {
     columnName?: string
   ): Promise<ServiceResult> {
     let query = `
-      SELECT column_name as name, data_type as type
+      SELECT column_name as name, data_type as type, is_nullable as is_nullable
       FROM information_schema.columns
       WHERE table_schema=$1
       AND table_name=$2

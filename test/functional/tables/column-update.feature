@@ -10,18 +10,21 @@ Feature:
   Scenario: Update a column
     Given text query = 
     """
-      mutation ($schemaName: String!, $tableName: String!, $columnName: String!, $newColumnName: String, $newColumnLabel: String, $newType: String){
+      mutation ($schemaName: String!, $tableName: String!, $columnName: String!, $newColumnName: String, $newColumnLabel: String, $newType: String, $newIsNotNullable: Boolean){
         wbUpdateColumn(
           schemaName: $schemaName,
           tableName: $tableName,
           columnName: $columnName,
           newColumnName: $newColumnName,
           newColumnLabel: $newColumnLabel,
-          newType: $newType
+          newType: $newType,
+          newIsNotNullable: $newIsNotNullable,
+          skipTracking: false,
+          sync: true
         )
       }
     """
-    And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnName: "#(columnName)", newColumnName: "#(newColumnNameChk)", newColumnLabel: "#(newColumnLabelChk)", newType: "#(newTypeChk)"}
+    And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnName: "#(columnName)", newColumnName: "#(newColumnNameChk)", newColumnLabel: "#(newColumnLabelChk)", newType: "#(newTypeChk)", newIsNotNullable: "#(newIsNotNullable)"}
     And request { query: "#(query)", variables: "#(variables)" }
     And header X-Test-User-Email = currentUserEmail
     When method POST

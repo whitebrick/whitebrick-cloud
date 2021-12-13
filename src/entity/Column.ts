@@ -2,13 +2,22 @@ import { QueryResult } from "pg";
 import { ConstraintId, ServiceResult } from "../types";
 
 export class Column {
-  static COMMON_TYPES: Record<string, string> = {
-    Text: "text",
-    Numeric: "numeric",
-    Decimal: "decimal",
-    Boolean: "boolean",
-    Date: "date",
-    "Date & Time": "timestamp",
+  static COMMON_TYPES: Record<string, Record<string, any>> = {
+    Text: { pgType: "text", egValue: "My Value" },
+    Numeric: { pgType: "numeric", egValue: 0 },
+    Decimal: { pgType: "decimal", egValue: 0.0 },
+    Boolean: { pgType: "boolean", egValue: false },
+    Date: { pgType: "date", egValue: "2022-01-31" },
+    "Date & Time": { pgType: "timestamp", egValue: "2022-01-31 13:59:59" },
+  };
+
+  static PG_TYPE_TO_COMMON_TYPE: Record<string, string> = {
+    numeric: "Numeric",
+    integer: "Numeric",
+    decimal: "Decimal",
+    boolean: "Boolean",
+    text: "Text",
+    date: "Date",
   };
 
   id!: number;
@@ -25,6 +34,15 @@ export class Column {
   isPrimaryKey!: boolean;
   foreignKeys!: [ConstraintId];
   referencedBy!: [ConstraintId];
+
+  public static egValueFromPgType(pgType: string) {
+    if (!Object.keys(this.PG_TYPE_TO_COMMON_TYPE).includes(pgType)) {
+      throw new Error(
+        `pgType ${pgType} does not have an entry in Column.PG_TYPE_TO_COMMON_TYPE`
+      );
+    }
+    return this.COMMON_TYPES[this.PG_TYPE_TO_COMMON_TYPE[pgType]].egValue;
+  }
 
   public static parseResult(data: QueryResult | null): Array<Column> {
     if (!data) throw new Error("Column.parseResult: input is null");

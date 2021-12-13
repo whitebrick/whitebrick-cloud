@@ -1760,6 +1760,39 @@ export class WhitebrickCloud {
     return tableResult;
   }
 
+  public async initTableData(
+    cU: CurrentUser,
+    schemaName: string,
+    tableName: string
+  ): Promise<ServiceResult> {
+    log.info(`initTableData(${cU.id},${schemaName},${tableName})`);
+    if (await cU.cant("read_and_write_table_records", tableName, schemaName)) {
+      return cU.denied();
+    }
+    let result = await this.dal.tableIsEmpty(schemaName, tableName);
+    if (!result.success || result.payload === false) return result;
+    result = await this.dal.columns(schemaName, tableName);
+    if (!result.success) return result;
+    const columns = result.payload;
+    if (columns.length == 0) {
+      result.payload = false;
+      return result;
+    }
+    let initRow: Record<string, any> = {};
+    for (const column of columns) {
+      if ((columns.length == 1 || column.isNotNullable) && !column.default) {
+        let value = Column.egValueFromPgType(column.type);
+        if (typeof value === "string") value = `'${value}'`;
+        initRow[column.name] = value;
+      } else {
+        initRow[column.name] = "NULL";
+      }
+    }
+    result = await this.dal.insert(schemaName, tableName, [initRow]);
+    if (result.success) result.payload = true;
+    return result;
+  }
+
   public async removeOrDeleteTable(
     cU: CurrentUser,
     schemaName: string,
@@ -2382,6 +2415,30 @@ export class WhitebrickCloud {
     return result;
   }
 
+  public async retrackTableWithPermissions(
+    cU: CurrentUser,
+    schemaName: string,
+    tableName: string,
+    sync?: boolean
+  ): Promise<ServiceResult> {
+    log.info(
+      `retrackTableWithPermissions(${cU.id},${schemaName},${tableName},${sync})`
+    );
+    let result = await this.tableBySchemaNameTableName(
+      cU,
+      schemaName,
+      tableName
+    );
+    if (!result.success) return result;
+    result = await this.trackTableWithPermissions(
+      cU,
+      result.payload,
+      true,
+      sync
+    );
+    return result;
+  }
+
   /**
    * ========== Table Users===========
    */
@@ -2578,11 +2635,11 @@ export class WhitebrickCloud {
     create?: boolean,
     columnType?: string,
     isNotNullable?: boolean,
-    sync?: boolean,
-    skipTracking?: boolean
+    skipTracking?: boolean,
+    sync?: boolean
   ): Promise<ServiceResult> {
     log.info(
-      `addOrCreateColumn(${cU.id},${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${isNotNullable},${sync},${skipTracking})`
+      `addOrCreateColumn(${cU.id},${schemaName},${tableName},${columnName},${columnLabel},${create},${columnType},${isNotNullable},${skipTracking},${sync})`
     );
     if (await cU.cant("alter_table", tableName, schemaName)) {
       return cU.denied();
@@ -2659,11 +2716,11 @@ export class WhitebrickCloud {
     tableName: string,
     columnName: string,
     del?: boolean,
-    sync?: boolean,
-    skipTracking?: boolean
+    skipTracking?: boolean,
+    sync?: boolean
   ): Promise<ServiceResult> {
     log.info(
-      `removeOrDeleteColumn(${cU.id},${schemaName},${tableName},${columnName},${del},${sync},${skipTracking})`
+      `removeOrDeleteColumn(${cU.id},${schemaName},${tableName},${columnName},${del},${skipTracking},${sync})`
     );
     if (await cU.cant("alter_table", tableName, schemaName)) {
       return cU.denied();
@@ -2706,10 +2763,11 @@ export class WhitebrickCloud {
     newColumnLabel?: string,
     newType?: string,
     newIsNotNullable?: boolean,
+    skipTracking?: boolean,
     sync?: boolean
   ): Promise<ServiceResult> {
     log.info(
-      `updateColumn(${cU.id},${schemaName},${tableName},${columnName},${newColumnName},${newColumnLabel},${newType},${newIsNotNullable})`
+      `updateColumn(${cU.id},${schemaName},${tableName},${columnName},${newColumnName},${newColumnLabel},${newType},${newIsNotNullable},${skipTracking},${sync})`
     );
     if (await cU.cant("alter_table", tableName, schemaName)) {
       return cU.denied();
@@ -2733,8 +2791,10 @@ export class WhitebrickCloud {
       }
     }
     if (newColumnName || newType) {
-      result = await this.untrackTable(cU, tableResult.payload);
-      if (!result.success) return result;
+      if (!skipTracking) {
+        result = await this.untrackTable(cU, tableResult.payload);
+        if (!result.success) return result;
+      }
     }
     result = await this.dal.updateColumn(
       schemaName,
@@ -2745,15 +2805,13 @@ export class WhitebrickCloud {
       newType,
       newIsNotNullable
     );
-    if (!result.success) return result;
-    if (newColumnName || newType) {
+    if (result.success && (newColumnName || newType) && !skipTracking) {
       result = await this.trackTableWithPermissions(
         cU,
         tableResult.payload,
         true,
         sync
       );
-      if (!result.success) return result;
     }
     return result;
   }
