@@ -6,6 +6,7 @@ Feature:
     * def newColumnNameChk = typeof newColumnName == "undefined" ? null : newColumnName
     * def newColumnLabelChk = typeof newColumnLabel == "undefined" ? null : newColumnLabel
     * def newTypeChk = typeof newType == "undefined" ? null : newType
+    * def newIsNotNullableChk = typeof newIsNotNullable == "undefined" ? null : newIsNotNullable
 
   Scenario: Update a column
     Given text query = 
@@ -24,7 +25,7 @@ Feature:
         )
       }
     """
-    And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnName: "#(columnName)", newColumnName: "#(newColumnNameChk)", newColumnLabel: "#(newColumnLabelChk)", newType: "#(newTypeChk)", newIsNotNullable: "#(newIsNotNullable)"}
+    And def variables = { schemaName: "#(schemaName)", tableName: "#(tableName)", columnName: "#(columnName)", newColumnName: "#(newColumnNameChk)", newColumnLabel: "#(newColumnLabelChk)", newType: "#(newTypeChk)", newIsNotNullable: "#(newIsNotNullableChk)"}
     And request { query: "#(query)", variables: "#(variables)" }
     And header X-Test-User-Email = currentUserEmail
     When method POST

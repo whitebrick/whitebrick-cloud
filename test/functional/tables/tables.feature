@@ -20,21 +20,21 @@ Feature: Tables
 
   Scenario: Create columns in new DB tables
     * table columns 
-      | currentUserEmail                 | schemaName            | tableName    | columnName  | columnLabel | columnType
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "id"        | "ID"        | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "author_id" | "Author ID" | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "title"     | "Title"     | "text"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "body"      | "Body"      | "text"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "authors"    | "id"        | "ID"        | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "authors"    | "name"      | "Full Name" | "text"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "tags"       | "id"        | "ID"        | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "tags"       | "name"      | "Tag"       | "text"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_tags"  | "post_id"   | "Post ID"   | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_tags"  | "tag_id"    | "Tag ID"    | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_links" | "post_id"   | "Post ID"   | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_links" | "url"       | "Link URL"  | "text"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_pk"   | "Test PK"   | "integer"
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"   | "Test FK"   | "integer"
+      | currentUserEmail                 | schemaName            | tableName    | columnName  | columnLabel | columnType | isNotNullable
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "id"        | "ID"        | "integer"  | true
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "author_id" | "Author ID" | "integer"  | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "title"     | "Title"     | "text"     | true
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "posts"      | "body"      | "Body"      | "text"     | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "authors"    | "id"        | "ID"        | "integer"  | true
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "authors"    | "name"      | "Full Name" | "text"     | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "tags"       | "id"        | "ID"        | "integer"  | true
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "tags"       | "name"      | "Tag"       | "text"     | true
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_tags"  | "post_id"   | "Post ID"   | "integer"  | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_tags"  | "tag_id"    | "Tag ID"    | "integer"  | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_links" | "post_id"   | "Post ID"   | "integer"  | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_links" | "url"       | "Link URL"  | "text"     | false
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_pk"   | "Test PK"   | "integer"  | true
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"   | "Test FK"   | "integer"  | true
     * def result = call read("column-create.feature") columns
     * match each result[*].response contains { errors: "#notpresent" }
 
@@ -75,29 +75,29 @@ Feature: Tables
 
   Scenario: Relabel a column
     * table columns
-      | currentUserEmail                 | schemaName            | tableName    | columnName | newColumnName | newColumnLabel | newType
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"  | null          | "Relabelled"   | null
+      | currentUserEmail                 | schemaName            | tableName    | columnName | newColumnName | newColumnLabel | newType | newIsNotNullable
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"  | null          | "Relabelled"   | null    | null
     * def result = call read("column-update.feature") columns
     * match each result[*].response contains { errors: "#notpresent" }
 
   Scenario: Change a column type
     * table columns
-      | currentUserEmail                 | schemaName            | tableName    | columnName | newColumnName     | newColumnLabel | newType
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"  | null              | null           | "numeric"
+      | currentUserEmail                 | schemaName            | tableName    | columnName | newColumnName     | newColumnLabel | newType   | newIsNotNullable
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"  | null              | null           | "numeric" | null
     * def result = call read("column-update.feature") columns
     * match each result[*].response contains { errors: "#notpresent" }
 
   Scenario: Rename a column
     * table columns
-      | currentUserEmail                 | schemaName            | tableName    | columnName | newColumnName     | newColumnLabel | newType
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"  | "test_fk_renamed" | null           | null
+      | currentUserEmail                 | schemaName            | tableName    | columnName | newColumnName     | newColumnLabel | newType | newIsNotNullable
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk"  | "test_fk_renamed" | null           | null    | null
     * def result = call read("column-update.feature") columns
     * match each result[*].response contains { errors: "#notpresent" }
 
   Scenario: Delete a column
     * table columns
-      | currentUserEmail                 | schemaName            | tableName    | columnName        | del
-      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk_renamed" | null   
+      | currentUserEmail                 | schemaName            | tableName    | columnName        | del  | newIsNotNullable
+      | "test_daisy@test.whitebrick.com" | "test_the_daisy_blog" | "post_extra" | "test_fk_renamed" | null | null   
     * def result = call read("column-delete.feature") columns
     * match each result[*].response contains { errors: "#notpresent" }
 

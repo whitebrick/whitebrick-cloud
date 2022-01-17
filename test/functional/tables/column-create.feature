@@ -13,7 +13,7 @@ Feature:
           tableName: $tableName,
           columnName: $columnName,
           columnLabel: $columnLabel,
-          create: true
+          create: true,
           columnType: $columnType,
           isNotNullable: $isNotNullable,
           skipTracking: false,
