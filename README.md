@@ -131,7 +131,7 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
     ```
 
     Make sure your database can be accessed from psql before proceeding (you may need to enable username/password authentication in pg_hba.conf)
-    ie `-U <username> -h <host> -p <port> <db name>`
+    ie `$ psql -U <username> -h <host> -p <port> <db name>`
 
 2. **Run Hasura**
 
@@ -166,12 +166,12 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
 
     Change to the `./hasura` directory, copy `config-example.yaml` to `config.yaml` and complete with `HASURA_GRAPHQL_ADMIN_SECRET` from (2) above.
     This config is used for the Hasura CLI.
-    Now create the whitebrick-cloud schema "wb" by running `./scripts/apply_latest_migration.bash`.
-    After the migration is complete, change to the `./db` directory and run `./scripts/seed.bash` to insert the initial data.
+    Now create the whitebrick-cloud schema "wb" by running `$ bash ./scripts/apply_latest_migration.bash`.
+    After the migration is complete, change to the `./db` directory and run `$ bash ./scripts/seed.bash` to insert the initial data.
 
 6. **Run Serverless Listener**
 
-    Run `/start_dev.bash` to start the serverless listener in local/offline mode. By default this listens to http://localhost:3000/graphql
+    Run `$ bash scripts/start_dev.bash` to start the serverless listener in local/offline mode. By default this listens to http://localhost:3000/graphql
 
 7. **Track wb.table_permissions**
 
@@ -187,11 +187,11 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
 9. **Run Functional Tests**
 
     Download [Karate](https://github.com/intuit/karate#getting-started) (the [stand-alone executable](https://github.com/intuit/karate/wiki/ZIP-Release) is all that is needed).
-    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test/functional` directory and run the command `.bash`
+    Update `./test/functional/karate-config.js` with your Hasura endpoint URL from (2) above and then with Hasura running, change to the `./test/functional` directory and run the command `$ bash run_tests.bash`
 
     This creates a few test users and a small test schema `test_the_daisy_blog`. Whitebrick is designed for incremental building-out of databases whereas this testing creates a database all at once so it can take time to run - up to 10 minutes in some cases. If karate lags make sure Hasura and/or it's container has plenty of RAM.
 
-    To then add additional test data (northwind, chinook and DVD databases) as a second step run `.bash importDBs` - this can take a additional 15 minutes. Or run `.bash withImportDBs` to run both in one hit.
+    To then add additional test data (northwind, chinook and DVD databases) as a second step run `$ bash run_tests.bash importDBs` - this can take a additional 15 minutes. Or run `$ bash run_tests.bash withImportDBs` to run both in one hit.
 
 <!-- END:BACKEND_SETUP ================================================== -->
 
