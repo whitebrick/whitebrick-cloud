@@ -339,7 +339,8 @@ export const resolvers: IResolvers = {
       const result = await context.wbCloud.addExistingTable(
         currentUser,
         schemaName,
-        tableName
+        tableName,
+        true
       );
       if (!result.success) throw context.wbCloud.err(result);
       return result.success;

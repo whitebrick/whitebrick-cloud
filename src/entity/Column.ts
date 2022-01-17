@@ -36,6 +36,7 @@ export class Column {
   referencedBy!: [ConstraintId];
 
   public static egValueFromPgType(pgType: string) {
+    pgType = pgType.toLowerCase();
     if (!Object.keys(this.PG_TYPE_TO_COMMON_TYPE).includes(pgType)) {
       throw new Error(
         `pgType ${pgType} does not have an entry in Column.PG_TYPE_TO_COMMON_TYPE`

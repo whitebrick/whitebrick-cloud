@@ -4,7 +4,7 @@ import { DAL } from "./dal";
 import { BgQueue } from "./bg-queue";
 import { hasuraApi } from "./hasura-api";
 import { ConstraintId, schema, ServiceResult } from "./types";
-import v = require("voca");
+import v from "voca";
 import { environment, USER_MESSAGES } from "./environment";
 import {
   Column,
@@ -33,6 +33,9 @@ export const graphqlHandler = new ApolloServer({
 
 export const log: Logger = new Logger({
   minLevel: "debug",
+  displayFilePath: "hidden",
+  displayFunctionName: false,
+  displayLogLevel: false,
 });
 
 export class WhitebrickCloud {
@@ -1236,26 +1239,34 @@ export class WhitebrickCloud {
   ): Promise<ServiceResult> {
     log.info(`removeOrDeleteSchema(${cU.id},${schemaName},${del})`);
     if (await cU.cant("alter_schema", schemaName)) return cU.denied();
-    let result = await this.addOrRemoveAllExistingRelationships(
-      cU,
+    // -- this is now dropped all-at-once in removeOrDeleteSchema --
+    // let result = await this.addOrRemoveAllExistingRelationships(
+    //   cU,
+    //   schemaName,
+    //   undefined,
+    //   true
+    // );
+    // if (!result.success) return result;
+    // result = await this.dal.tables(schemaName);
+    // if (!result.success) return result;
+    // for (const table of result.payload) {
+    //   result = await this.removeOrDeleteTable(cU, schemaName, table.name, del);
+    //   if (!result.success) return result;
+    // }
+    // result = await this.dal.removeAllUsersFromSchema(schemaName);
+    // if (!result.success) return result;
+    const schemaResult = await this.schemaByName(cU, schemaName);
+    if (!schemaResult.success) return schemaResult;
+
+    let result = await this.untrackAllTables(cU, schemaName);
+
+    result = await this.bgQueue.removeAllForSchema(schemaResult.payload.id);
+    if (!result.success) return result;
+    return await this.dal.removeOrDeleteSchema(
       schemaName,
-      undefined,
-      true
+      schemaResult.payload.id,
+      del
     );
-    if (!result.success) return result;
-    result = await this.dal.tables(schemaName);
-    if (!result.success) return result;
-    for (const table of result.payload) {
-      result = await this.removeOrDeleteTable(cU, schemaName, table.name, del);
-      if (!result.success) return result;
-    }
-    result = await this.dal.removeAllUsersFromSchema(schemaName);
-    if (!result.success) return result;
-    result = await this.schemaByName(cU, schemaName);
-    if (!result.success) return result;
-    result = await this.bgQueue.removeAllForSchema(result.payload.id);
-    if (!result.success) return result;
-    return await this.dal.removeOrDeleteSchema(schemaName, del);
   }
 
   public async updateSchema(
@@ -1859,7 +1870,7 @@ export class WhitebrickCloud {
     if (!result.success) return result;
     const tableNames = result.payload;
     for (const tableName of tableNames) {
-      result = await this.addExistingTable(cU, schemaName, tableName);
+      result = await this.addExistingTable(cU, schemaName, tableName, true);
       if (!result.success) return result;
     }
     return result;
@@ -1868,9 +1879,12 @@ export class WhitebrickCloud {
   public async addExistingTable(
     cU: CurrentUser,
     schemaName: string,
-    tableName: string
+    tableName: string,
+    withColumns?: boolean
   ): Promise<ServiceResult> {
-    log.info(`addExistingTable(${cU.id},${schemaName},${tableName})`);
+    log.info(
+      `addExistingTable(${cU.id},${schemaName},${tableName},${withColumns})`
+    );
     if (await cU.cant("alter_schema", schemaName)) {
       return cU.denied();
     }
@@ -1881,7 +1895,8 @@ export class WhitebrickCloud {
       v.titleCase(tableName.toString().replace(/_/g, " ")),
       false
     );
-    if (!tableResult.success) return tableResult;
+    // stop here if not adding columns
+    if (!withColumns || !tableResult.success) return tableResult;
     let result = await this.untrackTableWithPermissions(
       cU,
       tableResult.payload,
@@ -2259,7 +2274,8 @@ export class WhitebrickCloud {
 
   public async trackTable(
     cU: CurrentUser,
-    table: Table
+    table: Table,
+    untrackFirst?: boolean
   ): Promise<ServiceResult> {
     log.info(`trackTable(${cU.id},${JSON.stringify(table)})`);
     if (await cU.cant("alter_table", table.id)) {
@@ -2268,13 +2284,12 @@ export class WhitebrickCloud {
     if (!table.schemaName) {
       return errResult({ message: "schemaName not set" } as ServiceResult);
     }
-    let result = await hasuraApi.trackTable(table.schemaName, table.name);
-    if (!result.success) return result;
-    // return await this.addOrRemoveAllExistingRelationships(
-    //   cU,
-    //   table.schemaName,
-    //   table.name
-    // );
+    let result = errResult();
+    if (untrackFirst) {
+      result = await this.untrackTable(cU, table);
+      if (!result.success) return result;
+    }
+    result = await hasuraApi.trackTable(table.schemaName, table.name);
     return result;
   }
 
@@ -2332,8 +2347,9 @@ export class WhitebrickCloud {
       );
     } else {
       let fn = "bgTrackAndAddDefaultTablePermissions";
-      if (resetPermissions)
+      if (resetPermissions) {
         fn = "bgTrackAndRemoveAndAddDefaultTablePermissions";
+      }
       result = await this.bgQueue.queue(cU.id, table.schemaId, fn, {
         schemaName: table.schemaName,
         tableName: table.name,

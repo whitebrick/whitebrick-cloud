@@ -120,7 +120,7 @@ class HasuraApi {
         schema: schemaName,
         name: tableName,
       },
-      cascade: true,
+      cascade: true, // Drops all dependent objects
     });
     if (
       !result.success &&

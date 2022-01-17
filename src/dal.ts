@@ -126,9 +126,17 @@ export class DAL {
     schemaId: number,
     status: string,
     key: string,
-    data?: object | null
+    data?: any | null,
+    dependencies?: Record<string, any>[] | null
   ): Promise<ServiceResult> {
-    if (!data) data = null;
+    if (!data) {
+      if (!dependencies) {
+        data = null;
+      } else {
+        data = {};
+      }
+    }
+    if (data && dependencies) data.dependencies = dependencies;
     const result = await this.executeQuery({
       query: `
         INSERT INTO wb.bg_queue(
@@ -1356,15 +1364,60 @@ export class DAL {
 
   public async removeOrDeleteSchema(
     schemaName: string,
+    schemaId: number,
     del?: boolean
   ): Promise<ServiceResult> {
     const queriesAndParams: Array<QueryParams> = [
       {
         query: `
-          DELETE FROM wb.schemas
-          WHERE name=$1
+          DELETE FROM wb.columns
+          WHERE table_id IN (
+            SELECT id FROM wb.tables
+            WHERE schema_id=$1
+          );
         `,
-        params: [schemaName],
+        params: [schemaId],
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.table_permissions
+          WHERE table_id IN (
+            SELECT id FROM wb.tables
+            WHERE schema_id=$1
+          );
+        `,
+        params: [schemaId],
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.table_users
+          WHERE table_id IN (
+            SELECT id FROM wb.tables
+            WHERE schema_id=$1
+          );
+        `,
+        params: [schemaId],
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.tables
+          WHERE schema_id=$1
+        `,
+        params: [schemaId],
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.schema_users
+          WHERE schema_id=$1
+        `,
+        params: [schemaId],
+      } as QueryParams,
+      {
+        query: `
+          DELETE FROM wb.schemas
+          WHERE id=$1
+        `,
+        params: [schemaId],
       } as QueryParams,
     ];
     if (del) {
@@ -2311,10 +2364,13 @@ export class DAL {
     schemaName = DAL.sanitize(schemaName);
     tableName = DAL.sanitize(tableName);
     columnName = DAL.sanitize(columnName);
-    if (!columnPGType) columnPGType = "TEXT";
+    if (!columnPGType) columnPGType = "text";
     let sqlNotNull = "";
-    // TBD type null placeholders
-    if (isNotNullable) sqlNotNull = "DEFAULT '' NOT NULL";
+    if (isNotNullable) {
+      sqlNotNull = `DEFAULT '${Column.egValueFromPgType(
+        columnPGType
+      )}' NOT NULL`;
+    }
     let result = await this.tableBySchemaNameTableName(schemaName, tableName);
     if (!result.success) return result;
     const queriesAndParams: Array<QueryParams> = [

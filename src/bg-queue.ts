@@ -6,6 +6,7 @@ import { CurrentUser } from "./entity/CurrentUser";
 import Lambda from "aws-sdk/clients/lambda";
 import axios, { AxiosResponse } from "axios";
 import { mailer } from "./mailer";
+import v from "voca";
 
 export class BgQueue {
   dal: DAL;
@@ -20,6 +21,10 @@ export class BgQueue {
 
   static TABLE_BUSY_KEYS: string[] = [
     "bgImportSchema",
+    "bgImportTable",
+    "bgImportColumn",
+    "bgImportAllRelationships",
+    "bgSetAllTablePermissions",
     "bgRemoveSchema",
     "bgRetrackSchema",
     "bgTrackAndAddDefaultTablePermissions",
@@ -49,16 +54,62 @@ export class BgQueue {
     userId: number,
     schemaId: number,
     key: string,
-    data?: object
+    data?: object,
+    dependencies?: Record<string, any>[]
   ): Promise<ServiceResult> {
-    log.info(`bgQueue.queue(${key},${data})`);
+    log.info(`bgQueue.queue(${schemaId},${key},${data},${dependencies})`);
     return await this.dal.bgQueueInsert(
       userId,
       schemaId,
       BgQueue.BG_STATUS.pending,
       key,
-      data
+      data,
+      dependencies
     );
+  }
+
+  public async queueNextDependency(
+    dependencies: Record<string, any>[]
+  ): Promise<ServiceResult> {
+    log.info(`bgQueue.queueNextDependency(${dependencies})`);
+    if (dependencies.length == 0) {
+      log.info(`dependencies list == 0, returning`);
+      return { success: true } as ServiceResult;
+    }
+    const nextJob = dependencies.shift();
+    if (!nextJob) {
+      return errResult({
+        message: "Next job in dependencies list is not defined",
+      }) as ServiceResult;
+    }
+    return await this.queue(
+      nextJob.userId,
+      nextJob.schemaId,
+      nextJob.key,
+      nextJob.data,
+      dependencies
+    );
+  }
+
+  public static newDependenicesList(): Record<string, any>[] {
+    const dependencies: Record<string, any>[] = [];
+    return dependencies;
+  }
+
+  public static addDepndentToDependenciesList(
+    dependenciesList: Record<string, any>[],
+    userId: number,
+    schemaId: number,
+    key: string,
+    data?: object
+  ): Record<string, any>[] {
+    dependenciesList.push({
+      userId: userId,
+      schemaId: schemaId,
+      key: key,
+      data: data,
+    });
+    return dependenciesList;
   }
 
   public async removeAllForSchema(schemaId: number): Promise<ServiceResult> {
@@ -104,17 +155,17 @@ export class BgQueue {
   public async process(schemaId: number): Promise<ServiceResult> {
     log.info(`bgQueue.process(${schemaId})`);
     // 1. Is process already running?
-    const isRunningResult = await this.dal.bgQueueSelect(
-      ["id"],
-      schemaId,
-      BgQueue.BG_STATUS.running,
-      1
-    );
-    if (!isRunningResult.success) return isRunningResult;
-    if (isRunningResult.payload.rows.length == 1) {
-      log.info(`bgQueue.process - already running`);
-      return { success: true } as ServiceResult;
-    }
+    // const isRunningResult = await this.dal.bgQueueSelect(
+    //   ["id"],
+    //   schemaId,
+    //   BgQueue.BG_STATUS.running,
+    //   1
+    // );
+    // if (!isRunningResult.success) return isRunningResult;
+    // if (isRunningResult.payload.rows.length == 1) {
+    //   log.info(`bgQueue.process - already running`);
+    //   return { success: true } as ServiceResult;
+    // }
     // 2. Lock pending jobs with status=running so no other process starts
     const setRunningResult = await this.dal.bgQueueUpdateStatus(
       BgQueue.BG_STATUS.running,
@@ -126,6 +177,7 @@ export class BgQueue {
     // 3. Process each running job but lookup after each iteration
     // in case more jobs are added while running
     let running = true;
+    let newDependencyQueued = false;
     while (running) {
       const bgJobFetchResult = await this.dal.bgQueueSelect(
         ["id", "key", "data"],
@@ -137,9 +189,10 @@ export class BgQueue {
       log.info(`  - bgJobFetchResult=${JSON.stringify(bgJobFetchResult)}`);
       if (bgJobFetchResult.payload.rows.length == 0) {
         log.info(`  - no jobs left to run`);
-        return { success: true } as ServiceResult;
+        break;
       }
       const bgJobProcessResult = await this.bgRun(
+        schemaId,
         bgJobFetchResult.payload.rows[0].id,
         bgJobFetchResult.payload.rows[0].key,
         bgJobFetchResult.payload.rows[0].data
@@ -163,11 +216,24 @@ export class BgQueue {
         bgJobFetchResult.payload.rows[0].id
       );
       if (!setSuccessResult.success) return setSuccessResult;
+      // if this job has dependencies (subsequent jobs) queue the next for processing
+      if (bgJobFetchResult.payload.rows[0].data.dependencies) {
+        const queueDependencyResult = await this.queueNextDependency(
+          bgJobFetchResult.payload.rows[0].data.dependencies
+        );
+        if (!queueDependencyResult.success) return queueDependencyResult;
+        newDependencyQueued = true;
+      }
+    }
+    if (newDependencyQueued) {
+      log.info(`  - new dependency was queued from process, invoking...`);
+      const dependencyQueuedResult = await this.invoke(schemaId);
     }
     return { success: true } as ServiceResult;
   }
 
   public async bgRun(
+    schemaId: number,
     id: number,
     key: string,
     data: Record<string, any>
@@ -175,16 +241,90 @@ export class BgQueue {
     log.info(`  bgQueue.bgRun - running job id=${id} key=${key} data=${data}`);
     let result: ServiceResult = errResult();
     const cU = CurrentUser.getSysAdmin();
+    let newDependencyQueued = false;
     switch (key) {
       case "bgImportSchema":
-        result = await this.wbCloud.addAllExistingTables(cU, data.schemaName);
-        if (!result.success) break;
+        const tablesResult = await this.dal.discoverTables(data.schemaName);
+        if (!tablesResult.success) return tablesResult;
+
+        let jobs = BgQueue.newDependenicesList();
+        for (const tableName of tablesResult.payload) {
+          jobs = BgQueue.addDepndentToDependenciesList(
+            jobs,
+            cU.id,
+            schemaId,
+            "bgImportTable",
+            { schemaName: data.schemaName, tableName: tableName }
+          );
+
+          const colsResult = await this.dal.discoverColumns(
+            data.schemaName,
+            tableName
+          );
+          if (!colsResult.success) return colsResult;
+          for (const column of colsResult.payload) {
+            jobs = BgQueue.addDepndentToDependenciesList(
+              jobs,
+              cU.id,
+              schemaId,
+              "bgImportColumn",
+              {
+                schemaName: data.schemaName,
+                tableName: tableName,
+                columnName: column.name,
+              }
+            );
+          }
+        }
+
+        jobs = BgQueue.addDepndentToDependenciesList(
+          jobs,
+          cU.id,
+          schemaId,
+          "bgImportAllRelationships",
+          { schemaName: data.schemaName }
+        );
+
+        jobs = BgQueue.addDepndentToDependenciesList(
+          jobs,
+          cU.id,
+          schemaId,
+          "bgSetAllTablePermissions",
+          { schemaName: data.schemaName }
+        );
+
+        result = await this.queueNextDependency(jobs);
+        newDependencyQueued = true;
+        break;
+      case "bgImportTable":
+        result = await this.wbCloud.addExistingTable(
+          cU,
+          data.schemaName,
+          data.tableName
+          // do not add columns
+        );
+        break;
+      case "bgImportColumn":
+        result = await this.wbCloud.addOrCreateColumn(
+          cU,
+          data.schemaName,
+          data.tableName,
+          data.columnName,
+          v.titleCase(data.columnName.toString().replace(/_/g, " ")),
+          false,
+          undefined,
+          undefined,
+          false,
+          true // skip tracking
+        );
+        break;
+      case "bgImportAllRelationships":
         result = await this.wbCloud.addOrRemoveAllExistingRelationships(
           cU,
           data.schemaName
         );
-        if (!result.success) break;
-        // reset the roles now that new tables exist
+        break;
+      case "bgSetAllTablePermissions":
         result = await this.wbCloud.deleteAndSetTablePermissions(
           cU,
           undefined,
@@ -243,7 +383,7 @@ export class BgQueue {
           data.tableName
         );
         if (!result.success) break;
-        result = await this.wbCloud.trackTable(cU, result.payload);
+        result = await this.wbCloud.trackTable(cU, result.payload, true);
         if (!result.success) break;
         result = await this.wbCloud.removeDefaultTablePermissions(
           cU,
@@ -258,7 +398,7 @@ export class BgQueue {
           data.tableName
         );
         if (!result.success) break;
-        result = await this.wbCloud.trackTable(cU, result.payload);
+        result = await this.wbCloud.trackTable(cU, result.payload, true);
         if (!result.success) break;
         result = await this.wbCloud.addOrRemoveAllExistingRelationships(
           cU,
@@ -314,6 +454,10 @@ export class BgQueue {
           error: result,
         }
       );
+    }
+    if (newDependencyQueued) {
+      log.info(`  - new dependency was queued from bgRun, invoking...`);
+      const dependencyQueuedResult = await this.invoke(schemaId);
     }
     log.info(`  bgQueue.bgRun - returning result=${result}`);
     return result;
