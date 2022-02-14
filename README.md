@@ -2,6 +2,8 @@
 
 # whitebrick-cloud (back end) BETA
 
+(See [whitebrick](https://github.com/whitebrick/whitebrick) for the front end repo)
+
 <!-- START:HEADER ================================================== -->
 
 ### Instant front end for your existing Database
