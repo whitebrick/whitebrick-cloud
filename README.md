@@ -56,7 +56,7 @@ Whitebrick is licensed under the MIT License however dependency licenses vary.
 
 <!-- START:SUMMARY ================================================== -->
 
-The Whitebrick No Code DB comprises a front end Gatsby Jamstack client and back end Serverless application (whitebrick-cloud) that adds multi-tenant DDL and access control functions to a Database via the Hasura GraphQL Server. The Jamstack client uses [AG Grid](https://ag-grid.com/) as a spreadsheet-like UI that reads/writes table data directly from/to Hasura over GraphQL. Additional functions including DDL are provided by whitebrick-cloud Serverless functions that are exposed through the Hasura endpoint via schema stitching.
+The Whitebrick No Code DB (Data Repository) comprises a front end Gatsby Jamstack client ([whitebrick-client](https://github.com/whitebrick/whitebrick-client)) and back end Serverless application ([whitebrick-cloud](https://github.com/whitebrick/whitebrick-cloud)) that adds multi-tenant DDL and access control functions to a Database via the [Hasura](https://github.com/hasura/graphql-engine) GraphQL Server. The Jamstack client uses [AG Grid](https://ag-grid.com/) as a spreadsheet-like UI that reads/writes table data directly from/to Hasura over GraphQL. Additional functions including DDL are provided by whitebrick-cloud Serverless functions that are exposed through the Hasura endpoint via schema stitching.
 
 <!-- END:SUMMARY ================================================== -->
 
@@ -66,18 +66,15 @@ The Whitebrick No Code DB comprises a front end Gatsby Jamstack client and back 
 
 ### Hasura
 
-Hasura is a server application that automatically wraps a GraphQL API around a standard relational database.
-Hasura is written in Haskell and can be easily deployed directly from a Docker image.
-The server comes with a web GUI admin console that allows the underlying database to be browsed and _Tracked_ so that it can be accessed over GraphQL.
-Hasura also provides a WebSocket endpoint for subscription queries.
+Hasura is an Open Source server application that automatically wraps a GraphQL API around a standard relational database.
 
 **Database Queries**
 
-Whitebrick queries Hasura to display table data and to update table records. When table data is queried, paginated, sorted and updated (mutated) this is all managed by Hasura over GraphQL.
+Whitebrick queries Hasura to display table data and to update table records. When table data is queried, paginated, sorted and updated (mutated) this is processed by Hasura over GraphQL.
 
-**Schema Stitching**
+**Schema Stitching & Remote Joins**
 
-Hasura can also _stitch_ schemas together and pass requests on to other external endpoints. When Whitebrick requests DDL functions such as adding a new table or column, Hasura passes this request on to the Whitebrick Cloud Serverless app and then returns the response through the same single GraphQL endpoint.
+Hasura also supports stitching schemas and passing requests on to other external endpoints. When Whitebrick requests DDL functions such as adding a new table or column, Hasura passes this request on to the Whitebrick Cloud Serverless app and then returns the response through the same single GraphQL endpoint.
 
 **Metadata API**
 
@@ -85,15 +82,15 @@ Hasura provides a separate HTTP API that allows database metadata to be programm
 
 **Authentication & Authorization**
 
-Because Hasura stitches together multiple APIs under the one unified endpoint it is well placed to manage authentication and authorization. Hasura integrates with authentication providers such as Auth0 by checking for role variables encoded in JWTs with each request. Hasura also provides functionality to set permissions at a column level so checks can be configured to look-up user records for authorization.
+Because Hasura stitches together multiple APIs under the one unified endpoint it is well placed to manage authentication and authorization. Hasura checks for credentials in a JWT issued by a third-party authentication provider.
 
-### Whitebrick Cloud (back end)
+### Whitebrick Cloud
 
-The Whitebrick Cloud back end is a set of functions written in Javascript using the Apollo GraohQL interface and executed on a Serverless provider. Whitebrick Cloud connects with a database to make DDL calls such as creating new tables and columns. After mofifying the database Whitebrick Cloud then calls the Hasura Metadata API to _track_ the corresponding columns and tables. Whitebrick Cloud also manages additional metadata, background jobs, user permissions and settings, persisting them in a dedicated schema.
+The Whitebrick Cloud back end is a set of functions written in Javascript using the Apollo GraohQL interface and executed on a Serverless provider. Whitebrick Cloud connects with a database to make DDL calls such as creating new tables and columns. After modifying the database Whitebrick Cloud then calls the Hasura Metadata API to _track_ the corresponding columns and tables. Whitebrick Cloud also manages additional metadata, background jobs, user permissions and settings, persisting them in a dedicated schema.
 
-### Whitebrick (front end)
+### Whitebrick Client
 
-The Whitebrick front end is statically compiled Jamstack client written in Gatsby/React/Javascipt and uses AG Grid as the data grid GUI. Whitebrick sends GraphQL queries and mutations to the Hasura endpoint and displays the returned data. Because the client is statically compiled it can be easily customized by front end developers and deployed to any web site host.
+The Whitebrick front end is statically compiled Jamstack client written in Gatsby/React and uses AG Grid as the data grid GUI. Whitebrick sends GraphQL queries and mutations to the Hasura endpoint and displays the returned data. Because the client is statically compiled it can be easily customized by front end developers and deployed to any web site host.
 
 <!-- END:TECHNICAL_OVERVIEW ================================================== -->
 
@@ -105,8 +102,7 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
 
 ### Deploying on a Cloud Service
 
--   AWS CloudFormation Stack - in progress
--   Heroku, Azure, DigitalOcean - TBD
+-   Refer to Hasura and Serverless documentation
 
 ### Running Locally
 

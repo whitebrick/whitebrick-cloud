@@ -8,13 +8,12 @@ fi
 
 # for osx: brew install gnu-sed; brew info gnu-sed
 
-FROM_FILES="../whitebrick-web/docs/docs/*.md"
+FROM_FILES="../whitebrick-web/docs/platform/documentation/repository/*.md"
 TO_FILE="README.md"
 #FROM_IMAGES="../whitebrick-web/docs/assets/whitebrick-*.png"
 #TO_IMAGES="doc/"
 
 PARTIALS=(
-  "LICENSING"
   "SUMMARY"
   "TECHNICAL_OVERVIEW"
   "BACKEND_SETUP"
