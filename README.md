@@ -189,3 +189,7 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
 - [Medium](https://towardsdatascience.com/towards-a-modern-lims-dynamic-tables-no-code-databases-and-serverless-validations-8dea03416105)
 
 <!-- END:LINKS ================================================== -->
+
+## Contributing
+
+- Questions, comments, suggestions and contributions welcome - contact: _hello_ at _whitebrick_ dot _com_
