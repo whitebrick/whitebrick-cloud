@@ -180,6 +180,10 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
 
 <!-- END:BACKEND_SETUP ================================================== -->
 
+## Contributing
+
+- Questions, comments, suggestions and contributions welcome - contact: _hello_ at _whitebrick_ dot _com_
+
 ---
 
 <!-- START:LINKS ================================================== -->
