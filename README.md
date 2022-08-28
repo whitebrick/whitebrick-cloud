@@ -2,6 +2,10 @@
 
 # whitebrick-cloud No Code DB
 
+
+### :warning: **This project is no longer maintained**
+---
+
 (See [whitebrick-client](https://github.com/whitebrick/whitebrick-client) for front end)
 
 <!-- START:HEADER ================================================== -->
@@ -50,7 +54,7 @@ Whitebrick is licensed under the MIT License however dependency licenses vary.
 #### Overview
 
 - See [https://github.com/whitebrick/whitebrick-client](https://github.com/whitebrick/whitebrick-client) for front end
-- [Documentation](https://hello.whitebrick.com/platform/documentation/)
+- [Documentation](https://hello.whitebrick.com/integration-platform/documentation/)
 
 ![system diagram](https://hello.whitebrick.com/assets/whitebrick-no-code-db-diagram.png)
 
@@ -188,7 +192,7 @@ The Whitebrick front end is statically compiled Jamstack client written in Gatsb
 
 <!-- START:LINKS ================================================== -->
 
-- [Documentation](https://hello.whitebrick.com/platform/documentation/)
+- [Documentation](https://hello.whitebrick.com/integration-platform/documentation/)
 - [Discord](https://discord.gg/FPvjPCYt)
 - [Medium](https://towardsdatascience.com/towards-a-modern-lims-dynamic-tables-no-code-databases-and-serverless-validations-8dea03416105)
 
